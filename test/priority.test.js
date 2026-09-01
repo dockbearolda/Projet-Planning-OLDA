@@ -149,8 +149,20 @@ assert.strictEqual(daysUntil('pas une date', NOW), null, 'date invalide = null')
 // 5. machineOf : sous-étape de production prioritaire ; sinon technique de la
 //    fiche ; sinon rien.
 assert.strictEqual(machineOf(mk({ sub_stage: 'prod_dtf' })), 'dtf');
+// « DÉCOUPE & CONTRÔLE DTF » EST DU TRAVAIL DTF (01/09/2026). C'était la seule
+// des sept sous-étapes de production à NOMMER un poste dans son intitulé sans y
+// être rattachée : elle retombait sur la technique de la fiche, donc sur RIEN
+// pour un dossier qui n'en a pas — c'est-à-dire la plupart. L'importance d'une
+// machine goulot ne pesait jamais sur elle, alors que c'est le même poste et la
+// même file d'attente que « Production DTF » juste au-dessus.
+assert.strictEqual(machineOf(mk({ sub_stage: 'decoupe_dtf' })), 'dtf',
+  'découper le DTF se fait au poste DTF : le goulot doit peser là aussi');
 assert.strictEqual(machineOf(mk({ sub_stage: 'prod_pressage' })), 'presse');
 assert.strictEqual(machineOf(mk({ sub_stage: 'prod_uv' })), 'uv');
+// Les deux dernières ne nomment aucun poste : elles restent à la technique de
+// la fiche, et sans elle une ligne n'a PAS de machine. On ne lui en invente pas.
+assert.strictEqual(machineOf(mk({ sub_stage: 'montage_finition' })), null);
+assert.strictEqual(machineOf(mk({ sub_stage: 'controle_emballage' })), null);
 assert.strictEqual(
   machineOf(mk({ fiche: { articles: [{ zones: [{ technique: 'laser' }] }] } })), 'trotec',
   'la gravure laser de la fiche pointe la Trotec',

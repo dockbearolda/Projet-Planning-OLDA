@@ -771,19 +771,12 @@ async function selectStage(slug, sub = null, forcerRelecture = false) {
   syncTabForStage(slug, sub ?? null);
   currentStage = slug;
   currentSub = sub ?? null;
-  // LE RAIL RELÂCHE LA MACHINE. Le rail coupe la phase par étape du parcours,
-  // la rangée la coupe par poste de travail : ce sont deux façons de regarder
-  // la MÊME phase, jamais deux filtres qu'on empile (voir la rangée des
-  // machines). Sans cette ligne, cliquer « Pressage » dans le rail en gardant
-  // le filtre DTF donnait une liste vide sous un compteur qui annonçait douze.
-  currentMachine = null;
   sort = { key: null, dir: 1 };
   // Réponse immédiate au clic : entête + surbrillance (c'est ce qu'on a cliqué,
   // donc jamais périmé). Le reste (colonnes, lignes, animation) suit la donnée.
   $stageTitle.textContent = currentViewLabel();
   updateStageLink(slug);
   updateFiverrTool(slug);
-  renderMachines();
   paintSidebarActive();
   // Changer de sous-catégorie DANS la même famille ne recharge rien : les lignes
   // de la famille sont déjà en mémoire, on ne fait que re-filtrer (instantané).
@@ -1000,205 +993,6 @@ function belongsToCurrentView(r) {
   return (r.sub_stage ?? null) === currentSub;
 }
 
-// ===========================================================================
-// CE QU'IL Y A À PRODUIRE, MACHINE PAR MACHINE (01/09/2026)
-// ===========================================================================
-// « Je veux voir en un clic ce que j'ai à produire sur chaque machine : DTF,
-// Trotec, impression UV. »
-//
-// PAS D'ÉCRAN NEUF, PAS DE TRI NEUF, PAS DE DONNÉE NEUVE. Tout existait :
-//   · le REGISTRE des machines est un réglage du patron (app_meta.machines,
-//     GET /api/machines) — nom, importance de 1 à 5, coût horaire ;
-//   · le RATTACHEMENT d'une ligne à sa machine est `machineOf` (priority.js) :
-//     la sous-étape de production d'abord (prod_dtf → dtf), la technique de
-//     marquage de la fiche ensuite ;
-//   · l'ORDRE est `rankRequests`, le moteur que le Point du jour emploie déjà.
-// Il ne manquait que le POINT DE VUE, et un point de vue se pose sur l'écran
-// où les lignes sont déjà.
-//
-// TROIS DÉCISIONS, ET CHACUNE ÉVITE UN MENSONGE :
-//
-//   · LA RANGÉE NE PARAÎT QUE SUR LA PHASE PRODUCTION. Ailleurs, « à produire »
-//     ne veut rien dire : une machine se lit sur un dossier en chiffrage (le
-//     moteur s'en sert pour peser un poste goulot dès le devis), mais personne
-//     ne va au poste DTF chercher un devis à envoyer.
-//
-//   · LE COMPTEUR PORTE SUR LA PHASE ENTIÈRE, jamais sur la tranche affichée.
-//     C'est ce qu'on demande de lui : se lire SANS ouvrir le filtre. Un
-//     compteur qui annonce 12 doit donc en montrer 12 quand on le clique —
-//     d'où la décision suivante.
-//
-//   · UNE MACHINE REMPLACE LA SOUS-ÉTAPE, elle ne s'y ajoute pas. Les deux
-//     coupent la MÊME phase, autrement : le rail la coupe par étape du
-//     parcours, la rangée la coupe par poste de travail. Empilées, la pilule
-//     annoncerait plus de lignes qu'elle n'en montre. Choisir une machine
-//     relâche donc la sous-étape, et cliquer une étape du rail relâche la
-//     machine.
-//
-// LE MOTEUR ARRIVE À LA DEMANDE. `priority.js` pèse 10 Ko et il avait été
-// SORTI du préchargement de la coquille le 29/08, précisément parce que seul
-// le Point du jour le tirait — un écran que bien des postes n'ouvrent jamais.
-// On ne le remet pas sur le chemin de l'ouverture : il se charge au premier
-// passage en Production, en même temps que le registre, et le service worker
-// l'a déjà de côté (voir COQUILLE dans sw.js).
-const MACHINE_STAGE = 'production';
-
-let machines = [];            // le registre, tel que le patron l'a réglé
-let machinesEnVol = null;     // la promesse en cours (une seule à la fois)
-let machineOf = null;         // priority.js — chargé avec le registre
-let rankRequests = null;      // idem : l'ordre ne se réécrit pas ici
-let currentMachine = null;    // le poste regardé (null = toute la phase)
-
-// Le registre ET le moteur, ensemble : la rangée n'a de sens qu'avec les deux
-// (des noms sans rattachement ne compteraient rien). Un échec ne fige pas la
-// prochaine tentative — on relâche la promesse pour que le passage suivant
-// réessaie, plutôt que de garder une promesse rejetée pour l'éternité.
-function chargerMachines() {
-  if (machinesEnVol) return machinesEnVol;
-  machinesEnVol = Promise.all([api('GET', '/api/machines'), import('./priority.js')])
-    .then(([liste, moteur]) => {
-      machines = Array.isArray(liste) ? liste : [];
-      machineOf = moteur.machineOf;
-      rankRequests = moteur.rankRequests;
-    })
-    .catch((err) => { machinesEnVol = null; throw err; });
-  return machinesEnVol;
-}
-
-// UNE LIGNE SANS POSTE N'ENTRE DANS AUCUNE FILE, et c'est exact : le montage,
-// le contrôle & emballage d'un dossier sans technique connue ne se font à
-// aucune machine. C'est pour ça que la somme des pilules peut être inférieure
-// au compte de l'étape — on ne leur invente pas un poste pour faire l'appoint.
-
-// Le filtre EN VIGUEUR. Il ne suffit pas qu'une machine ait été cliquée : on
-// peut avoir quitté la phase depuis, et le moteur peut n'être pas revenu.
-const machineActive = () => (
-  currentStage === MACHINE_STAGE && currentMachine && machineOf ? currentMachine : null
-);
-
-const nomMachine = (slug) => {
-  const m = machines.find((x) => x.slug === slug);
-  return m ? m.name : slug;
-};
-
-// Combien de lignes par poste, sur TOUTE la phase chargée (`rows` porte la
-// famille entière, la sous-étape n'en filtre que l'affichage).
-function comptesParMachine() {
-  const par = new Map();
-  if (!machineOf) return par;
-  for (const r of rows) {
-    const m = machineOf(r);
-    if (m) par.set(m, (par.get(m) ?? 0) + 1);
-  }
-  return par;
-}
-
-// LES LIGNES D'UN POSTE, DANS L'ORDRE DU MOTEUR — pas dans un tri inventé ici.
-// `rankRequests` rend les trois bacs qu'il a toujours rendus, et on les pose
-// dans SON ordre de lecture : ce qu'il y a à faire maintenant, puis ce qui est
-// bloqué, puis ce qui attend le client. Concaténer n'est pas trier : chaque
-// bac garde le classement que le moteur lui a donné.
-function ordreMachine(slug) {
-  const lignes = rows.filter((r) => machineOf(r) === slug);
-  if (!rankRequests) return lignes;
-  const { queue, blocked, waiting } = rankRequests(lignes, machines, { now: Date.now() });
-  return [...queue.map((q) => q.r), ...blocked, ...waiting];
-}
-
-const $machines = document.getElementById('machines');
-let rangeeMontee = null;      // les slugs déjà montés, pour ne pas tout refaire
-const machineEls = new Map(); // slug → { btn, n }
-
-function choisirMachine(slug) {
-  const veut = currentMachine === slug ? null : slug;
-  currentMachine = veut;
-  // La machine REMPLACE la sous-étape (voir l'en-tête) : sans ça, la pilule
-  // annoncerait la phase entière et n'en montrerait qu'une étape.
-  if (veut && currentSub !== null) {
-    currentSub = null;
-    $stageTitle.textContent = currentViewLabel();
-    paintSidebarActive();
-  }
-  // L'ordre manuel de l'étape ne s'applique pas ici : le bouton qui propose d'y
-  // revenir n'aurait rien à annuler tant qu'on regarde un poste.
-  renderOrdreReset();
-  applySortAndRender();
-  remonterLaListe();
-  playStageEnter();
-}
-
-function renderMachines() {
-  if (!$machines) return;
-  if (currentStage !== MACHINE_STAGE) {
-    $machines.hidden = true;
-    return;
-  }
-  if (!machines.length) {
-    // Premier passage en Production : on va chercher le registre et le moteur,
-    // puis on repasse ici. La rangée reste absente entre-temps — elle ne
-    // clignote pas et ne pousse rien, elle arrive avec la liste.
-    chargerMachines().then(() => { renderMachines(); }).catch(() => {});
-    return;
-  }
-  // ON NE COMPTE PAS SUR LES LIGNES DE L'ÉTAPE PRÉCÉDENTE. `selectStage` pose
-  // l'en-tête tout de suite (c'est ce qu'on vient de cliquer), mais `rows`
-  // porte encore la famille qu'on quitte tant que la réponse n'est pas là —
-  // la rangée aurait annoncé les machines du chiffrage sous le titre
-  // « Production ». `lastRowsSig` est justement remise à vide le temps du
-  // chargement (voir selectStage).
-  if (!lastRowsSig) { $machines.hidden = true; return; }
-  const voulus = machines.map((m) => m.slug).join(',');
-  if (rangeeMontee !== voulus) {
-    machineEls.clear();
-    $machines.replaceChildren(...machines.map((m) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      // `.action-ligne` est la commande posée dans une rangée, celle de la
-      // charte : même boîte que « revenir au tri » à deux centimètres de là.
-      btn.className = 'action-ligne machine';
-      btn.dataset.machine = m.slug;
-      const nom = document.createElement('span');
-      nom.textContent = m.name;
-      const n = document.createElement('span');
-      n.className = 'machine__n';
-      btn.append(nom, n);
-      btn.addEventListener('click', () => choisirMachine(m.slug));
-      machineEls.set(m.slug, { btn, n });
-      return btn;
-    }));
-    rangeeMontee = voulus;
-  }
-  const par = comptesParMachine();
-  for (const [slug, { btn, n }] of machineEls) {
-    const c = par.get(slug) ?? 0;
-    const actif = currentMachine === slug;
-    n.textContent = String(c);
-    btn.classList.toggle('is-vide', c === 0 && !actif);
-    btn.classList.toggle('is-actif', actif);
-    btn.setAttribute('aria-pressed', actif ? 'true' : 'false');
-    // `attachTip` pose aussi le nom accessible : le compteur en fait partie,
-    // comme pour une entrée du rail — « DTF, 12 lignes à produire ».
-    const combien = `${c} ligne${c > 1 ? 's' : ''} à produire`;
-    attachTip(btn, actif
-      ? `${nomMachine(slug)} — ${combien}, dans l’ordre du moteur de priorité. Cliquer pour enlever le filtre.`
-      : `${nomMachine(slug)} — ${combien}. Cliquer pour ne garder que ce poste.`);
-  }
-  $machines.hidden = false;
-}
-
-// Le patron vient de rerégler ses machines (Réglages) : la rangée suit sans
-// rechargement. Un poste supprimé ne peut pas rester le filtre en vigueur.
-function machinesRerelues(liste) {
-  if (!Array.isArray(liste)) return;
-  machines = liste;
-  if (currentMachine && !machines.some((m) => m.slug === currentMachine)) {
-    currentMachine = null;
-    applySortAndRender();
-    return;
-  }
-  renderMachines();
-}
-
 // --- Tri -------------------------------------------------------------------
 // ORDRE MANUEL, PAR ÉTAPE. Le planning s'ouvre sur un tri automatique (priorité,
 // puis urgence) : c'est le bon défaut, personne n'a rien à ranger le premier
@@ -1345,16 +1139,8 @@ function applySortAndRender() {
   // On trie AVANT de filtrer : la tranche affichée est donc toujours une
   // sous-séquence exacte de l'ordre de la famille, et commitReorder peut y
   // replacer les lignes déplacées sans déranger les autres.
-  //
-  // UN POSTE REGARDÉ EST UN AUTRE ORDRE, et c'est celui du MOTEUR (voir
-  // ordreMachine) : la tranche affichée n'est alors plus une sous-séquence de
-  // l'ordre de la famille, et le réordonnancement à la main s'y refuse — c'est
-  // dit à celui qui essaie, dans onDragEnd.
-  const poste = machineActive();
-  const sorted = poste
-    ? ordreMachine(poste)
-    : ordreFamille()
-      .filter((r) => currentSub === null || (r.sub_stage ?? null) === currentSub);
+  const sorted = ordreFamille()
+    .filter((r) => currentSub === null || (r.sub_stage ?? null) === currentSub);
   // Rendu incrémental : on monte / réutilise TOUTES les lignes de l'étape. Le
   // filtre de recherche se fait ensuite par masquage CSS (aucune reconstruction
   // par frappe) — cf. applySearchAndCounts.
@@ -1363,12 +1149,6 @@ function applySortAndRender() {
   // Plus rien en attente : la liste est entière à l'écran (voir listeMontee).
   if (!suiteRendu) marquerRenduAcheve();
   applySearchAndCounts();
-  // LES COMPTEURS DE MACHINE SE REFONT ICI, et pas ailleurs : c'est le seul
-  // point par lequel passent TOUS les changements de la liste — chargement,
-  // évènement du flux, dépôt sur le rail, correction optimiste. Posé sur
-  // `loadRows` seul, un dossier passé de « Prêt à produire » à « Production
-  // DTF » par un autre poste laissait la pilule DTF sur son ancien chiffre.
-  renderMachines();
 }
 
 function cmpDeadline(a, b) {
@@ -2221,15 +2001,9 @@ function applySearchAndCounts() {
 
   $empty.hidden = visible > 0;
   if (visible === 0) {
-    const poste = machineActive();
     $empty.textContent = q
       ? 'Aucune commande ne correspond à la recherche.'
-      : poste
-        // « Aucune commande à cette étape » serait FAUX : l'étape en porte,
-        // c'est le poste regardé qui n'en a pas. Et le compteur de la pilule
-        // dit déjà zéro — la phrase ne fait que le confirmer là où l'œil est.
-        ? `Rien à produire sur ${nomMachine(poste)} pour l’instant.`
-        : 'Aucune commande à cette étape.';
+      : 'Aucune commande à cette étape.';
   }
   // LE COMPTE NE MENT PAS (26/08). Quand le serveur a coupé la liste, l'en-tête
   // annonçait ce qu'il AFFICHE et le rail ce que l'étape CONTIENT : mesuré sur
@@ -5593,15 +5367,6 @@ async function onDragEnd(e) {
       }
       applySortAndRender(); // rien n'a bougé : on rétablit l'ordre trié de la grille
     }
-  } else if (machineActive()) {
-    // ON NE RANGE PAS À LA MAIN UNE LISTE QU'ON N'A PAS TRIÉE. La vue machine
-    // est classée par le moteur de priorité : la tranche affichée n'est plus
-    // une sous-séquence de l'ordre de la famille, et `commitReorder` numérote
-    // justement en rejouant cet ordre-là (voir son en-tête). Il écrirait donc
-    // des positions qui ne veulent rien dire pour les autres postes, et le
-    // geste paraîtrait avoir marché. On le refuse, et on dit où ranger.
-    showToast('Vue machine : l’ordre vient du moteur de priorité. Enlève le filtre pour ranger à la main.');
-    applySortAndRender();
   } else {
     // Déposé dans la grille → réordonnancement. On rejoue le placement à la
     // position exacte du relâchement avant de l'écrire : c'est là que le geste
@@ -5758,11 +5523,7 @@ async function commitReorder(r) {
 // main : ailleurs il n'aurait rien à annuler.
 function renderOrdreReset() {
   const b = document.getElementById('ordreReset');
-  // MUET PENDANT QU'ON REGARDE UN POSTE : la vue machine est classée par le
-  // moteur de priorité, pas par l'ordre rangé à la main. Le bouton n'aurait
-  // rien à annuler, et sa seule présence dirait le contraire de ce que la
-  // liste montre.
-  if (b) b.hidden = !ordreManuel.has(currentStage) || !!machineActive();
+  if (b) b.hidden = !ordreManuel.has(currentStage);
 }
 
 document.getElementById('ordreReset')?.addEventListener('click', () => {
@@ -6735,12 +6496,6 @@ function onStreamChange(e) {
   // est partagée, l'ordre affiché ici doit suivre.
   if (kind === 'ordre-manuel') {
     loadOrdreManuel().then(() => { renderOrdreReset(); applySortAndRender(); });
-  }
-  // Le patron vient de rerégler ses machines : la rangée du planning suit sans
-  // rechargement — et un poste qu'il a supprimé ne reste pas le filtre en
-  // vigueur, avec une liste que plus rien à l'écran n'explique.
-  if (kind === 'machines') {
-    api('GET', '/api/machines').then(machinesRerelues).catch(() => {});
   }
   // Le détail complet mis de côté peut avoir été corrigé ailleurs : on le relit
   // pour la seule fiche ouverte (voir rafraichirFichesApresChangement).
