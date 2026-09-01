@@ -28,16 +28,16 @@ assert.deepStrictEqual(
   'les modes de paiement du planning sont ceux que le serveur accepte, dans le même ordre, avec les mêmes libellés',
 );
 
-// LE RESTE DE `catalog.json` N'EST PAS MORT, IL EST MAL RANGÉ (constat du
-// 01/09). Ses listes (types, zones, délais, typos, techniques, logos) ne sont
-// lues que par `POST /api/projets` — la route que plus aucun écran n'appelle…
-// et qui porte le SEUL chiffrage serveur de la grille tasse. C'est par elle que
-// `test/tarifs-tasse.test.js` vérifie qu'une tasse sort bien à 16 €, 14 € et
-// 22 €, et qu'un logo client sur l'autre face vaut +6 €.
-// Tant que ce calcul n'a pas d'autre porte, ni la route ni le fichier ne
-// partent : on ne retire pas le seul endroit qui prouve qu'un prix est juste.
+// ET `catalog.json` NE PORTE PLUS QUE ÇA. Ses autres listes — types, délais,
+// zones, typos, techniques, logos — n'étaient lues que par `POST /api/projets`,
+// la route que plus aucun écran n'appelait depuis le 31/07. Elle a d'abord
+// paru intouchable : elle portait le SEUL chiffrage serveur de la grille tasse,
+// donc la seule preuve qu'une tasse sort à 16 €. Le calcul est sorti dans
+// `tarif-tasse.js`, prouvé là où il vit, et la route est partie — le fichier
+// l'a suivie. Une clé qui reviendrait ici sans consommateur serait un doublon
+// en devenir.
 assert.deepStrictEqual(Object.keys(catalogue), ['commande'], 'catalog.json : une seule racine');
-assert.ok(Object.keys(catalogue.commande).includes('paiementModes'),
-  'catalog.json porte les modes de paiement');
+assert.deepStrictEqual(Object.keys(catalogue.commande), ['paiementModes'],
+  'catalog.json : rien d’autre que les modes de paiement');
 
 console.log('✓ modes de paiement : le miroir du planning suit le serveur, et catalog.json ne porte plus que lui');

@@ -70,41 +70,27 @@ delete process.env.APP_PASSWORD;
   // client veut ajouter son propre logo ou autre perso c'est 6 euros en plus »,
   // puis « TASSE en bois 22euro, expresso 14euros ».
   //
-  // On ne contrôle donc pas le composant : on fait CHIFFRER une tasse par le
-  // moteur et on exige le prix du comptoir. Un composant retouché sans regarder
-  // le total ferait repartir l'écart, et c'est exactement comme ça qu'il est né.
+  // LE CHIFFRAGE SE PROUVE AILLEURS DEPUIS LE 01/09. On ne contrôle pas le
+  // composant, on fait CHIFFRER une tasse et on exige le prix du comptoir — un
+  // composant retouché sans regarder le total ferait repartir l'écart, et
+  // c'est exactement comme ça qu'il est né. Mais ce chiffrage passait par
+  // `POST /api/projets`, une route sans écran : la preuve d'un prix tenait à
+  // une porte que personne n'empruntait. Le calcul vit maintenant dans
+  // `tarif-tasse.js`, seul et pur, et c'est `tarif-tasse-prix-magasin.test.js`
+  // qui exige les 16 / 14 / 22 € et le +6 € — en lisant la MÊME grille, par
+  // la même route de Réglages que ce fichier vérifie juste au-dessus.
+  //
+  // Ce qui reste ici est la GRILLE : qu'elle porte les trois tasses et l'option
+  // de face, sans quoi l'autre test n'aurait rien à chiffrer.
   const parCat = (cat, designation) => {
     const a = r0.find((x) => x.categorie === cat && x.designation === designation);
     assert.ok(a, `« ${designation} » doit être dans la grille`);
     return a.id;
   };
-  const chiffrer = async (produit, faces) => {
-    const rep = await call('POST', '/api/projets', {
-      kind: 'commande', delai: 'j15', client: { type: 'perso', societe: 'Contrôle' },
-      lignes: [{
-        type: 'tasse', quantite: 1, produitId: parCat('produit', produit),
-        face1Id: parCat('face', faces[0] || 'Aucune'),
-        face2Id: faces[1] ? parCat('face', faces[1]) : '',
-        dessousId: parCat('dessous', 'Aucune'), batId: parCat('bat', 'Non'),
-      }],
-    });
-    assert.strictEqual(rep.status, 201, JSON.stringify(rep.body));
-    return rep.body.projet.prixTotalTtc;
-  };
-
-  for (const [tasse, magasin] of [
-    ['Tasse Céramique 350 ml', 16],
-    ['Tasse Expresso 180 ml', 14],
-    ['Tasse en Bois', 22],
-  ]) {
-    const sortie = await chiffrer(tasse, ['Logo OLDA existant']);
-    assert.strictEqual(sortie, magasin,
-      `« ${tasse} » doit se chiffrer au prix du comptoir (${magasin} €), pas ${sortie} €`);
-    // « … si le client veut ajouter son propre logo, c'est 6 euros en plus. »
-    const avecPerso = await chiffrer(tasse, ['Logo OLDA existant', 'Logo client vectorisé']);
-    assert.strictEqual(avecPerso - sortie, 6,
-      `le logo du client sur l’autre face vaut +6 € (obtenu : +${avecPerso - sortie} €)`);
-  }
+  for (const t of ['Tasse Céramique 350 ml', 'Tasse Expresso 180 ml', 'Tasse en Bois']) parCat('produit', t);
+  for (const o of ['Aucune', 'Logo OLDA existant', 'Logo client vectorisé']) parCat('face', o);
+  parCat('dessous', 'Aucune');
+  parCat('bat', 'Non');
 
   // 3. PUT articles : remplace la liste, valide la forme, filtre les entrées vides.
   r = await call('PUT', '/api/tarifs-tasse', [

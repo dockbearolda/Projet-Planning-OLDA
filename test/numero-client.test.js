@@ -114,13 +114,11 @@ delete process.env.APP_PASSWORD;
   // du patron portait deux sortes de clients.
   // -------------------------------------------------------------------------
   const societe = 'Comptoir Numéro ' + Date.now();
-  const dossier = await j('POST', '/api/projets', {
-    kind: 'demande',
-    client: { societe, contact: 'Mélina', type: 'pro' },
-    lignes: [{ type: 'textile', quantite: 1, description: '1 tee-shirt', prixTtcManuel: 25 }],
-    delai: 'j5',
-  });
-  assert.strictEqual(dossier.status, 201, JSON.stringify(dossier.body));
+  // LE DOSSIER SE PREND AU COMPTOIR (01/09) : `POST /api/projets`, la route
+  // sans écran, est partie. La règle vérifiée est la même — un client né d'une
+  // prise de commande reçoit son numéro comme les autres.
+  const { creerDossier } = require('./dossier');
+  await creerDossier(j, { demande: true, societe, contact: 'Mélina', quantite: 1, montant: null });
   const neAuComptoir = (await j('GET', '/api/clients')).body.find((c) => c.entreprise === societe);
   assert.ok(neAuComptoir, 'la prise de commande a créé la fiche client');
   assert.match(neAuComptoir.code, /^CLI-PRO-\d{4}$/,
@@ -128,13 +126,7 @@ delete process.env.APP_PASSWORD;
 
   // Un particulier pris au comptoir suit sa propre série.
   const perso = 'Comptoir Perso ' + Date.now();
-  const dossierPerso = await j('POST', '/api/projets', {
-    kind: 'demande',
-    client: { societe: perso, type: 'perso' },
-    lignes: [{ type: 'textile', quantite: 1, description: '1 sweat', prixTtcManuel: 40 }],
-    delai: 'j5',
-  });
-  assert.strictEqual(dossierPerso.status, 201, JSON.stringify(dossierPerso.body));
+  await creerDossier(j, { demande: true, perso: true, societe: perso, quantite: 1, montant: null });
   const persoComptoir = (await j('GET', '/api/clients')).body.find((c) => c.entreprise === perso);
   assert.ok(persoComptoir, 'la fiche du particulier est créée');
   assert.match(persoComptoir.code, /^CLI-PERSO-\d{4}$/, 'série PERSO au comptoir aussi');

@@ -72,22 +72,30 @@ function bloc(src, signature) {
   // =========================================================================
   // 1. La synthèse porte ce que le Point du jour lit vraiment
   // =========================================================================
-  // Une commande de polos marqués en DTF, prise par Nouveau Projet : elle entre
-  // au chiffrage, donc bien AVANT la production — c'est tout l'enjeu de la
-  // pondération « machine ».
-  const projet = await call('POST', '/api/projets', {
-    kind: 'commande',
-    delai: 'j5',
-    client: { type: 'pro', societe: 'Audit Synthèse', email: 'contact@audit-synthese.sx' },
-    lignes: [{
-      type: 'textile', quantite: 3, designation: 'Polo', prixUnitaireTtc: 30,
-      faces: { avant: { emplacement: 'coeur', technique: 'dtf' } },
-      tailles: { M: 3 },
-    }],
+  // Une commande de polos marqués en DTF : elle entre au chiffrage, donc bien
+  // AVANT la production — c'est tout l'enjeu de la pondération « machine ».
+  //
+  // LA FICHE EST POSÉE EN BASE (01/09) : la seule route qui savait écrire
+  // `lignes[].faces[]` était `POST /api/projets`, partie avec ses neuf cents
+  // lignes le jour où la production a montré qu'elle n'avait plus servi depuis
+  // le 31/07. Ce qui se vérifie ici reste entier : la SYNTHÈSE doit transporter
+  // la technique quand la fiche en porte une, sinon la pondération machine du
+  // Point du jour n'a rien à lire.
+  const { pool } = require('../db');
+  const ficheDtf = {
+    kind: 'projet-simple',
+    client: { societe: 'Audit Synthèse' },
+    details: [['Article 1', 'Polo']],
     paiement: { mode: 'cb', paye: true },
-  });
-  assert.strictEqual(projet.status, 201, JSON.stringify(projet.body));
-  const idProjet = projet.body.id;
+    lignes: [{ type: 'textile', quantite: 3, designation: 'Polo', faces: [{ emplacement: 'coeur', technique: 'dtf' }] }],
+  };
+  const { rows: pose } = await pool.query(
+    `INSERT INTO requests (stage, sub_stage, billing_company, contact_email, quantity, product, fiche, paye, paiement_mode)
+     VALUES ('demande_chiffrage', 'a_chiffrer', 'Audit Synthèse', 'contact@audit-synthese.sx', 3, 'Polo', $1, true, 'cb')
+     RETURNING id`,
+    [JSON.stringify(ficheDtf)],
+  );
+  const idProjet = pose[0].id;
 
   const synthese = (await call('GET', '/api/requests/synthese')).body;
   const ligne = synthese.lignes.find((l) => l.id === idProjet);

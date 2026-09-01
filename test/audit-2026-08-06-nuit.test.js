@@ -113,19 +113,18 @@ function bloc(src, signature) {
     'une heure mal formée est refusée avant de prendre le verrou',
   );
 
-  const projet = await call('POST', '/api/projets', {
-    kind: 'commande',
-    delai: 'j5',
-    client: { type: 'pro', societe: 'Audit Verrou Fiche' },
-    lignes: [{
-      type: 'textile', quantite: 2, designation: 'Polo', prixUnitaireTtc: 25,
-      faces: { avant: { emplacement: 'coeur', technique: 'dtf' } },
-      tailles: { M: 2 },
-    }],
+  // LE DOSSIER SE PREND AU COMPTOIR (01/09) : il se fabriquait par
+  // `POST /api/projets`, la route sans écran retirée ce jour-là. Ce qui compte
+  // pour ce test n'a pas changé — il lui faut UNE commande au planning, avec
+  // une fiche à corriger deux fois de suite.
+  const { creerDossier } = require('./dossier');
+  const dossier = await creerDossier(call, {
+    societe: 'Audit Verrou Fiche',
+    quantite: 2,
+    montant: 50,
     paiement: { mode: 'cb', paye: true },
   });
-  assert.strictEqual(projet.status, 201, JSON.stringify(projet.body));
-  const idProjet = projet.body.id;
+  const idProjet = dossier.id;
 
   // Deux corrections qui se suivent, sur des champs différents : la seconde
   // part de la fiche DÉJÀ corrigée, donc les deux tiennent.

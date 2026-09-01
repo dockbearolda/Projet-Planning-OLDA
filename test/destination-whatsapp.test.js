@@ -35,18 +35,23 @@ delete process.env.APP_PASSWORD;
     return { status: res.status, body: res.status === 204 ? null : await res.json() };
   };
 
-  const fiche = (extra) => ({
-    kind: 'commande',
-    client: { type: 'pro', facturation: 'Hôtel Mercure', whatsapp: '0690 66 24 00' },
-    lignes: [{ type: 'textile', quantite: 30, description: '30 polos brodés', prixTtcManuel: 600 }],
-    delai: 'j5',
-    ...extra,
-  });
+  // === 1. LA DESTINATION CHOISIE AU COMPTOIR ==============================
 
-  // === 1. Destination ======================================================
+  // CE QUI A CHANGÉ LE 01/09. Cette section passait par `POST /api/projets`,
+  // qui rangeait le dossier DIRECTEMENT à la famille demandée et refusait une
+  // sous-étape étrangère. Cette route n'avait plus d'écran depuis le 31/07 et
+  // la production le confirmait — huit dossiers, aucun depuis. Elle est partie.
+  //
+  // La règle qui la remplace est plus stricte, et c'est le comptoir qui la
+  // porte : TOUT ce que la vendeuse enregistre tombe dans « À trier », et la
+  // destination voyage DANS la fiche pour que le rangement se fasse d'un seul
+  // geste. Le refus d'une sous-étape incohérente vit désormais sur `PATCH
+  // /api/requests/:id`, au moment où quelqu'un range vraiment la ligne.
+  // Le détail du tri est tenu par `a-trier.test.js` ; ici on garde ce qui
+  // touche à WhatsApp : le numéro du client doit arriver sur la ligne.
 
-  // 1.1 Le serveur sert le pipeline : sans lui, le poste de saisie ne pourrait
-  // pas proposer les destinations.
+  // 1.1 Le serveur sert le pipeline : sans lui, aucun écran ne pourrait
+  // proposer les destinations.
   let r = await call('GET', '/api/pipeline');
   assert.strictEqual(r.status, 200);
   const prepa = r.body.find((f) => f.slug === 'preparation');
@@ -56,44 +61,21 @@ delete process.env.APP_PASSWORD;
   assert.ok(r.body.some((f) => f.slug === 'fiverr'),
     'Fiverr reste une destination possible');
 
-  // 1.2 Sans destination explicite : celle que la nature implique (une commande
-  // validée atterrit sur « À chiffrer »).
-  r = await call('POST', '/api/projets', fiche());
-  assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.projet.stage, 'demande_chiffrage');
-  assert.strictEqual(r.body.projet.subStage, 'a_chiffrer');
+  // 1.2 Un dossier pris au comptoir garde sa destination, et son numéro.
+  const { creerDossier } = require('./dossier');
+  const pris = await creerDossier(call, {
+    societe: 'Hôtel Mercure', tel: '0690 66 24 00', quantite: 30, montant: 600,
+    stage: 'Préparation du projet', status: 'À commander',
+  });
+  assert.strictEqual(pris.stage, 'a_trier', 'tout passe par le tri');
+  assert.deepStrictEqual(pris.destination, { stage: 'preparation', subStage: 'a_commander' },
+    '… en gardant la famille désignée au comptoir');
 
-  // 1.3 Destination choisie : c'est elle qui l'emporte sur l'habitude.
-  r = await call('POST', '/api/projets', fiche({ stage: 'preparation', subStage: 'a_commander' }));
-  assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.projet.stage, 'preparation');
-  assert.strictEqual(r.body.projet.subStage, 'a_commander');
-  let rows = (await call('GET', '/api/requests?stage=preparation')).body;
-  assert.ok(rows.some((x) => x.billing_company === 'Hôtel Mercure' && x.sub_stage === 'a_commander'),
-    'la ligne est bien rangée où on l\'a demandé');
-
-  // 1.4 Famille SANS préciser la sous-étape : position valide (« à préciser »).
-  r = await call('POST', '/api/projets', fiche({ stage: 'preparation', subStage: null }));
-  assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.projet.subStage, null);
-
-  // 1.5 Une famille visée sans préciser sa sous-étape : « à préciser » est valide.
-  r = await call('POST', '/api/projets', fiche({ stage: 'demande_chiffrage' }));
-  assert.strictEqual(r.status, 201);
-  assert.strictEqual(r.body.projet.stage, 'demande_chiffrage');
-
-  // 1.6 Refus : étape inconnue, et sous-étape étrangère à la famille visée.
-  r = await call('POST', '/api/projets', fiche({ stage: 'nulle_part' }));
-  assert.strictEqual(r.status, 400, 'étape inconnue refusée');
-  r = await call('POST', '/api/projets', fiche({ stage: 'demande_chiffrage', subStage: 'a_commander' }));
-  assert.strictEqual(r.status, 400, 'sous-étape étrangère à la famille refusée');
-  r = await call('POST', '/api/projets', fiche({ stage: 'preparation', subStage: 'prod_uv' }));
-  assert.strictEqual(r.status, 400, 'sous-étape d\'une autre famille refusée');
-
-  // 1.7 Le numéro saisi au comptoir arrive sur la ligne : c'est lui qui décide
+  // 1.3 Le numéro saisi au comptoir arrive sur la ligne : c'est lui qui décide
   // si la pastille WhatsApp s'affiche.
-  rows = (await call('GET', '/api/requests?stage=demande_chiffrage')).body;
-  const ligne = rows.find((x) => x.billing_company === 'Hôtel Mercure');
+  const rows = (await call('GET', '/api/requests?stage=a_trier')).body;
+  const ligne = rows.find((x) => x.id === pris.id);
+  assert.ok(ligne, 'la ligne est au planning');
   assert.strictEqual(ligne.contact_phone, '0690 66 24 00',
     'le WhatsApp du client suit la commande');
 
@@ -128,6 +110,6 @@ delete process.env.APP_PASSWORD;
     400, 'message trop long refusé',
   );
 
-  console.log('✓ destination + WhatsApp : choix de l\'étape, refus des destinations incohérentes, message réglable OK');
+  console.log('✓ destination + WhatsApp : le dossier garde sa destination par le tri, et le message est réglable');
   process.exit(0);
 })().catch((err) => { console.error(err); process.exit(1); });

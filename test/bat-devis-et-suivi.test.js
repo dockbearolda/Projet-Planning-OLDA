@@ -234,17 +234,29 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(retrait.status, 200, 'le créneau de retrait se pose depuis la boutique');
 
   // =========================================================================
-  // 6. LES DEUX BARÈMES DE DÉLAI (§7)
+  // 6. LE BARÈME DE DÉLAI QUI S'APPLIQUE VRAIMENT (§7)
   // =========================================================================
-  const delais = await call('Loïc', 'GET', '/api/delais');
-  const jourJ = delais.body.delais.find((x) => x.id === 'jour_j');
-  const express = delais.body.delais.find((x) => x.id === 'express');
-  assert.strictEqual(jourJ.majoration, 20, 'Jour J : +20 %, exactement la règle du patron');
-  assert.strictEqual(express.majoration, 10, 'Express sous 3 jours : +10 %');
-  // LE SECOND BARÈME EST RENDU À CÔTÉ, PAS FUSIONNÉ. Les réconcilier en silence
-  // changerait des prix sans que personne l'ait décidé.
-  assert.ok(delais.body.supplementsVenteDirecte,
-    'le barème de la vente directe est SIGNALÉ, pas fondu dans l’autre');
+  // IL Y EN AVAIT DEUX, IL N'EN RESTE QU'UN — et ce n'est pas celui qu'on
+  // croyait. Le catalogue portait la règle du patron (jour J +20 %, express
+  // sous 3 jours +10 %) et la vente directe un barème réglable par paliers
+  // (dans 5 / 10 / 15 jours). `GET /api/delais` servait à montrer les deux côte
+  // à côte plutôt qu'à les fondre en silence.
+  //
+  // Le 01/09, la seule chose qui APPLIQUAIT le barème du catalogue — l'ancien
+  // « Nouveau Projet » interne — est partie : elle n'avait plus d'écran depuis
+  // le 31/07. Le catalogue ne faisait donc plus foi, il ne faisait plus rien.
+  // Il est parti avec, et la route qui le servait aussi.
+  //
+  // ⚠ CE QUI RESTE À TRANCHER, ET QUI N'APPARTIENT PAS AU CODE : les deux
+  // barèmes ne disent pas la même chose. « Jour J » majore de 20 % le jour même,
+  // « dans 5 jours » majore de 20 % à cinq jours. Depuis le 31/07, c'est le
+  // second qui s'applique au comptoir. Voir ARCHITECTURE.md.
+  const supplements = await call('Loïc', 'GET', '/api/supplements-express');
+  assert.strictEqual(supplements.status, 200, 'le barème réglable répond');
+  for (const palier of ['j5', 'j10', 'j15']) {
+    assert.ok(typeof supplements.body[palier] === 'number',
+      `le palier « ${palier} » porte un pourcentage — c'est lui que le comptoir applique`);
+  }
 
   // =========================================================================
   // 7. CE QUI SE LIT DANS LE SOURCE

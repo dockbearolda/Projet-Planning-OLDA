@@ -137,14 +137,14 @@ delete process.env.APP_PASSWORD;
   // 5. Création automatique à l'enregistrement d'un projet, sans doublon.
   const before = (await j('GET', '/api/clients')).body.length;
   const nouveauClient = 'Chez Testeur ' + Math.floor(seeded.body.length);
-  const cmd = {
-    kind: 'commande',
-    client: { societe: nouveauClient, contact: 'Paul', telephone: '0690 12 34 56', type: 'pro' },
-    lignes: [{ type: 'textile', quantite: 3, description: '3 t-shirts', prixTtcManuel: 60 }],
-    delai: 'j5',
+  // LE DOSSIER PART DU COMPTOIR (01/09) : il partait de `POST /api/projets`, la
+  // route sans écran retirée ce jour-là. Ce qui se vérifie ne change pas — un
+  // dossier pris à l'accueil crée la fiche client s'il faut, et une seule.
+  const { creerDossier } = require('./dossier');
+  const dossierClient = {
+    societe: nouveauClient, contact: 'Paul', tel: '0690 12 34 56', quantite: 3, montant: 60,
   };
-  const c1 = await j('POST', '/api/projets', cmd);
-  assert.strictEqual(c1.status, 201, JSON.stringify(c1.body));
+  await creerDossier(j, dossierClient);
   const after1 = await j('GET', '/api/clients');
   assert.strictEqual(after1.body.length, before + 1, 'un nouveau client créé');
   const auto = after1.body.find((c) => c.entreprise === nouveauClient);
@@ -155,7 +155,7 @@ delete process.env.APP_PASSWORD;
   assert.ok(auto.commandes >= 1, 'la commande est comptée');
 
   // Un 2e projet du MÊME client (casse différente) ne crée pas de doublon.
-  await j('POST', '/api/projets', { ...cmd, client: { ...cmd.client, societe: nouveauClient.toUpperCase() } });
+  await creerDossier(j, { ...dossierClient, societe: nouveauClient.toUpperCase() });
   const after2 = await j('GET', '/api/clients');
   assert.strictEqual(after2.body.length, before + 1, 'pas de doublon malgré la casse');
   const autoBis = after2.body.find((c) => c.entreprise === nouveauClient);
@@ -163,13 +163,9 @@ delete process.env.APP_PASSWORD;
 
   // Un projet PERSO crée un client perso dans la base (la nature suit).
   const persoName = 'Particulier Testeur ' + Math.floor(seeded.body.length);
-  const cmdPerso = await j('POST', '/api/projets', {
-    kind: 'demande',
-    client: { societe: persoName, contact: 'Sophie', type: 'perso' },
-    lignes: [{ type: 'textile', quantite: 1, description: '1 sweat', prixTtcManuel: 40 }],
-    delai: 'j5',
+  await creerDossier(j, {
+    demande: true, perso: true, societe: persoName, contact: 'Sophie', quantite: 1, montant: null,
   });
-  assert.strictEqual(cmdPerso.status, 201, JSON.stringify(cmdPerso.body));
   const autoPerso = (await j('GET', '/api/clients')).body.find((c) => c.entreprise === persoName);
   assert.ok(autoPerso, 'le client perso est dans la base');
   assert.strictEqual(autoPerso.client_type, 'perso', 'la nature perso suit le client');
@@ -178,17 +174,12 @@ delete process.env.APP_PASSWORD;
   // planning porte « Prénom NOM » — jamais le nom de famille tout seul —, et sa
   // fiche naît complète (les deux champs remplis, pas seulement `entreprise`).
   const suffixe = Math.floor(seeded.body.length);
-  const cmdIdentite = await j('POST', '/api/projets', {
-    kind: 'demande',
-    client: { type: 'perso', prenom: 'Jean-Marc', nom: `DUPONT${suffixe}`, whatsapp: '0690 11 22 33' },
-    lignes: [{ type: 'textile', quantite: 1, description: '1 polo', prixTtcManuel: 30 }],
-    delai: 'j5',
+  // Le comptoir envoie le nom COMPLET tel qu'il l'a saisi ; c'est le serveur qui
+  // le coupe en prénom / nom pour la fiche (`couperNomPerso`).
+  await creerDossier(j, {
+    demande: true, perso: true, societe: `Jean-Marc DUPONT${suffixe}`, tel: '0690 11 22 33',
+    quantite: 1, montant: null,
   });
-  assert.strictEqual(cmdIdentite.status, 201, JSON.stringify(cmdIdentite.body));
-  assert.strictEqual(
-    cmdIdentite.body.projet.client.societe, `Jean-Marc DUPONT${suffixe}`,
-    'le nom du dossier porte le prénom ET le nom',
-  );
   const ligneIdentite = (await j('GET', '/api/requests')).body
     .find((r) => r.billing_company === `Jean-Marc DUPONT${suffixe}`);
   assert.ok(ligneIdentite, 'la ligne du planning affiche « Prénom NOM »');
