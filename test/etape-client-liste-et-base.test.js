@@ -170,7 +170,9 @@ assert.ok(/window\.menuRafraichir\(sel\)/.test(bloc(DEVIS, 'function renderClien
 // de chaque client allongeaient chaque ligne — dans le panneau comme dans le
 // champ une fois le choix fait — sans aider à reconnaître le sien : les noms
 // sont uniques en base, la clé de rapprochement l'impose.
-assert.ok(/<option value="\$\{esc\(c\.id\)\}" data-cherche="\$\{esc\(clientOptionSearch\(c\)\)\}">\$\{esc\(c\.name\)\}<\/option>/
+// Le nom passe par `clientNomAffiche` : le NOM DE FAMILLE se lit en capitales
+// (règle unique, public/nom-client.js), et `c.name` reste la valeur en base.
+assert.ok(/<option value="\$\{esc\(c\.id\)\}" data-cherche="\$\{esc\(clientOptionSearch\(c\)\)\}">\$\{esc\(clientNomAffiche\(c\)\)\}<\/option>/
   .test(DEVIS), 'une option de client n’affiche que le nom');
 
 // … MAIS ILS RESTENT CHERCHABLES. Le champ de filtre promet « nom, téléphone,

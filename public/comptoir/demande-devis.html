@@ -2679,7 +2679,7 @@ function renderClientOptions(){
     ? 'Sélectionner un client'
     : 'Aucun client dans la base — crée-le à côté';
   sel.innerHTML=`<option value="">${esc(tete)}</option>`
-    +clientDirectory.map(c=>`<option value="${esc(c.id)}" data-cherche="${esc(clientOptionSearch(c))}">${esc(c.name)}</option>`).join('');
+    +clientDirectory.map(c=>`<option value="${esc(c.id)}" data-cherche="${esc(clientOptionSearch(c))}">${esc(clientNomAffiche(c))}</option>`).join('');
   /* Un `.value` posé par programme ne déclenche AUCUN évènement : le champ
      fermé doit être repeint à la main, sinon il affiche encore l'ancien choix. */
   sel.value=selectedClient?selectedClient.id:'';
@@ -2699,7 +2699,7 @@ function renderSelectedClient(){
   const box=$('selectedClientCard');
   if(!selectedClient){box.classList.add('hidden');box.innerHTML='';return;}
   box.classList.remove('hidden');
-  box.innerHTML=`<b style="font-size:var(--taille-texte);color:var(--text-2)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">${esc(selectedClient.name)}</span><br><span class="help">${esc(selectedClient.type)}${selectedClient.phone?` • ${esc(selectedClient.phone)}`:''}${selectedClient.email?` • ${esc(selectedClient.email)}`:''}</span>`;
+  box.innerHTML=`<b style="font-size:var(--taille-texte);color:var(--text-2)">Client sélectionné</b><br><span style="font-weight:var(--graisse-forte)">${esc(clientNomAffiche(selectedClient))}</span><br><span class="help">${esc(selectedClient.type)}${selectedClient.phone?` • ${esc(selectedClient.phone)}`:''}${selectedClient.email?` • ${esc(selectedClient.email)}`:''}</span>`;
 }
 
 function showNewClientForm(){$('newClientForm').classList.remove('hidden');$('newClientName').focus()}
@@ -2746,7 +2746,20 @@ function createAndSelectClient(){clearStep5Validation();
 }
 
 
-function clientName(c){return c?(c.company||c.name||'Client'):'Client'}
+/* LE NOM DU CLIENT SE LIT EN CAPITALES — un particulier comme un restaurant,
+   et la vendeuse peut donc le taper en minuscules accentuees. La regle
+   elle-meme vit dans `public/nom-client.js` — un seul endroit pour le CRM,
+   la fiche client, les
+   deux ecrans du comptoir, la fiche de production et les deux papiers.
+   `pont.js` l'applique en remplissant la base clients et pose le resultat dans
+   `nomAffiche` ; ici on ne fait que LIRE ce champ. `name` reste la VALEUR :
+   c'est elle que le formulaire de correction reprend et elle qui repart en
+   base. Sans pont (ecran ouvert seul), `nomAffiche` est absent et le nom
+   s'affiche tel qu'il a ete saisi. */
+function clientNomAffiche(c){return c?(c.nomAffiche||c.company||c.name||''):''}
+window.clientNomAffiche=clientNomAffiche;
+
+function clientName(c){return c?(clientNomAffiche(c)||'Client'):'Client'}
 /* L'ANCIEN CHOIX DU CLIENT A ÉTÉ RETIRÉ ICI (24/08/2026). Sept fonctions —
    selectClient, clearClient, openClientCreation, closeClientCreation,
    chooseClientType, validPhone, createClient — visaient `#searchArea`,
@@ -3360,7 +3373,7 @@ $('requestDate').value=todayISO();$('requestDateDisplay').value=new Date().toLoc
       c.phone,
       c.sector
     ].filter(Boolean).join(' · ');
-    box.innerHTML='<div class="client-recap-tete"><b>'+esc2(c.name)+'</b>'+
+    box.innerHTML='<div class="client-recap-tete"><b>'+esc2(window.clientNomAffiche(c))+'</b>'+
       '<button type="button" class="secondary" onclick="editSelectedClientInfo()">Modifier</button></div>'+
       '<div class="help">'+esc2(infos)+'</div>';
   };
@@ -3678,7 +3691,7 @@ function tl(k,v){var t=String(v==null?'':v).trim();return (!t||t==='—')?'':'<d
            piégée s'exécutait ici. */
         box.textContent='⚠ Ce client semble déjà enregistré : ';
         var fort=document.createElement('b');
-        fort.textContent=dup.name;
+        fort.textContent=window.clientNomAffiche(dup);
         box.appendChild(fort);
         box.appendChild(document.createTextNode(
           (dup.phone?' — '+dup.phone:'')+(dup.email?' — '+dup.email:'')

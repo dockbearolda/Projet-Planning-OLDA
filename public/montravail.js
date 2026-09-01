@@ -14,6 +14,8 @@
 
 import { fetchBorne } from './reseau.js';
 import { ecranTete } from './ecran-tete.js';
+// UN NOM DE CLIENT SE LIT EN CAPITALES — règle unique, voir nom-client.js.
+import { nomClientAffiche } from './nom-client.js';
 
 let ROOT = null;
 const el = (tag, cls, text) => {
@@ -36,7 +38,8 @@ function carte(l, avecEtape = true) {
   c.tabIndex = 0;
   c.setAttribute('role', 'button');
   const haut = el('div', 'mt-carte__haut');
-  haut.append(el('span', 'mt-carte__client', l.billing_company || 'Sans client'));
+  haut.append(el('span', 'mt-carte__client',
+    nomClientAffiche(l.billing_company, l.client_type) || 'Sans client'));
   if (l.priority === 3) haut.append(el('span', 'mt-carte__urgent', 'Urgent'));
   c.append(haut);
 

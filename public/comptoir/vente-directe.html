@@ -561,8 +561,26 @@ function normalizeSearch(value){
     .replace(/[^a-z0-9]/g,"");
 }
 
+/* LE NOM DU CLIENT SE LIT EN CAPITALES — un particulier comme un restaurant,
+   et la vendeuse peut donc le taper en minuscules accentuees. La regle
+   elle-meme vit dans `public/nom-client.js` — un seul endroit pour le CRM,
+   la fiche client, les
+   deux ecrans du comptoir, la fiche de production et les deux papiers.
+   `pont.js` l'applique en remplissant la base clients et pose le resultat dans
+   `nomAffiche` ; ici on ne fait que LIRE ce champ. `name` reste la VALEUR :
+   c'est elle que le formulaire de correction reprend et elle qui repart en
+   base. Sans pont (ecran ouvert seul), `nomAffiche` est absent et le nom
+   s'affiche tel qu'il a ete saisi. */
+function clientNomAffiche(client){
+  if(!client)return "";
+  return client.nomAffiche
+    || (client.type==="Professionnel" ? client.company : client.name)
+    || "";
+}
+window.clientNomAffiche=clientNomAffiche;
+
 function clientDisplayName(client){
-  return client.type==="Professionnel" ? client.company : client.name;
+  return clientNomAffiche(client);
 }
 
 function clientMeta(client){
@@ -2166,7 +2184,7 @@ renderProducts();
         var box=el('clientDuplicateWarn')||document.createElement('div');
         box.id='clientDuplicateWarn';
         box.className='dup-warn';
-        var label=(d.company||d.name||'Client')+(d.phone?' — '+d.phone:'')+(d.email?' — '+d.email:'');
+        var label=(window.clientNomAffiche(d)||'Client')+(d.phone?' — '+d.phone:'')+(d.email?' — '+d.email:'');
         /* Construit par le DOM : le libellé vient de champs libres de la base
            clients, et concaténé dans du HTML une fiche piégée s'exécutait ici. */
         box.textContent='⚠ Ce client semble déjà enregistré : ';

@@ -50,6 +50,8 @@ import { armerModale } from './modale.js';
 // briefing du matin est calculé.
 import { lirePoste } from './poste.js';
 import { ecranTete } from './ecran-tete.js';
+// UN NOM DE CLIENT SE LIT EN CAPITALES — règle unique, voir nom-client.js.
+import { nomClientAffiche } from './nom-client.js';
 
 export function createDashboard(deps) {
   const {
@@ -153,7 +155,8 @@ export function createDashboard(deps) {
 
   // --- Dérivations métier --------------------------------------------------
   const isActive = (r) => ACTIVE_SET.has(r.stage);
-  const clientName = (r) => r.billing_company || r.contact_referent || 'Sans nom';
+  const clientName = (r) => nomClientAffiche(r.billing_company, r.client_type)
+    || r.contact_referent || 'Sans nom';
   const articleOf = (r) => r.product || r.description || '—';
 
   // Pilote par défaut d'une catégorie (config d'attribution ; sous-étape > famille).

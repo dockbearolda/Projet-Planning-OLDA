@@ -1763,7 +1763,7 @@ app.get('/api/mon-travail', asyncH(async (req, res) => {
   // liste se viderait en plein service.
   const debutJour = `${jourAtelier()}T00:00:00-04:00`;
   const { rows: faits } = await pool.query(
-    `SELECT e.request_id, e.value_after, e.created_at, r.billing_company, r.product
+    `SELECT e.request_id, e.value_after, e.created_at, r.billing_company, r.client_type, r.product
        FROM request_events e JOIN requests r ON r.id = e.request_id
       WHERE e.who = $1 AND e.field = 'sub_stage' AND e.created_at >= $2
         AND r.deleted_at IS NULL
@@ -1777,8 +1777,8 @@ app.get('/api/mon-travail', asyncH(async (req, res) => {
     if (vues.has(f.request_id)) continue;
     vues.add(f.request_id);
     finiAujourdhui.push({
-      id: f.request_id, billing_company: f.billing_company, product: f.product,
-      sub_stage: f.value_after, quand: f.created_at,
+      id: f.request_id, billing_company: f.billing_company, client_type: f.client_type,
+      product: f.product, sub_stage: f.value_after, quand: f.created_at,
     });
   }
 
@@ -2135,7 +2135,7 @@ app.get('/api/pilotage', exige('marge'), asyncH(async (req, res) => {
   // Triés du plus ANCIENNEMENT bloqué au plus récent : c'est celui qui attend
   // depuis le plus longtemps qui coûte le plus cher, pas le dernier arrivé.
   const { rows: aDebloquer } = await pool.query(
-    `SELECT id, billing_company, product, flag_reason, responsable, deadline, updated_at, stage, sub_stage
+    `SELECT id, billing_company, client_type, product, flag_reason, responsable, deadline, updated_at, stage, sub_stage
        FROM requests WHERE ${VIVANTES_NU} AND flag = 'bloque'
       ORDER BY updated_at ASC LIMIT 30`,
   );

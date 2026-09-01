@@ -114,9 +114,16 @@ vm.createContext(bac);
 
 // Le module est un module ES du navigateur : on l'évalue après avoir neutralisé
 // ses `export` et ses `import`, comme le fait déjà `test/fiche-atelier.test.js`.
-// Le calendrier est le seul import, et il ne sert qu'au clic sur la date.
-const NU = JS.replace(/^export /gm, '').replace(/^import[\s\S]*?from '[^']*';$/gm, 'const calendrierOuvrir = () => {};');
-vm.runInContext(`${NU}\nthis.dessiner = dessinerFicheAtelier;`, bac);
+// Deux imports : le calendrier, qui ne sert qu'au clic sur la date et qu'on
+// bouchonne — et `nom-client.js`, dont on colle le VRAI source devant, parce
+// que c'est lui qui décide comment le nom du client s'affiche.
+const NOM_CLIENT = fs.readFileSync(path.join(__dirname, '..', 'public', 'nom-client.js'), 'utf8')
+  .replace(/^export /gm, '');
+const NU = JS.replace(/^export /gm, '').replace(/^import[\s\S]*?from '[^']*';$/gm, '');
+vm.runInContext(
+  `const calendrierOuvrir = () => {};\n${NOM_CLIENT}\n${NU}\nthis.dessiner = dessinerFicheAtelier;`,
+  bac,
+);
 const dessiner = bac.dessiner;
 assert.strictEqual(typeof dessiner, 'function', 'le module rend bien sa fonction de dessin');
 

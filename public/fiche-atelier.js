@@ -72,6 +72,11 @@ const ic = (name, cls) => {
 // litteralement : le composant a ete sorti de `comptoir/pont.js` vers
 // `calendrier.js`, que les trois ecrans lisent. Cf. l'entete de ce module-la.
 import { calendrierOuvrir } from './calendrier.js';
+// UN NOM DE CLIENT SE LIT EN CAPITALES. Règle unique (nom-client.js), posée
+// sur ce qui se LIT. Les champs de la zone Client rendent la valeur de la base
+// telle quelle : ce sont eux qui servent à corriger une faute de frappe, et un
+// champ qui ne rend pas ce qu'on a tapé n'est plus corrigeable.
+import { nomClientAffiche } from './nom-client.js';
 
 const deuxChiffres = (n) => String(n).padStart(2, '0');
 const jourCourt = (d) => `${JOURS[d.getDay()]} ${deuxChiffres(d.getDate())}/${deuxChiffres(d.getMonth() + 1)}`;
@@ -450,7 +455,8 @@ export function dessinerFicheAtelier(r, ctx) {
     el('span', 'fa-ref', ctx.lotDossier || ''),
     // LE NOM DU CLIENT MÈNE À SA FICHE : c'est la question qui suit
     // immédiatement « qui est-ce ? » — on a déjà fait quoi pour eux.
-    bouton('fa-client', r.billing_company || 'Sans nom', () => ctx.ouvrirClient && ctx.ouvrirClient(r)),
+    bouton('fa-client', nomClientAffiche(r.billing_company, r.client_type) || 'Sans nom',
+      () => ctx.ouvrirClient && ctx.ouvrirClient(r)),
     chProjet,
   );
   // LA CROIX REVIENT, et pour une raison qui a change. Elle avait ete retiree

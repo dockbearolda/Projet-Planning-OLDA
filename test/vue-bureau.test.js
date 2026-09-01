@@ -142,8 +142,10 @@ const bac = chargerPapier('bureau.js',
 
   // --- 6. LA CARTE NE DIT PAS DEUX FOIS LA MÊME CHOSE ----------------------
   const texte = bureauTexte(t);
-  assert.strictEqual((texte.match(/Blue Martini/g) || []).length, 1,
+  assert.strictEqual((texte.match(/BLUE MARTINI/g) || []).length, 1,
     'le nom du client s’écrit UNE fois — le bloc client de la fiche le répétait');
+  assert.ok(!/Blue Martini/.test(texte),
+    '… et il s’imprime EN CAPITALES, comme il se lit à l’écran');
   assert.strictEqual((texte.match(/c@bm\.fr/g) || []).length, 1, 'l’e-mail aussi');
   assert.match(texte, /Adresse : 12 rue de la Liberté/,
     'mais ce que les colonnes ne portent pas reste, lui');
@@ -224,7 +226,7 @@ const bac = chargerPapier('bureau.js',
 
   // « Client : Blue Martini » puis « Nom / société : Blue Martini », deux
   // lignes plus bas, sur le même papier.
-  assert.strictEqual((texteVente.match(/Blue Martini/g) || []).length, 1,
+  assert.strictEqual((texteVente.match(/BLUE MARTINI/g) || []).length, 1,
     'le nom du client ne s’écrit qu’une fois');
 
   // La colonne `description` d'un dossier du comptoir est remplie PAR L'ÉCRAN,

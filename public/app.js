@@ -6,8 +6,11 @@
 // Dashboard « Point du jour » (projection temps réel du planning).
 // WhatsApp « commande prête » : numéro au format international + message rempli.
 import { whatsappLink } from './whatsapp.js';
-// Nom d'un particulier : où s'arrête le prénom, où commence le NOM de famille.
-import { splitPersoName } from './nom-client.js';
+// La règle d'AFFICHAGE d'un nom de client : TOUT en capitales, restaurants et
+// sociétés compris, seul le prénom d'un particulier garde ses initiales. Elle
+// vit là et nulle part ailleurs : un écran qui peint un nom sans passer par ce
+// module finit par diverger des cinq autres.
+import { capitales, nomClientAffiche } from './nom-client.js';
 // La boîte de confirmation de l'app (jamais celle du système) — partagée avec
 // la Base clients, qui en a besoin pour la suppression d'une fiche.
 import { confirmerAction } from './confirmer.js';
@@ -216,7 +219,9 @@ let booted = false;            // la grille est montée (start() est allé au bo
 function rowWhatsappLink(r) {
   const d = parseDeadline(r.deadline);
   return whatsappLink(r.contact_phone, whatsappMessage, {
-    client: r.billing_company || r.contact_referent || '',
+    // Le nom de famille EN CAPITALES, comme partout ailleurs : c'est le même
+    // nom que le client a sous les yeux sur son ticket.
+    client: nomClientAffiche(r.billing_company, r.client_type) || r.contact_referent || '',
     commande: r.product || r.description || '',
     date: d ? d.toLocaleDateString('fr-FR') : '',
   });
@@ -1418,7 +1423,7 @@ function buildCard(r, options) {
   // 1. POUR QUI — le nom du dossier, et la référence du ticket dessous.
   const client = document.createElement('div');
   client.className = 'pcard__client';
-  client.textContent = r.billing_company || 'Sans nom';
+  client.textContent = nomClientAffiche(r.billing_company, r.client_type) || 'Sans nom';
   const ref = document.createElement('div');
   ref.className = 'pcard__ref';
   ref.textContent = (r.fiche && r.fiche.ref) || '';
@@ -2530,7 +2535,7 @@ function banniereLot(bande) {
 
   const nom = document.createElement('span');
   nom.className = 'lot-band__nom';
-  nom.textContent = r0.billing_company || 'Sans nom';
+  nom.textContent = nomClientAffiche(r0.billing_company, r0.client_type) || 'Sans nom';
   const ref = document.createElement('span');
   ref.className = 'lot-band__ref';
   ref.textContent = bande.ref;
@@ -2648,19 +2653,6 @@ function cellSubStage(r) {
   return td;
 }
 
-// Peint le nom du dossier dans `el` : un particulier se lit prénom en graisse
-// normale + NOM DE FAMILLE EN GRAS (c'est le nom qu'on cherche en balayant la
-// colonne) ; une société ou un nom seul gardent un seul bloc.
-function paintClientName(el, clientType, valeur) {
-  const { prenom, nom } = clientType === 'perso'
-    ? splitPersoName(valeur)
-    : { prenom: '', nom: '' };
-  if (!(prenom && nom)) { el.textContent = valeur; return; }
-  const famille = document.createElement('b');
-  famille.textContent = nom;
-  el.replaceChildren(document.createTextNode(`${prenom} `), famille);
-}
-
 // Nom du dossier client : SE LIT ici, se modifie dans la fiche (30/08, Charlie :
 // « la seule façon de faire des modifs est de cliquer dessus, la ligne »). Le
 // référent, le téléphone et l'email restent lisibles via le popover contact
@@ -2681,9 +2673,12 @@ function cellDossier(r) {
     company.classList.add('is-empty');
     company.textContent = 'nom du dossier';
   } else {
-    // « Jean DUPONT » : prénom en graisse normale, NOM DE FAMILLE EN GRAS — le
-    // nom qu'on cherche en balayant la colonne.
-    paintClientName(company, r.client_type, texte);
+    // « Jean DUPONT », « HÔTEL RÉSIDENCE DES ÎLES » : le nom du client SE LIT
+    // en capitales — une seule graisse, c'est la casse qui le fait ressortir
+    // quand on balaie la colonne. Le gras d'avant (31/08, Charlie : « j'ai pas
+    // demandé en gras mais en majuscule ») découpait la cellule en deux
+    // graisses pour dire ce que les capitales disent déjà.
+    company.textContent = nomClientAffiche(texte, r.client_type);
   }
   name.appendChild(company);
 
@@ -4932,7 +4927,8 @@ function finalizeCreate(tmpId, created) {
 
 // --- Suppression (optimiste) ----------------------------------------------
 async function removeRow(r) {
-  const quoi = [r.billing_company, r.product].filter(Boolean).join(' — ') || 'cette commande';
+  const quoi = [nomClientAffiche(r.billing_company, r.client_type), r.product]
+    .filter(Boolean).join(' — ') || 'cette commande';
   const ok = await confirmerAction(
     'Supprimer cette commande ?',
     `${quoi} sera retirée du planning définitivement.`,
@@ -5098,7 +5094,7 @@ function beginDrag() {
   dragState.grabDY = startY - rect.top;
   const ghost = document.createElement('div');
   ghost.className = 'drag-ghost';
-  ghost.textContent = r.billing_company || r.product || 'commande';
+  ghost.textContent = nomClientAffiche(r.billing_company, r.client_type) || r.product || 'commande';
   ghost.style.width = rect.width + 'px';
   document.body.appendChild(ghost);
   dragState.ghost = ghost;
@@ -6788,10 +6784,10 @@ function buildPaletteItem(r, tokens, idx) {
   el.dataset.idx = idx;
 
   const title = r.__quoi === 'client'
-    ? r.entreprise
-    : (r.billing_company || r.contact_referent || '— sans dossier');
+    ? nomClientAffiche(r.entreprise, r.client_type)
+    : (nomClientAffiche(r.billing_company, r.client_type) || r.contact_referent || '— sans dossier');
   const desc = r.__quoi === 'client'
-    ? [r.nom, r.ville, r.telephone, r.email].filter(Boolean).join(' · ')
+    ? [capitales(r.nom), r.ville, r.telephone, r.email].filter(Boolean).join(' · ')
     : (r.product || r.description || '');
 
   const main = document.createElement('div');

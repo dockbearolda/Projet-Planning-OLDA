@@ -19,6 +19,11 @@ import { fetchBorne } from './reseau.js';
 // fermeture. Le tiroir se déclarait modal en laissant le clavier DERRIÈRE lui.
 import { armerModale } from './modale.js';
 import { ecranTete } from './ecran-tete.js';
+// UN NOM DE CLIENT SE LIT EN CAPITALES — un particulier comme un restaurant.
+// La règle vit dans `nom-client.js` et ne se recopie pas ici : c'est
+// L'AFFICHAGE qu'elle change, jamais la valeur — les champs de la fiche, eux,
+// rendent ce qui est en base pour qu'une faute reste corrigeable.
+import { capitales, nomClientAffiche } from './nom-client.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -412,11 +417,11 @@ function card(c) {
 
   const body = el('div', 'cl-card__body');
   const nameRow = el('div', 'cl-card__namerow');
-  nameRow.append(el('span', 'cl-card__name', c.entreprise));
   const nat = nature(c.client_type);
+  nameRow.append(el('span', 'cl-card__name', nomClientAffiche(c.entreprise, nat)));
   nameRow.append(el('span', `cl-nature cl-nature--${nat}`, natureLabel(nat)));
   body.append(nameRow);
-  const sub = [c.nom, c.type, c.zone].filter(Boolean).join(' · ');
+  const sub = [capitales(c.nom), c.type, c.zone].filter(Boolean).join(' · ');
   body.append(el('div', 'cl-card__sub', sub || '—'));
   b.append(body);
 
@@ -648,7 +653,9 @@ function renderDrawer() {
   const head = el('header', 'cl-dh');
   head.append(el('span', 'cl-dh__av', initials(c.entreprise) || '+'));
   const titles = el('div', 'cl-dh__titles');
-  titles.append(el('h2', 'cl-dh__title', creating ? 'Nouveau client' : (c.entreprise || 'Client')));
+  titles.append(el('h2', 'cl-dh__title', creating
+    ? 'Nouveau client'
+    : (nomClientAffiche(c.entreprise, nature(c.client_type)) || 'Client')));
   const sub = [c.type, c.zone].filter(Boolean).join(' · ');
   titles.append(el('p', 'cl-dh__sub', creating ? 'Renseignez au moins la société' : (sub || '—')));
   head.append(titles);

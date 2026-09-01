@@ -9,8 +9,13 @@
 // sortent de la même ligne à un clic l'un de l'autre : écrites deux fois, ces
 // valeurs redeviennent deux valeurs le jour où l'une bouge.
 //
-// Un contexte `vm` ne résout pas un import. On colle donc le socle DEVANT le
-// module et on retire la ligne d'import — c'est exactement ce que fait le
+// Depuis le 31/08 ils importent AUSSI `nom-client.js` : le nom de famille
+// s'imprime en capitales, et cette règle-là est déjà celle de la colonne
+// « Client » du planning — écrite une deuxième fois pour le papier, elle aurait
+// divergé le jour où l'une des deux bouge.
+//
+// Un contexte `vm` ne résout pas un import. On colle donc les socles DEVANT le
+// module et on retire les lignes d'import — c'est exactement ce que fait le
 // navigateur, et ça garde le principe de ces tests : on évalue le VRAI source,
 // pas une copie.
 //
@@ -34,7 +39,9 @@ function chargerPapier(fichier, noms, transformer) {
   const passe = typeof transformer === 'function' ? transformer : (x) => x;
   const bac = {};
   vm.createContext(bac);
-  const socle = nu(passe(fs.readFileSync(path.join(PUBLIC, 'papier.js'), 'utf8')));
+  const socle = ['papier.js', 'nom-client.js']
+    .map((f) => nu(passe(fs.readFileSync(path.join(PUBLIC, f), 'utf8'))))
+    .join('\n');
   const corps = nu(passe(fs.readFileSync(path.join(PUBLIC, fichier), 'utf8')));
   const sorties = noms.map((n) => `globalThis.${n} = ${n};`).join('\n');
   vm.runInContext(`${socle}\n${corps}\n${sorties}`, bac);

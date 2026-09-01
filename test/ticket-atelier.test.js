@@ -158,7 +158,7 @@ const DEMANDE = {
   assert.strictEqual(tv.demande, false);
   assert.strictEqual(tv.titre, 'Ticket atelier');
   assert.strictEqual(tv.ref, '26.08.06-003');
-  assert.strictEqual(tv.client, 'Coco Beach');
+  assert.strictEqual(tv.client, 'COCO BEACH');
   assert.strictEqual(tv.contact, 'Mélina');
   assert.strictEqual(tv.tel, '0690 66 24 00');
 
@@ -229,7 +229,7 @@ const DEMANDE = {
   assert.ok(!papier.includes('€'), `aucun montant ne doit figurer sur le ticket :\n${papier}`);
 
   // …et ce qui DOIT y être : quoi, combien, pour qui, comment.
-  for (const attendu of ['TICKET ATELIER', 'Coco Beach',
+  for (const attendu of ['TICKET ATELIER', 'COCO BEACH',
     'Mélina', '0690 66 24 00',
     '2 x Polo brodé', 'Broderie poitrine, fil or', '1 x Tasse personnalisée']) {
     assert.ok(papier.includes(attendu), `le ticket doit porter « ${attendu} » :\n${papier}`);
@@ -256,7 +256,7 @@ const DEMANDE = {
   });
   // Le récapitulatif figé dit encore « Coco Beach » et l'ancien numéro : c'est
   // la LIGNE qui fait foi pour tout ce qui se corrige après la vente.
-  assert.strictEqual(corrigee.client, 'Coco Beach Bar');
+  assert.strictEqual(corrigee.client, 'COCO BEACH BAR');
   assert.strictEqual(corrigee.tel, '0690 00 11 22');
 
   // L'ARGENT N'EST PLUS UN CHAMP DU MODÈLE. Le montant de la ligne ne remonte

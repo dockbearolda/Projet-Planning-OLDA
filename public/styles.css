@@ -1574,11 +1574,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .client-line { display: flex; align-items: center; min-width: 0; }
 .client-line .client-name { flex: 1 1 auto; min-width: 0; }
 
-/* Nom d'un PARTICULIER : « Jean DUPONT » — prénom en graisse normale, NOM DE
-   FAMILLE EN GRAS (c'est le nom qu'on cherche en balayant la colonne). Une
-   société, un nom seul ou un champ vide s'affichent tels quels. */
-.client-company b { font-weight: var(--graisse-forte); }
-
 /* Les pastilles du dossier (WhatsApp, devis, facture, BAT, détail, envoi PDF)
    tiennent leur PROPRE rangée, sous le nom. Elles pèsent 204 px
    INCOMPRESSIBLES à six (6 × 24 px + marges + écarts + le retrait

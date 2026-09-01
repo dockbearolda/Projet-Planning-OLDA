@@ -172,6 +172,24 @@
     return s.endsWith(`-${poste()}`) ? s : `${s}-${poste()}`;
   };
 
+  // --- 0. LE NOM DU CLIENT EN CAPITALES -------------------------------------
+  // Règle unique de l'application : un nom de client SE LIT en capitales — un
+  // particulier comme un restaurant — et c'est l'affichage qui change, jamais
+  // la valeur. Elle vit dans
+  // `public/nom-client.js` — le même module que la colonne « Client » du
+  // planning, la fiche client et les deux papiers.
+  //
+  // `pont.js` est un script CLASSIQUE (les deux écrans le chargent en
+  // `<script src>`) : il ne peut pas l'importer en tête de fichier, il le
+  // charge donc à la demande. Aucune course : les fiches n'arrivent qu'après
+  // `chargerClients()`, qui attend cette promesse avant de peindre quoi que ce
+  // soit. Si le module ne vient pas, les écrans affichent le nom SAISI — un
+  // comptoir qui tourne compte plus qu'une capitale.
+  let NOM_AFFICHE = null;
+  const reglePrete = import('../nom-client.js')
+    .then((m) => { NOM_AFFICHE = m.nomClientAffiche; })
+    .catch(() => { NOM_AFFICHE = null; });
+
   // --- 1. La base clients ---------------------------------------------------
   // Une fiche de la base (colonnes du CRM) vue par l'écran du comptoir. Les
   // deux écrans lisent les mêmes clés, on les sert donc toutes :
@@ -193,7 +211,13 @@
     const fiche = {
       id: c.id,
       type: NATURE_ECRAN[c.client_type] || 'Professionnel',
+      // `name` reste LA VALEUR, mot pour mot ce qui est en base : c'est elle
+      // que le formulaire de correction reprend, elle qui repart en `PATCH`, et
+      // elle qui part au planning comme nom du dossier. La mettre en capitales
+      // ici, c'était transformer À L'ÉCRITURE.
       name: c.entreprise || '',
+      // Ce que les écrans AFFICHENT — jamais ce qu'ils enregistrent.
+      nomAffiche: NOM_AFFICHE ? NOM_AFFICHE(c.entreprise || '', c.client_type) : (c.entreprise || ''),
       phone: c.telephone || '',
       email: c.email || '',
     };
@@ -297,6 +321,10 @@
   // `const` de la page : on les REMPLIT sur place, on ne les remplace pas.
   // `typeof` évite le ReferenceError sur l'écran qui n'a pas l'autre.
   async function chargerClients() {
+    // La règle d'affichage AVANT la première peinture : sinon la liste
+    // s'afficherait une fois en minuscules, puis sauterait en capitales au
+    // rafraîchissement suivant.
+    await reglePrete;
     const liste = await api('GET', '/api/clients');
     const fiches = (Array.isArray(liste) ? liste : []).map(versEcran);
     if (typeof clients !== 'undefined' && Array.isArray(clients)) {

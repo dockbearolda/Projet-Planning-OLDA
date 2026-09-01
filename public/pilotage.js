@@ -17,6 +17,8 @@
 
 import { fetchBorne } from './reseau.js';
 import { ecranTete } from './ecran-tete.js';
+// UN NOM DE CLIENT SE LIT EN CAPITALES — règle unique, voir nom-client.js.
+import { nomClientAffiche } from './nom-client.js';
 
 let ROOT = null;
 const el = (tag, cls, text) => {
@@ -104,7 +106,8 @@ export function renderPilotage(d) {
     for (const b of bloques) {
       const l = el('article', 'pil-bloque');
       const haut = el('div', 'pil-bloque__haut');
-      haut.append(el('span', 'pil-bloque__client', b.billing_company || 'Sans client'));
+      haut.append(el('span', 'pil-bloque__client',
+        nomClientAffiche(b.billing_company, b.client_type) || 'Sans client'));
       // DEPUIS QUAND. C'est la seule chose qui hiérarchise : un dossier bloqué
       // depuis six jours n'est pas le même problème qu'un dossier bloqué ce matin.
       haut.append(el('span', 'pil-bloque__depuis', depuis(b.updated_at)));

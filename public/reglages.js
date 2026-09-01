@@ -13,6 +13,8 @@
 // laisse le bouton désactivé et « Enregistrement… » à l'écran, indéfiniment.
 import { fetchBorne } from './reseau.js';
 import { ecranTete } from './ecran-tete.js';
+// UN NOM DE CLIENT SE LIT EN CAPITALES — règle unique, voir nom-client.js.
+import { nomClientAffiche } from './nom-client.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT.querySelector(sel);
@@ -517,7 +519,7 @@ function corbeilleRow(r) {
   const row = el('div', 'reg-corb');
   const quoi = el('div', 'reg-corb__quoi');
   quoi.append(
-    el('span', 'reg-corb__nom', r.billing_company || 'Sans client'),
+    el('span', 'reg-corb__nom', nomClientAffiche(r.billing_company, r.client_type) || 'Sans client'),
     el('span', 'reg-corb__detail', [
       r.product,
       r.quantity ? `${r.quantity} pièce${r.quantity > 1 ? 's' : ''}` : null,
