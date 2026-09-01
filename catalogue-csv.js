@@ -218,9 +218,18 @@ function cleProduit(famille, designation, variante) {
 // (`rangeDepuis`) et le nom qu'on a posé sur sa variante (`varianteNommee`).
 function preparerRegles(brut) {
   const r = brut && typeof brut === 'object' ? brut : {};
+  // UN ÉCART PORTE SUR UN RAYON, OU SUR UN SEUL PRODUIT. Le second cas est
+  // arrivé avec les tasses : la famille entière n'est pas à écarter, mais les
+  // trois que la GRILLE DE CHIFFRAGE tarife déjà, si — leur prix de vente s'y
+  // calcule, et l'importer une seconde fois ferait deux sources pour un même
+  // nombre. C'est le second qu'on oublie de corriger.
   const ecartes = new Map();
   for (const e of Array.isArray(r.ecartes) ? r.ecartes : []) {
-    if (e && e.famille) ecartes.set(reduire(e.famille), String(e.pourquoi || 'rayon écarté'));
+    if (!e || !e.famille) continue;
+    const cle = e.designation
+      ? `${reduire(e.famille)}\u0001${reduire(e.designation)}`
+      : reduire(e.famille);
+    ecartes.set(cle, String(e.pourquoi || 'rayon écarté'));
   }
   const familles = new Map();
   for (const f of Array.isArray(r.familles) ? r.familles : []) {
@@ -334,7 +343,9 @@ function analyserImport(texte, existants, reglesBrutes) {
     //    se compte à part. Confondre les deux ferait lire « 55 refusées » là où
     //    il y a des erreurs ET des exclusions voulues.
     const cleFamille = reduire(l.famille);
-    const ecart = regles.ecartes.get(cleFamille);
+    // Le PRODUIT d'abord, le rayon ensuite : une règle plus précise l'emporte.
+    const ecart = regles.ecartes.get(`${cleFamille}\u0001${reduire(l.designation)}`)
+      || regles.ecartes.get(cleFamille);
     if (ecart) { l.ecarte = ecart; return; }
 
     // 2. LE NOM DE LA VARIANTE, retrouvé par son prix — le seul repère que
