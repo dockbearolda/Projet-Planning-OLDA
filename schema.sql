@@ -280,6 +280,23 @@ CREATE INDEX IF NOT EXISTS idx_requests_updated ON requests (updated_at);
 -- client_type pro/perso des commandes. Down : DROP TABLE client_notes; DROP TABLE clients;
 CREATE TABLE IF NOT EXISTS clients (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- LE NUMÉRO DU CLIENT — « CLI-PRO-0007 » / « CLI-PERSO-0007 ». Un repère
+  -- lisible, comme dans le classeur du patron ; l'`id` est un UUID, personne ne
+  -- le dicte au téléphone. Il est ATTRIBUÉ PAR LE SERVEUR à la création (les
+  -- deux portes : la fiche du CRM et la prise de commande au comptoir, qui crée
+  -- le client toute seule) et n'est JAMAIS modifiable à la main : il ne figure
+  -- pas dans CLIENT_FIELDS, donc ni POST ni PATCH ne l'atteignent.
+  -- Le compteur vit en `app_meta` (client_code_seq_pro / _perso), incrémenté en
+  -- UNE requête atomique : jamais dérivé des lignes en place, donc un numéro
+  -- attribué n'est jamais réutilisé, même si sa fiche est désactivée ensuite.
+  -- L'UNICITÉ est posée EN BASE (idx_clients_code, dans db.js) : c'est elle et
+  -- elle seule qui protège deux postes qui créent une fiche dans la même
+  -- fraction de seconde. pg-mem, en local, ne verrouille rien.
+  -- Nullable : une fiche d'avant la migration reste valide le temps que le
+  -- rattrapage lui en pose un (rattraperCodesClients).
+  -- Down : DROP INDEX IF EXISTS idx_clients_code;
+  --        ALTER TABLE clients DROP COLUMN IF EXISTS code;
+  code        text,
   entreprise  text NOT NULL,                 -- société / marque (obligatoire)
   nom         text,                          -- personne contact
   fonction    text,                          -- son rôle (Gérante, Resp. Marketing…)
