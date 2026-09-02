@@ -706,6 +706,51 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
   assert.ok(/filter\(\(l\) => l\.sansPrix\)\.length/.test(ECRAN),
     'l’en-tête compte les lignes qui attendent encore leur prix');
 }
+// ---------------------------------------------------------------------------
+// UN DEVIS OÙ RIEN N'EST CHIFFRÉ N'A PAS DE TOTAL (02/09/2026)
+// ---------------------------------------------------------------------------
+// Charlie : « par défaut je ne veux pas de prix, ça doit être vierge ». À
+// l'ouverture de l'écran, la feuille imprimait déjà « TOTAL À PAYER 0,00 € » en
+// géant, trois lignes à zéro au-dessus, et le compteur annonçait « 0 article ·
+// 0,00 € ». C'est la règle des lignes (« À chiffrer ») tenue une marche plus
+// haut : un zéro affiché est un prix, et celui-là, c'est la maison qui le tient.
+{
+  const BASE = { regime: 'tgca', tauxTgca: 0.04, arrondi: 'euro', acompte: 50 };
+  const vierge = calculerDevis({ ...BASE, lignes: [] });
+  assert.strictEqual(vierge.aucunPrix, true, 'un devis sans article n’a pas de prix');
+  // TOUTES LES LIGNES « À CHIFFRER », C'EST PAREIL : personne n'a rien décidé.
+  const attente = calculerDevis({ ...BASE, lignes: [{ designation: 'Tasse', quantite: 12, unitaireHt: null }] });
+  assert.strictEqual(attente.aucunPrix, true,
+    'un devis dont toutes les lignes sont à chiffrer n’a pas de total non plus');
+  // UNE SEULE LIGNE CHIFFRÉE SUFFIT À LES FAIRE REVENIR — et un article OFFERT
+  // en est une : son zéro a été TAPÉ.
+  const offert = calculerDevis({ ...BASE, lignes: [{ designation: 'Cadeau', quantite: 1, unitaireHt: 0 }] });
+  assert.strictEqual(offert.aucunPrix, false, 'un zéro voulu est un prix : les totaux reviennent');
+
+  // --- LE PAPIER ----------------------------------------------------------
+  const neuf = modeleDevis({ ...BASE, date: '2026-09-02', client: {}, lignes: [] }, MAISON);
+  assert.strictEqual(neuf.totaux, null, 'pas de bloc de totaux sur un devis vierge');
+  assert.strictEqual(neuf.reglement, null,
+    'ni acompte à réclamer : 0,00 € tout de suite, c’est la même promesse écrite plus gros');
+  const sur = texteEntier(dessinerDevis(neuf, faireDoc()));
+  for (const mot of ['Sous-total HT', 'Total HT', 'TOTAL À PAYER', 'ACOMPTE']) {
+    assert.ok(!sur.includes(mot),
+      `« ${mot} » ne s’imprime pas sur un devis vierge (feuille obtenue : ${sur})`);
+  }
+  // ⚠ ET PAS LE MONTANT NON PLUS. Le pied porte le capital de la maison — un
+  // « 500,00 € » réglé, qui n'est pas un prix : on cherche le zéro, pas l'euro.
+  assert.ok(!/\b0,00\s*€/.test(sur), `aucun montant à zéro sur la feuille (obtenu : ${sur})`);
+  // LE DÉLAI ET LE BAT, EUX, RESTENT : ce sont des textes commerciaux, pas des
+  // montants — c'est ce qu'on peut opposer à la maison en cas de retard.
+  assert.ok(/BON À TIRER/.test(sur), 'les cadres délai et BAT ne dépendent pas du prix');
+
+  // --- ET L'ÉCRAN DIT LA MÊME CHOSE QUE LA FEUILLE ------------------------
+  // Deux moitiés d'écran à dix centimètres l'une de l'autre : le volet
+  // « Fiscalité et règlement » et le compteur de l'en-tête portent tous deux un
+  // montant, et tous deux doivent se taire.
+  assert.ok((ECRAN.match(/compte\.aucunPrix/g) || []).length >= 2,
+    'l’écran applique le verdict aux DEUX endroits qui affichent un montant');
+}
 {
   // --- LA TASSE S'ADDITIONNE, ET LA GRILLE FAIT FOI -----------------------
   assert.ok(/api\('GET', '\/api\/tarifs-tasse'\)/.test(ECRAN),
