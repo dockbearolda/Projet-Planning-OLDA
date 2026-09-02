@@ -794,5 +794,28 @@ assert.ok(/dfModule\.refreshDevisFlash\(\)/.test(APP),
 assert.ok(/if \(p\.actif === false\) continue;/.test(ECRAN),
   'le devis flash ne propose pas un produit éteint au catalogue');
 
+// LE PRIX SUIT LE PRODUIT (02/09, Charlie : « peu importe où je clique, c'est
+// toujours le même prix »). Le prix de rayon ne se posait que sur une ligne
+// SANS prix : une tasse à 15,38 € corrigée en planche restait à 15,38 €, avec la
+// teinte du décor et la face de la tasse. Choisir un produit, c'est en changer.
+{
+  const debut = ECRAN.indexOf('function choisirProduit(');
+  const choisir = ECRAN.slice(debut, ECRAN.indexOf('function ajouterTransport(', debut));
+  assert.ok(debut > 0 && choisir.length > 0, 'choisirProduit existe');
+  assert.ok(!/!ligne\.unitaireHt/.test(choisir),
+    'choisir un produit pose SON prix, même si la ligne en portait déjà un');
+  assert.ok(/ligne\.puManuel = false;/.test(choisir),
+    '… et rend la main au moteur ou à la grille : un prix repris à la main appartenait à l’article d’avant');
+  assert.ok(/ligne\.pleinHt = ht;/.test(choisir) && /ligne\.unitaireHt = ligne\.remise \?/.test(choisir),
+    'la remise de la ligne s’applique au prix du nouvel article, depuis son prix plein');
+  assert.ok(/\} else \{\s*\n(?:\s*\/\/[^\n]*\n)*\s*ligne\.pleinHt = null;\s*\n\s*ligne\.unitaireHt = null;/.test(choisir),
+    'un produit sans prix se dit « à chiffrer », pas au prix de l’article d’avant');
+  assert.ok(/if \(etaitTasse\) ligne\.faces = '';/.test(choisir) && /else if \(etaitTasse\) ligne\.couleur = '';/.test(choisir),
+    'la teinte du décor et les faces de la tasse d’avant ne suivent pas une planche');
+  // Et l'écran relit TOUTES les cases après le choix, pas seulement celles de la tasse.
+  assert.ok(/marq\.value = ligne\.marquage \|\| '';\s*\n\s*faces\.value = ligne\.faces \|\| '';\s*\n\s*coul\.value = ligne\.couleur \|\| '';\s*\n\s*majFamille\(\);/.test(ECRAN),
+    'marquage, faces et couleur se relisent depuis la ligne après un changement de produit');
+}
+
 console.log('✓ devis : l’addition tombe juste sur trois arrondis, le papier tient son A4, '
   + 'l’écran ne réinvente aucun composant, et les six tailles comptent la quantité');
