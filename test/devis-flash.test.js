@@ -608,7 +608,7 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
   // UNE LIGNE SIMPLE S'ARRÊTE À SA RANGÉE : le transport n'a ni référence, ni
   // couleur, ni marquage, ni tailles — il sortait avec les trois rangées d'un
   // t-shirt, soit quatre fois la place de ce qu'il dit.
-  assert.ok(/if \(!ligne\.simple\) bloc\.append\(detail, caseNote, cases\)/.test(ECRAN),
+  assert.ok(/if \(!ligne\.simple\) bloc\.append\(detail, detail2, libre, caseNote, cases\)/.test(ECRAN),
     'une ligne simple ne porte pas le détail de production d’un article');
   assert.ok(/simple: true,/.test(ECRAN), '… et c’est le transport qui la demande');
   // L'en-tête se tait quand il n'y a rien dessous, et il se réveille au premier
@@ -618,7 +618,11 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
 }
 {
   // LES SIX TAILLES, de XS à 2XL, dans la grille de la fiche de production.
-  assert.ok(/const TAILLES = \['XS', 'S', 'M', 'L', 'XL', '2XL'\]/.test(ECRAN), 'XS, S, M, L, XL, 2XL — et dans cet ordre');
+  // « AUTRES » FERME LA GRILLE (02/09) : le bac de ce qui ne rentre pas dans
+  // les six — un 3XL, un enfant. Le comptoir l'a depuis toujours ; sans lui, ces
+  // pièces se saisissaient dans la quantité et sortaient de la répartition.
+  assert.ok(/const TAILLES = \['XS', 'S', 'M', 'L', 'XL', '2XL', 'Autres'\]/.test(ECRAN),
+    'XS, S, M, L, XL, 2XL puis Autres — et dans cet ordre');
   assert.ok(ECRAN.includes("el('div', 'fa-tailles')") && ECRAN.includes("'fa-lab fa-taille__k'"),
     'les cases de taille sont celles de la fiche de production, pas une grille qui leur ressemble');
   assert.ok(!/\.fa-tailles?\s*(,|\{)/.test(FEUILLE), 'devis-flash.css ne redéclare pas la grille des tailles');

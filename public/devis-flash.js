@@ -90,7 +90,25 @@ function saisieNeuve() {
     validite: jourPlus(jour, VALIDITE_JOURS),
     projet: '',
     dueDate: '',
-    client: { nom: '', code: '', ville: '', contact: '', tel: '', email: '', type: 'pro' },
+    // L'HEURE SOUHAITÉE (02/09). Une date sans heure, sur une commande qu'on
+    // vient chercher, laisse la question entière — « jeudi » ne dit pas si
+    // c'est avant midi. Le comptoir la demandait déjà, pas le devis.
+    dueHeure: '',
+    // « ON DOIT JUSTE INDIQUER SI UNE MAQUETTE EST À FAIRE » (Charlie, 02/09).
+    // Le comptoir en fait trois champs — type de logo, statut du logo, maquette.
+    // Ici c'est OUI ou NON : ce que l'atelier a besoin de savoir, c'est s'il y a
+    // du travail de PAO devant lui.
+    maquette: false,
+    // LA NOTE INTERNE NE S'IMPRIME PAS. C'est ce qu'on se dit entre nous — une
+    // remise accordée de vive voix, un client qui paie toujours en retard. Elle
+    // suit le dossier au planning, jamais le papier remis au client.
+    noteInterne: '',
+    client: {
+      nom: '', code: '', ville: '', contact: '', tel: '', email: '', type: 'pro',
+      // LE WHATSAPP N'EST PAS LE TÉLÉPHONE. À Saint-Martin, c'est par là qu'on
+      // relance : le planning en fait une pastille cliquable (`whatsapp.js`).
+      whatsapp: '',
+    },
     appro: APPRO_DEFAUT,
     lignes: [],
     regime: 'tgca',
@@ -110,7 +128,11 @@ function saisieNeuve() {
 // coefficient est dégressif sur la quantité, pas sur la répartition (voir
 // `chiffrerTextile`, qui lui passe `{ other: quantité }`). Un XS de plus ici ne
 // change donc rien au prix, et n'oblige à toucher à rien là-bas.
-const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
+// ⚠ « AUTRES » FERME LA GRILLE (02/09, Charlie : « ajoute autre taille »). Le
+// comptoir l'a depuis toujours : c'est le bac de ce qui ne rentre pas dans les
+// six — un 3XL, un enfant, une coupe femme comptée à part. Sans lui, ces pièces
+// se saisissaient dans la quantité et disparaissaient de la répartition.
+const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL', 'Autres'];
 
 // CE QUE LES TAILLES DISENT SUR LE DEVIS : « 2 × S · 3 × M ». C'est la
 // grammaire de toute la maison — la fiche de production et le ticket de
@@ -331,13 +353,14 @@ export async function refreshDevisFlash() {
 }
 
 async function rechargerReglages() {
-  const [cl, cat, ent, par, tr, tex] = await Promise.all([
+  const [cl, cat, ent, par, tr, tex, logos] = await Promise.all([
     api('GET', '/api/clients').catch(() => []),
     api('GET', '/api/catalogue-produits').catch(() => []),
     api('GET', '/api/settings/entreprise').catch(() => ({})),
     api('GET', '/api/tarifs-tasse/parametres').catch(() => null),
     api('GET', '/api/tarifs-transport').catch(() => ({})),
     api('GET', '/api/settings/textile').catch(() => null),
+    api('GET', '/api/tailles-logo').catch(() => null),
   ]);
   clients = Array.isArray(cl) ? cl : [];
   catalogue = Array.isArray(cat) ? cat : [];
@@ -345,6 +368,11 @@ async function rechargerReglages() {
   transports = tr && typeof tr === 'object' ? tr : {};
   if (par && Number.isFinite(Number(par.tgca))) saisie.tauxTgca = Number(par.tgca);
   reglagesTextile = tex && typeof tex === 'object' ? tex : null;
+  // LES FACES DE TOUTES LES FAMILLES, dédoublonnées et dans l'ordre du tableau.
+  // Une face qui n'existe que pour la tasse doit rester proposable : le devis ne
+  // sait pas encore quelle famille porte la ligne.
+  const familles = logos && Array.isArray(logos.familles) ? logos.familles : [];
+  facesConnues = [...new Set(familles.flatMap((f) => (Array.isArray(f.faces) ? f.faces : [])))];
   // ⚠ DÉFAUT CORRIGÉ LE 02/09 : le devis chiffrait avec les réglages PAR DÉFAUT
   // du moteur (7,56 € le mètre de DTF, 25 € l'heure…), pendant que le comptoir
   // chiffrait avec ceux de l'atelier, gardés en base depuis toujours
@@ -584,6 +612,7 @@ function carteClient() {
   const email = entree('dvf-cl-email', { type: 'email', valeur: saisie.client.email, exemple: 'facultatif' });
   const contact = entree('dvf-cl-contact', { valeur: saisie.client.contact, exemple: 'facultatif' });
   const tel = entree('dvf-cl-tel', { type: 'tel', valeur: saisie.client.tel, exemple: 'facultatif' });
+  const wa = entree('dvf-cl-wa', { type: 'tel', valeur: saisie.client.whatsapp, exemple: '0690 12 34 56' });
   // ⚠ PAS DE « TYPE DE CLIENT » ICI (retiré le 02/09, Charlie : « c'est en
   // automatique à la création du client »). Un client choisi dans la base
   // apporte le sien ; un client inconnu le reçoit quand il entre en base. Une
@@ -593,10 +622,11 @@ function carteClient() {
     rang('Client / société', nom), rang('Code client', code),
     rang('Ville', ville), rang('E-mail', email),
     rang('Personne à contacter', contact), rang('Téléphone', tel),
+    rang('WhatsApp', wa),
   ));
 
   for (const [n, cle] of [[nom, 'nom'], [code, 'code'], [ville, 'ville'],
-    [email, 'email'], [contact, 'contact'], [tel, 'tel']]) {
+    [email, 'email'], [contact, 'contact'], [tel, 'tel'], [wa, 'whatsapp']]) {
     n.addEventListener('input', () => { saisie.client[cle] = n.value; redessiner(); });
   }
 
@@ -650,12 +680,16 @@ function prendreClient(cl) {
     ville: cl.ville || '',
     contact: cl.nom || '',
     tel: cl.telephone || '',
+    // La base clients ne tient qu'UN numéro : il sert des deux côtés tant que
+    // personne n'en a saisi un second ici.
+    whatsapp: cl.whatsapp || cl.telephone || '',
     email: cl.email || '',
     type: cl.type === 'perso' ? 'perso' : 'pro',
   };
   for (const [id, v] of [['#dvf-cl-nom', saisie.client.nom], ['#dvf-cl-code', saisie.client.code],
     ['#dvf-cl-ville', saisie.client.ville], ['#dvf-cl-email', saisie.client.email],
-    ['#dvf-cl-contact', saisie.client.contact], ['#dvf-cl-tel', saisie.client.tel]]) {
+    ['#dvf-cl-contact', saisie.client.contact], ['#dvf-cl-tel', saisie.client.tel],
+    ['#dvf-cl-wa', saisie.client.whatsapp]]) {
     const n = $(id);
     if (n) n.value = v;
   }
@@ -673,10 +707,19 @@ function carteProjet() {
   const projet = entree('dvf-projet', { valeur: saisie.projet, exemple: 'STAFF, Terrasse, Rentrée…' });
   const appro = menu('dvf-appro', APPROS, saisie.appro);
   const due = entree('dvf-due', { type: 'date', valeur: saisie.dueDate });
+  const heure = entree('dvf-heure', { type: 'time', valeur: saisie.dueHeure });
   const val = entree('dvf-validite', { type: 'date', valeur: saisie.validite });
+  const maq = menu('dvf-maquette', [
+    { id: 'non', label: 'Non — le client fournit son visuel' },
+    { id: 'oui', label: 'Oui — maquette à créer' },
+  ], saisie.maquette ? 'oui' : 'non');
+  const interne = entree('dvf-note-interne', { valeur: saisie.noteInterne, exemple: 'Ne figure pas sur le devis' });
   corps.append(feuille(
     rang('Nom du projet', projet), rang('Approvisionnement', appro),
-    rang('Date souhaitée client', due), rang('Validité du devis', val),
+    rang('Date souhaitée client', due), rang('Heure souhaitée', heure),
+    rang('Validité du devis', val),
+    rang('Maquette à faire', maq),
+    rang('Note interne', interne),
   ));
 
   // ⚠ L'ÉTAT DU DÉLAI EST RETIRÉ (02/09, Charlie : « on s'en fout »). Une bande
@@ -686,6 +729,11 @@ function carteProjet() {
 
   projet.addEventListener('input', () => { saisie.projet = projet.value; redessiner(); });
   due.addEventListener('change', () => { saisie.dueDate = due.value; redessiner(); });
+  heure.addEventListener('change', () => { saisie.dueHeure = heure.value; redessiner(); });
+  maq.addEventListener('change', () => { saisie.maquette = maq.value === 'oui'; redessiner(); });
+  // LA NOTE INTERNE NE REDESSINE PAS LA FEUILLE : elle n'y figure pas. Elle
+  // n'écrit que dans la saisie — et le brouillon la garde.
+  interne.addEventListener('input', () => { saisie.noteInterne = interne.value; garderBrouillon(); });
   val.addEventListener('change', () => { saisie.validite = val.value; redessiner(); });
   appro.addEventListener('change', () => { saisie.appro = appro.value; redessiner(); });
   return c;
@@ -875,6 +923,38 @@ const TRANSPORT_MOTEUR = 'Maritime';
 // remplace pas. Rien ne bouge sous les doigts (loi 9) — et une ligne qui n'est
 // pas un textile garde un champ de texte ordinaire, sans menu vide à ouvrir.
 const ID_MARQUAGES = 'dvf-marquages';
+// LES COULEURS D'ENCRE ET LES FACES — deux listes posées UNE fois pour tout
+// l'écran, comme celle des produits. Les encres viennent du moteur (elles
+// décident du rendu, pas du prix), les faces du tableau des tailles de logo,
+// qui les déclare par famille : c'est la source de la fiche de l'atelier et du
+// ticket, pas une liste réécrite ici.
+const ID_ENCRES = 'dvf-encres';
+const ID_FACES = 'dvf-faces';
+function poserListe(id, valeurs) {
+  if (!valeurs.length) return false;
+  let liste = document.getElementById(id);
+  if (!liste) {
+    liste = el('datalist');
+    liste.id = id;
+    ROOT.append(liste);
+  }
+  if (liste.options.length) return true;
+  for (const v of valeurs) {
+    const o = el('option');
+    o.value = v;
+    liste.append(o);
+  }
+  return true;
+}
+// Habiller un champ APRÈS coup : le composant remplace le champ dans la page,
+// il faut donc qu'il y soit déjà — et une seule fois, sinon on empile les peaux.
+function habiller(champLa, id, valeurs) {
+  if (!champLa || champLa.dataset.menuListe === id) return;
+  if (!poserListe(id, valeurs)) return;
+  champLa.setAttribute('list', id);
+  menuPoser(champLa);
+}
+let facesConnues = [];
 function poserMarquages(champMarq) {
   if (!champMarq || champMarq.dataset.menuListe === ID_MARQUAGES) return;
   moteurTextile().then((TE) => {
@@ -904,13 +984,22 @@ function poserMarquages(champMarq) {
 // les deux cas le prix saisi reste ce qu'il est, il ne tombe pas à zéro.
 async function chiffrerTextile(ligne) {
   if (!ligne || !ligne.textile || ligne.puManuel) return null;
+  // Une référence libre sans prix d'achat ne se chiffre pas : le moteur rendrait
+  // `null` et le prix saisi resterait ce qu'il est — c'est ce qu'on veut.
   const quantite = Math.max(0, Number(ligne.quantite) || 0);
   if (!quantite) return null;
   let TE;
   try { TE = await moteurTextile(); } catch (err) { dire(err.message, 'is-ko'); return null; }
   const compte = TE.calculate({
     ref: ligne.textile.ref,
-    isCustom: false,
+    // UNE RÉFÉRENCE LIBRE SE CHIFFRE COMME LES AUTRES (02/09). Le moteur sait le
+    // faire depuis toujours — il lui faut un prix d'achat, et il refuse
+    // poliment (rend `null`) s'il n'en a pas. C'est ce qui permet de chiffrer un
+    // article qu'on n'a jamais vendu sans l'entrer d'abord au catalogue.
+    isCustom: !!ligne.libre,
+    customRef: ligne.libre ? ligne.libre.ref : '',
+    customPurchase: ligne.libre ? ligne.libre.achat : '',
+    customDesignation: ligne.libre ? ligne.libre.designation : '',
     genre: ligne.textile.genre,
     transport: TRANSPORT_MOTEUR,
     printType: ligne.marquage || MARQUAGE_AUCUN,
@@ -919,7 +1008,10 @@ async function chiffrerTextile(ligne) {
     // dégressif sur le total, pas sur la répartition — et c'est elle qu'on lui
     // donne. La répartition reste ce que la ligne dit au client.
     sizes: { other: quantite },
-    discount: '',
+    // LA REMISE EST CELLE DE LA LIGNE. Le moteur l'applique AVANT l'arrondi
+    // commercial — c'est l'ordre du fichier V9, et l'inverse rendrait des prix
+    // qui ne tombent pas sur le pas d'arrondi.
+    discount: ligne.remise || '',
     manualPrice: '',
     // Les coefficients du fichier V9 portent déjà la marge : une majoration de
     // plus la compterait deux fois.
@@ -994,6 +1086,20 @@ function ajouterTransport() {
 function ajouterLigne(modele) {
   saisie.lignes.push({
     designation: '', reference: '', couleur: '', tailles: '', marquage: '', note: '',
+    // `encre` : la COULEUR du marquage — le mot de l'atelier, celui de la fiche
+    // de production. « Marquage » dit OÙ, « encre » dit avec quoi.
+    encre: '',
+    // `faces` : ce qu'on marque, face par face. Un objet n'a pas de tailles, il
+    // a des emplacements — et c'est le tableau des tailles de logo qui les
+    // déclare, famille par famille.
+    faces: '',
+    // `remise` : un pourcentage accordé sur CETTE ligne. Le moteur le connaît
+    // (`discount`) et l'applique avant l'arrondi ; sur une ligne qui ne se
+    // chiffre pas, il s'applique au prix saisi.
+    remise: 0,
+    // `libre` : une référence qui n'est pas au catalogue — sa ref, son prix
+    // d'achat et sa désignation, que le moteur chiffre comme les autres.
+    libre: null,
     // `simple` : la ligne n'a pas de détail de production (le transport). Elle
     // tient sur sa rangée de tableau, et rien dessous.
     simple: false,
@@ -1076,10 +1182,22 @@ function rangeeArticle(ligne) {
   // valable, et c'est ce qui rend la « ligne libre » inutile en tant que bouton.
   design.setAttribute('list', ID_PRODUITS);
   design.dataset.menuFiltre = 'Cherche : NS300, tasse, magnet…';
-  // PAS DE « + AJOUTER » SUR CE CHAMP-LÀ. Le composant le propose pour saisir
-  // une valeur hors liste — mais ici le champ EST libre : le bouton ouvrait une
-  // seconde zone de frappe pour faire ce qu'on fait déjà en tapant, et il
-  // poussait la rangée des deux métiers d'un cran vers le bas.
+  // LE BOUTON « RÉFÉRENCE LIBRE » EST DANS LE MENU (02/09, Charlie : « je dois
+  // pouvoir ajouter Référence libre via un bouton ajouter à l'intérieur de ce
+  // input »). Le composant sait poser cette ligne au pied de sa liste et lève
+  // `menu-action` : la page décide de la suite.
+  //
+  // ⚠ CE N'EST PAS « SAISIR UNE VALEUR HORS LISTE » — le champ est DÉJÀ libre,
+  // on peut y écrire n'importe quoi. C'est autre chose : un article qui n'est
+  // pas au catalogue mais qu'on veut CHIFFRER, donc dont il faut le prix
+  // d'achat et le genre. Le moteur sait le faire (`isCustom`), il lui manquait
+  // seulement un endroit où le demander.
+  design.dataset.menuAction = 'Référence libre — à chiffrer';
+  // ⚠ ET TOUJOURS PAS DE « + AJOUTER » GÉNÉRIQUE. Le composant en propose un
+  // pour ranger dans la liste ce qu'on vient de taper — mais ici le champ EST
+  // libre : ce bouton-là ouvrait une seconde zone de frappe pour faire ce qu'on
+  // fait déjà en tapant. Deux lignes « + » au même endroit, dont une qui ne sert
+  // à rien, c'est une hésitation de plus au comptoir.
   design.dataset.menuManuelNon = '';
 
   const refe = entree(`dvf-a-${n}-r`, { valeur: ligne.reference, exemple: 'NS300' });
@@ -1128,6 +1246,35 @@ function rangeeArticle(ligne) {
   // chevauchait celui de « Qté ». La note prend la rangée suivante, en entier :
   // c'est une phrase, elle ne tient pas dans un tiers de colonne.
   const detail = el('div', 'dvf-r3');
+  const detail2 = el('div', 'dvf-r3');
+  // LA COULEUR DU MARQUAGE — c'est `encre` sur la fiche de production, et les
+  // teintes sont celles du moteur (`DB.markingColorsHex`), pas une liste écrite
+  // ici : en ajouter une demain ne doit pas demander de retoucher cet écran.
+  const encre = entree(`dvf-a-${n}-e`, { valeur: ligne.encre, exemple: 'Blanc, Or, Multi couleur…' });
+  // LES FACES — ce qu'on marque, face par face. Elles viennent du tableau des
+  // tailles de logo, qui les déclare par FAMILLE : c'est la même source que la
+  // fiche de l'atelier et que le ticket.
+  const faces = entree(`dvf-a-${n}-f`, { valeur: ligne.faces, exemple: 'Coeur, Dos…' });
+  const remise = entree(`dvf-a-${n}-rm`, { type: 'number', valeur: ligne.remise || '', classe: 'dvf-nb' });
+  remise.max = '100';
+  remise.placeholder = '0';
+  detail2.append(champ('Couleur du marquage', encre), champ('Faces à marquer', faces),
+    champ('Remise %', remise));
+
+  // LE VOLET DE LA RÉFÉRENCE LIBRE. Il n'existe que quand on l'a demandé : trois
+  // cases de plus sur chaque article, pour un cas sur vingt, c'est exactement ce
+  // que la règle du volet interdit.
+  const libre = el('div', 'dvf-r3');
+  libre.hidden = !ligne.libre;
+  const lRef = entree(`dvf-a-${n}-lr`, { valeur: ligne.libre ? ligne.libre.ref : '', exemple: 'SWEAT-XL' });
+  const lAchat = entree(`dvf-a-${n}-la`, {
+    type: 'number', valeur: ligne.libre ? ligne.libre.achat : '', classe: 'dvf-nb',
+  });
+  lAchat.step = '0.01';
+  lAchat.placeholder = '12.50';
+  const lGenre = entree(`dvf-a-${n}-lg`, { valeur: ligne.libre ? ligne.libre.genre : '', exemple: 'Unisexe' });
+  libre.append(champ('Référence libre', lRef), champ('Prix d’achat HT', lAchat),
+    champ('Genre (table des temps)', lGenre));
 
   // --- LES TAILLES --------------------------------------------------------
   // LES TAILLES SONT DES CASES, PAS UNE PHRASE (01/09). Charlie : « des inputs
@@ -1189,7 +1336,7 @@ function rangeeArticle(ligne) {
   detail.append(champ('Référence', refe), champ('Couleur', coul), champ('Marquage', marq));
   // ⚠ UNE LIGNE SIMPLE S'ARRÊTE À SA RANGÉE. Un transport n'a ni référence, ni
   // couleur, ni marquage, ni tailles, et sa note est écrite d'avance.
-  if (!ligne.simple) bloc.append(detail, caseNote, cases);
+  if (!ligne.simple) bloc.append(detail, detail2, libre, caseNote, cases);
 
   // LA QUANTITÉ SE COMPTE QUAND LES TAILLES SONT REMPLIES, et elle se tape
   // sinon. Une tasse n'a pas de taille : sa case reste une saisie. Un t-shirt
@@ -1231,7 +1378,8 @@ function rangeeArticle(ligne) {
     });
   };
 
-  for (const [n2, cle] of [[refe, 'reference'], [coul, 'couleur'], [note, 'note']]) {
+  for (const [n2, cle] of [[refe, 'reference'], [coul, 'couleur'], [note, 'note'],
+    [encre, 'encre'], [faces, 'faces']]) {
     n2.addEventListener('input', () => { ligne[cle] = n2.value; rafraichirTete(); redessiner(); });
   }
 
@@ -1303,8 +1451,53 @@ function rangeeArticle(ligne) {
     // d'enlever.
     if (ligne.textile) recalculer();
   });
+  // LA REMISE REFAIT LE PRIX. Sur un textile, le moteur l'applique avant
+  // l'arrondi ; sur une ligne saisie à la main, elle s'applique au prix tapé —
+  // et dans ce cas c'est l'écran qui la pose, une seule fois, sur la valeur de
+  // départ retenue à la première remise.
+  remise.addEventListener('input', () => {
+    ligne.remise = Math.min(100, Math.max(0, Number(remise.value) || 0));
+    if (ligne.textile) { recalculer(); return; }
+    // ⚠ ON GARDE LE PRIX PLEIN. Sans lui, deux remises successives se
+    // composeraient (10 % puis 10 % feraient 19 %), et revenir à 0 ne rendrait
+    // jamais le prix de départ.
+    if (ligne.pleinHt == null) ligne.pleinHt = Number(ligne.unitaireHt) || 0;
+    ligne.unitaireHt = Math.round(ligne.pleinHt * (1 - ligne.remise / 100) * 100) / 100;
+    majPu();
+    rafraichirTete();
+    redessiner();
+  });
+
+  // --- LA RÉFÉRENCE LIBRE ------------------------------------------------
+  // Le composant lève `menu-action` quand on clique sa ligne : on ouvre le
+  // volet, et la ligne devient un textile à chiffrer.
+  const ouvrirLibre = () => {
+    ligne.libre = ligne.libre || { ref: '', achat: '', designation: '', genre: 'Unisexe' };
+    ligne.textile = { ref: '', genre: ligne.libre.genre || 'Unisexe' };
+    if (!ligne.marquage) { ligne.marquage = MARQUAGE_AUCUN; marq.value = MARQUAGE_AUCUN; }
+    libre.hidden = false;
+    lGenre.value = ligne.libre.genre || 'Unisexe';
+    poserMarquages(marq);
+    lRef.focus();
+  };
+  design.addEventListener('menu-action', ouvrirLibre);
+  for (const [n3, cle] of [[lRef, 'ref'], [lAchat, 'achat'], [lGenre, 'genre']]) {
+    n3.addEventListener('input', () => {
+      if (!ligne.libre) return;
+      ligne.libre[cle] = n3.value;
+      // La désignation du devis reste celle qu'on a tapée dans la ligne : c'est
+      // elle que le client lit. Le moteur, lui, prend la sienne.
+      ligne.libre.designation = ligne.designation || n3.value;
+      if (cle === 'genre') ligne.textile = { ref: '', genre: n3.value || 'Unisexe' };
+      recalculer();
+    });
+  }
+
   pu.addEventListener('input', () => {
     ligne.unitaireHt = Math.max(0, Number(pu.value) || 0);
+    // Un prix tapé à la main devient le nouveau prix PLEIN : la remise repartira
+    // de lui, pas de celui d'avant.
+    ligne.pleinHt = ligne.remise ? null : ligne.unitaireHt;
     // ON REPREND LA MAIN, ET LE MOTEUR LA REND. Un prix tapé pendant une
     // négociation ne doit pas se faire écraser au prochain changement de
     // quantité ; « Recalculer » le rend au moteur quand on a fini.
@@ -1324,6 +1517,15 @@ function rangeeArticle(ligne) {
     if (!saisie.lignes.length) poserLignes();
     redessiner();
   });
+
+  // LES DEUX LISTES S'HABILLENT TOUT DE SUITE : elles ne dépendent d'aucun choix
+  // de produit, contrairement aux emplacements de marquage. Les faces peuvent
+  // manquer (tableau des tailles de logo injoignable) — le champ reste alors une
+  // saisie libre, ce qui est exactement ce qu'il faut.
+  habiller(faces, ID_FACES, facesConnues);
+  moteurTextile()
+    .then((TE) => habiller(encre, ID_ENCRES, Object.keys(TE.DB.markingColorsHex || {})))
+    .catch(() => { /* moteur injoignable : la couleur se tape */ });
 
   // Un brouillon relu porte déjà des lignes textiles : elles retrouvent leur
   // liste de marquages sans qu'on ait à rechoisir le produit.
@@ -1492,6 +1694,12 @@ async function enregistrer() {
       validite: saisie.validite,
       projet: saisie.projet,
       dueDate: saisie.dueDate,
+      // CE QUI SUIT LE DOSSIER MAIS PAS LE PAPIER (02/09) : l'heure de retrait,
+      // le travail de maquette à prévoir, et ce qu'on se dit entre nous. Un
+      // serveur d'une version antérieure les ignore — ils n'empêchent rien.
+      dueHeure: saisie.dueHeure,
+      maquette: saisie.maquette,
+      noteInterne: saisie.noteInterne,
       client: saisie.client,
       appro: saisie.appro,
       regime: saisie.regime,
@@ -1525,13 +1733,17 @@ function repartirDeZero() {
   saisie = saisieNeuve();
   dossierId = null;
   for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-ville', ''],
-    ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cherche', ''],
-    ['#dvf-projet', ''], ['#dvf-due', ''], ['#dvf-validite', saisie.validite]]) {
+    ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cl-wa', ''],
+    ['#dvf-cherche', ''],
+    ['#dvf-projet', ''], ['#dvf-due', ''], ['#dvf-heure', ''], ['#dvf-note-interne', ''],
+    ['#dvf-validite', saisie.validite]]) {
     const n = $(id);
     if (n) n.value = v;
   }
   const appro = $('#dvf-appro');
   if (appro) appro.value = saisie.appro;
+  const maquette = $('#dvf-maquette');
+  if (maquette) maquette.value = 'non';
   poserLignes();
   redessiner();
 }
