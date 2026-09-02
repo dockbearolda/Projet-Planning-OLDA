@@ -236,6 +236,12 @@ export function modeleDevis(saisie, entreprise) {
       couleur: texte(l.couleur),
       tailles: texte(l.tailles),
       marquage: texte(l.marquage),
+      // CE QU'ON IMPRIME, AVEC QUOI ET OÙ (02/09). Le client relit sa commande
+      // sur ce papier : « Coeur + dos » ne dit pas la couleur de l'encre, et une
+      // tasse n'a pas de tailles mais des faces. Une case vide ne sort pas —
+      // c'est la règle de toutes les autres.
+      encre: texte(l.encre),
+      faces: texte(l.faces),
       note: texte(l.note),
       quantite: l.quantite,
       unitaireHt: euro(l.unitaireHt),
@@ -477,7 +483,8 @@ export function dessinerDevis(t, doc) {
     const cell = el('td');
     cell.append(el('div', 'dv__art', l.designation));
     for (const [k, v] of [['Réf', l.reference], ['Couleur', l.couleur],
-      ['Tailles', l.tailles], ['Marquage', l.marquage]]) {
+      ['Tailles', l.tailles], ['Marquage', l.marquage],
+      ['Encre', l.encre], ['Faces', l.faces]]) {
       if (v) cell.append(el('div', 'dv__art-d', `${k} : ${v}`));
     }
     if (l.note) cell.append(el('div', 'dv__art-n', l.note));

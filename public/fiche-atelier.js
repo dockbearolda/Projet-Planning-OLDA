@@ -179,6 +179,8 @@ export function texteMarge(ttc, cout) {
 //   ctx.etapes / ctx.employes / ctx.provenances / ctx.reglements / ctx.types
 //   ctx.fermer()                   → retour au planning
 //   ctx.ouvrirClient()             → la fiche du client, dans son onglet
+//   ctx.reprendreDevis(ligne)      → l'écran du devis, rempli de CE devis, pour
+//                                    en écrire la version suivante
 export function dessinerFicheAtelier(r, ctx) {
   const fiche = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
   // LA COLONNE DE PRODUCTION EXISTE MEME SANS `fiche.prod` (29/08). Elle etait
@@ -456,6 +458,8 @@ export function dessinerFicheAtelier(r, ctx) {
   // n'y a plus de « a cote » ou cliquer. Sans elle, la seule sortie serait
   // Echap — un cul-de-sac a la souris.
   const outils = el('div', 'fa-outils');
+  // DEUX BOUTONS, ET CHACUN NE PARAIT QUE S'IL MENE QUELQUE PART.
+  //
   // L'HISTORIQUE S'OUVRE D'ICI (01/09). Le journal du dossier et les versions
   // de ses documents s'ecrivaient depuis des mois sans qu'aucun ecran ne les
   // montre. Un BOUTON, pas une quatrieme zone : la fiche a ses trois zones, et
@@ -464,6 +468,18 @@ export function dessinerFicheAtelier(r, ctx) {
   // relit dans un bac a sable, elle n'importe rien elle-meme.
   if (ctx.ouvrirHistorique) {
     outils.append(bouton('fa-btn', 'Historique', () => ctx.ouvrirHistorique()));
+  }
+  // REPRENDRE LE DEVIS — la V2, la V3 (02/09/2026). Charlie : « ce devis pourra
+  // être modifié directement depuis la ligne pour créer la v2, 3, 4… dans le cas
+  // où le client souhaite une modification ».
+  //
+  // IL N'APPARAÎT QUE SUR UN DOSSIER QUI PORTE UN DEVIS. Sur les autres il
+  // n'ouvrirait rien — et un bouton qui n'ouvre rien est un bouton qu'on
+  // apprend à ne plus lire.
+  if (fiche && fiche.devis && ctx.reprendreDevis) {
+    const rang = Math.max(1, Math.round(Number(fiche.version) || 1));
+    outils.append(bouton('fa-btn', `Reprendre — version ${rang + 1}`,
+      () => ctx.reprendreDevis(r)));
   }
   outils.append(etatSauve, bouton('fa-btn fa-btn--carre', '×', () => ctx.fermer()));
   tete.append(ident, outils);

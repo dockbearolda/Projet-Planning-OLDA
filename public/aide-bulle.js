@@ -11,11 +11,16 @@
 // relues zéro fois après la première ouverture. Le texte ne disparaît pas — il
 // se demande. « À égalité, celle qui montre MOINS gagne. »
 //
-// UNE SEULE ÉCRITURE POUR LES DEUX ÉCRANS. Réglages et Devis sont à un clic
-// l'un de l'autre et portent la MÊME carte : deux fabriques qui se ressemblent
-// redeviendraient deux bulles le jour où l'une bouge. La forme vit dans
-// `charte.css` (`.aide-b` / `.aide-bulle`), le comportement ici — exactement
-// la coupe de `ecran-tete.js` et de `modale.js`.
+// UNE SEULE ÉCRITURE, QUEL QUE SOIT L'ÉCRAN QUI LA POSE. Deux fabriques qui se
+// ressemblent redeviendraient deux bulles le jour où l'une bouge. La forme vit
+// dans `charte.css` (`.aide-b` / `.aide-bulle`), le comportement ici —
+// exactement la coupe de `ecran-tete.js` et de `modale.js`.
+//
+// ⚠ SEULS LES RÉGLAGES L'APPELLENT DEPUIS LE 02/09. Le devis a retiré ses quatre
+// « i » (Charlie : « supprime les points d'information ») : sur un écran qu'on
+// remplit devant le client, ce qui s'apprend une fois se franchit ensuite à
+// chaque devis. Le composant ne bouge pas pour autant — il attend l'écran
+// suivant qui aura quelque chose à expliquer.
 //
 // LA BULLE NE POUSSE PERSONNE (loi 8). Elle sort du flux et se pose sur la
 // largeur de son HÔTE, pas sur celle du « i » : voir la note de `charte.css`.

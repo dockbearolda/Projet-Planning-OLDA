@@ -62,9 +62,15 @@ delete process.env.APP_PASSWORD;
   let r = await call('POST', '/api/devis', DEVIS);
   assert.strictEqual(r.status, 201, JSON.stringify(r.body));
   const id = r.body.id;
-  assert.strictEqual(r.body.stage, 'demande_chiffrage');
-  assert.strictEqual(r.body.subStage, 'devis_envoye',
-    'un devis chiffré et imprimé attend le client, il n’est pas « à chiffrer »');
+  // ⚠ LE DEVIS ENTRE PAR « À TRIER » DEPUIS LE 02/09 (Charlie). Il allait droit
+  // à « Demande & chiffrage / Devis envoyé — Attente client » : ça répondait à
+  // la question « qui le relance ? », mais ça présumait de la précédente — un
+  // devis composé devant un client n'est pas forcément un devis PARTI. « À
+  // trier » est la corbeille d'entrée de l'atelier, celle qu'on vide le matin,
+  // et c'est de là qu'il se range.
+  assert.strictEqual(r.body.stage, 'a_trier');
+  assert.strictEqual(r.body.subStage, null,
+    '« À trier » n’a pas de sous-étape : c’est le sur-dossier, pas une phase');
   // LE NUMÉRO VIENT DU COMPTEUR DU SERVEUR quand l'écran n'a rien imprimé : un
   // dossier de devis sans référence ne se retrouve pas.
   assert.match(r.body.numero, /^DEV-26\.09\.01-\d{3}$/, `numéro inattendu : ${r.body.numero}`);
@@ -182,7 +188,60 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(Number(r.body.project_value), 502,
     'ni un tarif tasse : ce qui est chiffré est chiffré');
 
-  console.log('✓ devis au planning : « Tarif / Devis envoyé », nature demande, numéro unique, '
-    + 'et un prix qui ne se retarife jamais');
+  // -------------------------------------------------------------------------
+  // 5. LA REPRISE — V2, V3, ET UN SEUL DOSSIER (02/09/2026)
+  // -------------------------------------------------------------------------
+  // « Ce devis pourra être modifié directement depuis la ligne pour créer la v2,
+  // 3, 4… dans le cas où le client souhaite une modification » (Charlie).
+  //
+  // CE QUI COÛTE CHER SI ÇA DÉRIVE : un DEUXIÈME dossier pour le même client et
+  // le même projet. Il faudrait les rapprocher à la main, et on relancerait le
+  // mauvais. C'est ce qui est arrivé en le jouant la première fois — `id` est un
+  // UUID, `Number(id)` rend NaN, la reprise passait pour absente.
+  {
+    const avant = (await call('GET', '/api/requests')).body.length;
+    const V2 = {
+      ...DEVIS,
+      dossierId: id,
+      numero: '',                     // le serveur en pose un neuf, « …-V2 »
+      lignes: [{ designation: 'T-shirt STAFF', quantite: 80, unitaireHt: 13, totalHt: 1040 }],
+      sousTotalHt: 1040, totalHt: 1040, taxe: 41.6, ttc: 1081,
+    };
+    let v = await call('POST', '/api/devis', V2);
+    assert.strictEqual(v.status, 200, JSON.stringify(v.body));
+    assert.strictEqual(v.body.reprise, true, 'le serveur dit qu’il a repris, pas créé');
+    assert.strictEqual(v.body.id, id, 'et c’est le MÊME dossier');
+    assert.strictEqual(v.body.version, 2);
+    assert.match(v.body.numero, /-V2$/, 'le numéro garde sa racine et gagne son rang');
+
+    const apres = (await call('GET', '/api/requests')).body.length;
+    assert.strictEqual(apres, avant, 'une reprise n’ouvre AUCUN dossier de plus');
+
+    const f = (await call('GET', `/api/requests/${id}`)).body;
+    assert.strictEqual(f.fiche.version, 2);
+    assert.strictEqual(f.fiche.devis.ttc, 1081, 'la version courante est la nouvelle');
+    assert.strictEqual(Number(f.project_value), 1081, 'et la ligne du planning porte son montant');
+    assert.strictEqual(f.quantity, 80);
+    // LA VERSION D'AVANT EST RANGÉE, PAS PERDUE : le client a une feuille en
+    // main, il faut pouvoir dire ce qu'on lui avait chiffré.
+    assert.strictEqual(f.fiche.devisPassees.length, 1);
+    assert.strictEqual(f.fiche.devisPassees[0].version, 1);
+    assert.strictEqual(f.fiche.devisPassees[0].devis.ttc, 502);
+
+    // UNE TROISIÈME EMPILE, elle n'écrase pas la deuxième.
+    v = await call('POST', '/api/devis', { ...V2, ttc: 900, totalHt: 900, sousTotalHt: 900 });
+    assert.strictEqual(v.body.version, 3);
+    assert.match(v.body.numero, /-V3$/, 'la racine ne se dédouble pas : jamais « -V2-V3 »');
+    const f3 = (await call('GET', `/api/requests/${id}`)).body;
+    assert.deepStrictEqual(f3.fiche.devisPassees.map((x) => x.version), [2, 1],
+      'de la plus récente à la plus ancienne');
+
+    // UN DOSSIER QUI N'EST PAS UN DEVIS NE SE REPREND PAS.
+    const ko = await call('POST', '/api/devis', { ...V2, dossierId: 'inexistant' });
+    assert.strictEqual(ko.status, 404, 'un dossier introuvable se dit, il ne crée pas un devis orphelin');
+  }
+
+  console.log('✓ devis au planning : « À trier », nature demande, numéro unique, '
+    + 'reprise en V2/V3 sur UN seul dossier, et un prix qui ne se retarife jamais');
   process.exit(0);
 })();
