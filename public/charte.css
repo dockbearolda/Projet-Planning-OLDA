@@ -489,11 +489,24 @@
 }
 /* La gauche et la droite sont deux groupes, pas deux marges : `flex-end`
    rognerait par la gauche sur une rangee trop etroite — meme piege que la
-   barre du comptoir et que la rangee du Point du jour. */
-.ecran-tete__gauche { display: flex; align-items: center; gap: var(--pas-3); min-width: 0; }
+   barre du comptoir et que la rangee du Point du jour.
+   `display: contents` DEPUIS LE 01/09, ET C'EST LE CORRECTIF D'UN CHEVAUCHEMENT
+   VU AU RENDU. Sur la rangee verrouillee, ce groupe se laissait ecraser jusqu'a
+   ZERO (`min-width: 0`) pendant que son titre, lui, debordait par-dessus les
+   commandes : a 1 000 px, « Devis » passait sous « Nouveau devis ». En rendant
+   ses deux enfants directement au rang de la rangee, le titre y occupe une vraie
+   place et c'est le COMPTEUR qui cede — l'ecart entre les deux vaut le meme
+   `--pas-3` qu'avant, celui de la rangee. */
+.ecran-tete__gauche { display: contents; }
 /* LES COMMANDES NE SE COMPRIMENT PAS : sur une rangee verrouillee, c'est le
-   groupe de GAUCHE qui rend la place — un nom d'ecran s'abrege, un bouton
-   dont le mot se coupe ne se clique plus. */
+   COMPTEUR qui rend la place — un bouton dont le mot se coupe ne se clique
+   plus, et le nom de l'ecran est ce qu'on est venu lire.
+   CE QUI N'EST PAS EGALISABLE SE DIT : sous ~1 150 px de fenetre, un ecran a
+   trois commandes larges (le devis flash : 584 px de boutons) n'a plus de quoi
+   les poser, meme le compteur efface. La derniere se fait alors rogner par le
+   bord de l'ecran. C'est assume : le plancher de travail est 1 280 (PC
+   uniquement, voir CLAUDE.md), et une rangee qui double de hauteur pour tenir
+   coute 51 px a TOUTES les largeurs pour sauver une largeur qu'on n'a pas. */
 .ecran-tete__droite {
   display: flex; align-items: center; gap: var(--pas-2);
   margin-left: auto; flex-shrink: 0;
