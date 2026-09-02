@@ -1741,8 +1741,13 @@ function peindre() {
       || !String(saisie.client.nom || '').trim();
     // LE BOUTON DIT CE QU'IL FERA, pas ce qu'il est. « Enregistrer » sur une
     // reprise laisserait croire qu'on ouvre un second dossier.
+    // ⚠ COURT. « Enregistrer dans « À trier » » faisait 267 px à lui seul et
+    // poussait la rangée des trois boutons sous le titre — mesuré au rendu :
+    // 902 px de contenu dans 918 de barre, l'écart de la gouttière suffisait à
+    // la faire s'enrouler, et l'en-tête passait de 82 à 122 px. Où va le devis,
+    // le message le dit après le clic ; le bouton n'a qu'à dire ce qu'il fait.
     bSave.textContent = repriseDe ? `Enregistrer la version ${version + 1}`
-      : (dossierId ? 'Enregistré au planning' : 'Enregistrer dans « À trier »');
+      : (dossierId ? 'Enregistré' : 'Enregistrer');
   }
 
   const feuille = $('#dvf-feuille');
