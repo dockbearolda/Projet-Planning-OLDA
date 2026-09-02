@@ -42,7 +42,7 @@ import { poserAide } from './aide-bulle.js';
 // 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
 // TOUS LES INPUTS avec un menu déroulant ». Il a déménagé de `pont.js` pour
 // qu'il n'en existe qu'UN — voir l'en-tête de `menu-recherche.js`.
-import { menuPoser, menuRafraichir, menuOuvrirDe, poserStyleMenu } from './menu-recherche.js';
+import { menuPoser, menuRafraichir, poserStyleMenu } from './menu-recherche.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT && ROOT.querySelector(sel);
@@ -103,7 +103,51 @@ function saisieNeuve() {
   };
 }
 
+// LES SIX TAILLES, ÉCRITES UNE FOIS. Charlie, 01/09 : « des inputs par défaut
+// pour chaque taille de t-shirt, de XS à 2XL ». Elles sont l'ordre d'affichage
+// ET l'ordre d'écriture sur le devis — deux listes finiraient par diverger, et
+// c'est le papier remis au client qui le dirait.
+//
+// ⚠ CE N'EST PAS LA LISTE DU MOTEUR. `textile-catalog.js` compte en
+// S/M/L/XL/XXL/other, et il ne s'en sert QUE pour faire un total : le
+// coefficient est dégressif sur la quantité, pas sur la répartition (voir
+// `chiffrerTextile`, qui lui passe `{ other: quantité }`). Un XS de plus ici ne
+// change donc rien au prix, et n'oblige à toucher à rien là-bas.
+const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
+
+// CE QUE LES TAILLES DISENT SUR LE DEVIS : « 2 × S · 3 × M ». C'est la
+// grammaire de toute la maison — la fiche de production et le ticket de
+// l'atelier comptent ainsi. Le texte est DÉRIVÉ des cases : il n'y a qu'une
+// source, et une répartition corrigée à l'écran ne peut pas laisser sur le
+// papier celle d'avant.
+function texteTailles(parTaille) {
+  return TAILLES
+    .filter((t) => Number((parTaille || {})[t]) > 0)
+    .map((t) => `${Number(parTaille[t])} × ${t}`)
+    .join(' · ');
+}
+function totalTailles(parTaille) {
+  return TAILLES.reduce((s, t) => s + (Number((parTaille || {})[t]) || 0), 0);
+}
+// UN BROUILLON D'AVANT LES CASES porte ses tailles en TEXTE. On le relit plutôt
+// que de le jeter : la grammaire est la nôtre, on sait la défaire.
+function lireTailles(texte) {
+  const par = {};
+  const re = /(\d+)\s*[×x]\s*([A-Za-z0-9]+)/g;
+  let m = re.exec(String(texte || ''));
+  while (m) {
+    const t = TAILLES.find((k) => k.toLowerCase() === m[2].toLowerCase());
+    if (t) par[t] = (par[t] || 0) + Number(m[1]);
+    m = re.exec(String(texte || ''));
+  }
+  return par;
+}
+
 let saisie = saisieNeuve();
+// QUELLES CATÉGORIES SONT DÉPLIÉES. Par appareil, avec le brouillon : celui qui
+// a replié la fiscalité une fois ne veut pas la replier à chaque devis.
+// Absente de l'objet = ouverte : une catégorie neuve s'ouvre.
+let replis = {};
 let clients = [];
 let catalogue = [];
 let entreprise = {};
@@ -118,7 +162,7 @@ let dossierId = null;
 // l'écran le DIT.
 const CLE_BROUILLON = 'olda.devis.brouillon';
 function garderBrouillon() {
-  try { localStorage.setItem(CLE_BROUILLON, JSON.stringify({ saisie, dossierId })); } catch (_) { /* plein ou refusé */ }
+  try { localStorage.setItem(CLE_BROUILLON, JSON.stringify({ saisie, dossierId, replis })); } catch (_) { /* plein ou refusé */ }
 }
 function relireBrouillon() {
   try {
@@ -128,7 +172,13 @@ function relireBrouillon() {
     if (!d || !d.saisie || typeof d.saisie !== 'object') return;
     saisie = { ...saisieNeuve(), ...d.saisie, client: { ...saisieNeuve().client, ...(d.saisie.client || {}) } };
     saisie.lignes = Array.isArray(d.saisie.lignes) ? d.saisie.lignes : [];
+    // Une ligne d'avant les cases de taille garde sa répartition : on la relit
+    // du texte, seule écriture qu'elle en avait.
+    for (const l of saisie.lignes) {
+      if (!l.parTaille || typeof l.parTaille !== 'object') l.parTaille = lireTailles(l.tailles);
+    }
     dossierId = d.dossierId || null;
+    replis = d.replis && typeof d.replis === 'object' ? d.replis : {};
   } catch (_) { /* un brouillon illisible vaut pas de brouillon */ }
 }
 
@@ -139,9 +189,29 @@ function relireBrouillon() {
 // chaque frappe reprend le curseur à qui écrit, et c'est une saisie perdue par
 // ligne. Le squelette est donc pose une fois ; seuls les TOTAUX et la FEUILLE
 // se redessinent, et ni l'un ni l'autre ne porte de curseur.
-function carte(icone, titre, aide) {
-  const c = el('section', 'reg-card');
-  const t = el('header', 'reg-card__head');
+// UNE CATÉGORIE SE REPLIE (01/09). Charlie : « un menu dépliant pour chaque
+// catégorie ». Une carte ouverte de bout en bout, c'est quatre écrans de champs
+// à franchir pour arriver aux articles — et sur un devis sur trois, le client
+// est déjà en base et la fiscalité ne bouge pas.
+//
+// C'EST LE VOLET DE LA CHARTE, celui des deux écrans du comptoir
+// (`.volet-plus`, charte.css) : un `<details>`, sa flèche, et son ouverture
+// glissée. Pas un repli écrit ici qui lui ressemblerait.
+//
+// LE CORPS EST UN BLOC, ET C'EST STRUCTUREL : `.reg-card` est une colonne
+// `flex` avec son écart ; sur un `<details>`, cette colonne ne compte que DEUX
+// enfants — le résumé et la boîte de contenu — et l'écart entre les rangées de
+// la carte disparaîtrait. Le corps le reprend donc à son compte.
+//
+// Rend `[bloc, corps]` : on empile dans le corps, jamais dans le bloc.
+function carte(icone, titre, aide, cle) {
+  const c = el('details', 'reg-card dvf-cat volet-plus');
+  c.open = replis[cle] !== false;
+  if (cle) {
+    c.dataset.cat = cle;
+    c.addEventListener('toggle', () => { replis[cle] = c.open; garderBrouillon(); });
+  }
+  const t = el('summary', 'reg-card__head');
   t.append(ic(icone));
   t.firstChild.classList.add('reg-card__ic');
   const ligne = el('div', 'reg-card__t');
@@ -152,13 +222,48 @@ function carte(icone, titre, aide) {
   // une fois, et ensuite on les franchit a chaque devis. Ils sont dans la bulle
   // du « i » — meme fabrique que les Reglages, la carte est la leur.
   poserAide(t, ligne, aide);
+  // CE QUE LA CATÉGORIE DIT QUAND ELLE EST REPLIÉE. Un volet fermé qui ne dit
+  // rien de ce qu'il contient oblige à le rouvrir pour vérifier — c'est-à-dire
+  // à défaire ce qu'on vient de faire. Rempli par `peindre()`.
+  const resume = el('span', 'dvf-cat__resume');
+  if (cle) resume.dataset.resume = cle;
+  ligne.append(resume);
   c.append(t);
+  const corps = el('div', 'dvf-cat__corps');
+  c.append(corps);
+  return [c, corps];
+}
+
+// UNE RANGÉE DE FEUILLE DE CALCUL : l'intitulé à gauche, la case à droite, et
+// rien autour. Charlie, 01/09 : « les lignes simples à remplir façon Google
+// Sheet ». L'intitulé au-dessus (`.fa-case`, la grammaire du comptoir) reste
+// celui du TABLEAU des articles, où il coiffe une colonne et se lit une fois
+// pour toutes les lignes ; ici, où chaque rangée porte un champ différent, il
+// se pose à gauche et le regard descend une seule colonne de cases.
+//
+// Il garde `.fa-lab` et `.fa-in` — l'intitulé et la boîte de l'application. Ce
+// qui change, c'est la mise en place, pas les composants.
+function rang(nom, noeud) {
+  const c = el('div', 'dvf-rang');
+  const lab = el('label', 'fa-lab dvf-rang__k', nom);
+  const boite = el('div', 'dvf-rang__v');
+  boite.append(noeud);
+  if (noeud.id) lab.setAttribute('for', noeud.id);
+  c.append(lab, boite);
   return c;
 }
 
-// UN CHAMP, ET C'EST CELUI DU COMPTOIR : intitulé au-dessus, boîte toujours
-// visible. Une seule fabrique — écrit à la main quinze fois, il finirait par
-// exister en quinze versions.
+// UNE COLONNE DE RANGÉES. Les traits de séparation viennent de la grille, pas
+// de chaque rangée : une bordure écrite par rangée en pose une de trop en bas.
+function feuille(...rangs) {
+  const g = el('div', 'dvf-grille');
+  g.append(...rangs);
+  return g;
+}
+
+// UN CHAMP À INTITULÉ AU-DESSUS — celui du comptoir (`.fa-case`). Il ne sert
+// plus que là où l'intitulé coiffe une case isolée dans le tableau : les
+// tailles et la note d'un article.
 function champ(nom, noeud) {
   const c = el('div', 'fa-case');
   const lab = el('label', 'fa-lab', nom);
@@ -323,9 +428,9 @@ function mettreALEchelle() {
 // choisi remplit les quatre champs ; un client inconnu se tape à la main et
 // entre en base à l'enregistrement — c'est la règle de tous les parcours.
 function carteClient() {
-  const c = carte('contacts', 'Client',
+  const [c, corps] = carte('contacts', 'Client',
     'Cherche dans la base clients. Un client inconnu se saisit ici et entre en base '
-    + 'quand le devis part au planning.');
+    + 'quand le devis part au planning.', 'client');
 
   const cherche = el('div', 'dvf-cherche');
   const pilule = el('div', 'champ-recherche');
@@ -342,26 +447,24 @@ function carteClient() {
   props.id = 'dvf-props';
   props.hidden = true;
   cherche.append(pilule, props);
-  c.append(cherche);
+  corps.append(cherche);
 
-  const r2 = el('div', 'dvf-r2');
   const nom = entree('dvf-cl-nom', { valeur: saisie.client.nom, exemple: 'Nom ou société' });
   const code = entree('dvf-cl-code', { valeur: saisie.client.code, exemple: 'ALO' });
   const ville = entree('dvf-cl-ville', { valeur: saisie.client.ville, exemple: '97150 Saint-Martin' });
   const email = entree('dvf-cl-email', { type: 'email', valeur: saisie.client.email, exemple: 'facultatif' });
-  r2.append(champ('Client / société', nom), champ('Code client', code),
-    champ('Ville', ville), champ('E-mail', email));
-  c.append(r2);
-
-  const r3 = el('div', 'dvf-r3');
   const contact = entree('dvf-cl-contact', { valeur: saisie.client.contact, exemple: 'facultatif' });
   const tel = entree('dvf-cl-tel', { type: 'tel', valeur: saisie.client.tel, exemple: 'facultatif' });
   const type = menu('dvf-cl-type', [
     { id: 'professionnel', label: 'Professionnel' }, { id: 'particulier', label: 'Particulier' },
     { id: 'association', label: 'Association' }, { id: 'revendeur', label: 'Revendeur' },
   ], saisie.client.type === 'perso' ? 'particulier' : 'professionnel');
-  r3.append(champ('Personne à contacter', contact), champ('Téléphone', tel), champ('Type', type));
-  c.append(r3);
+  corps.append(feuille(
+    rang('Client / société', nom), rang('Code client', code),
+    rang('Ville', ville), rang('E-mail', email),
+    rang('Personne à contacter', contact), rang('Téléphone', tel),
+    rang('Type', type),
+  ));
 
   for (const [n, cle] of [[nom, 'nom'], [code, 'code'], [ville, 'ville'],
     [email, 'email'], [contact, 'contact'], [tel, 'tel']]) {
@@ -442,21 +545,18 @@ function prendreClient(cl) {
 // CARTE 2 — LE PROJET ET CE QU'ON PEUT PROMETTRE
 // ===========================================================================
 function carteProjet() {
-  const c = carte('event', 'Projet et délai',
+  const [c, corps] = carte('event', 'Projet et délai',
     'La date demandée par le client reste indicative tant que l’acompte, le BAT et '
-    + 'l’approvisionnement ne sont pas sécurisés.');
+    + 'l’approvisionnement ne sont pas sécurisés.', 'projet');
 
-  const rA = el('div', 'dvf-r2');
   const projet = entree('dvf-projet', { valeur: saisie.projet, exemple: 'STAFF, Terrasse, Rentrée…' });
   const appro = menu('dvf-appro', APPROS, saisie.appro);
-  rA.append(champ('Nom du projet', projet), champ('Approvisionnement', appro));
-  c.append(rA);
-
-  const rB = el('div', 'dvf-r2');
   const due = entree('dvf-due', { type: 'date', valeur: saisie.dueDate });
   const val = entree('dvf-validite', { type: 'date', valeur: saisie.validite });
-  rB.append(champ('Date souhaitée client', due), champ('Validité du devis', val));
-  c.append(rB);
+  corps.append(feuille(
+    rang('Nom du projet', projet), rang('Approvisionnement', appro),
+    rang('Date souhaitée client', due), rang('Validité du devis', val),
+  ));
 
   // L'ÉTAT DU DÉLAI N'EST PAS UN CHAMP : c'est ce que l'approvisionnement choisi
   // ENTRAÎNE, et c'est une phrase. Posé dans une demi-colonne comme s'il se
@@ -466,7 +566,7 @@ function carteProjet() {
   // une commande.
   const etat = el('div', 'dvf-etat');
   etat.id = 'dvf-etat';
-  c.append(etat);
+  corps.append(etat);
 
   projet.addEventListener('input', () => { saisie.projet = projet.value; redessiner(); });
   due.addEventListener('change', () => { saisie.dueDate = due.value; redessiner(); });
@@ -478,25 +578,46 @@ function carteProjet() {
 // ===========================================================================
 // CARTE 3 — LES ARTICLES
 // ===========================================================================
+// LES COLONNES DU TABLEAU, ÉCRITES UNE FOIS. L'en-tête les pose, chaque ligne
+// les remplit dans le même ordre : deux listes, ce serait un intitulé qui coiffe
+// la mauvaise case le jour où l'on en insère une.
+const COLONNES = ['Désignation', 'Référence', 'Qté', 'PU HT', 'Total', ''];
+
 function carteArticles() {
-  const c = carte('local_grocery_store', 'Articles',
+  const [c, corps] = carte('local_grocery_store', 'Articles',
     'Le produit se cherche dans la DÉSIGNATION de la ligne : on tape, la liste '
     + 'filtre, et les deux métiers de la maison — Textile et Boutique — se '
     + 'basculent en haut du menu. Rien n’oblige à choisir : une désignation '
     + 'écrite à la main reste une ligne valable. Les prix affichés sont HT — le '
     + 'devis est le seul document de la maison qui les montre ainsi ; un prix de '
-    + 'catalogue, lui, est TTC, et il est converti au taux en vigueur.');
+    + 'catalogue, lui, est TTC, et il est converti au taux en vigueur.', 'articles');
 
+  // LE TABLEAU (01/09). Charlie : « une présentation façon tableau ». Un article
+  // tenait dans un bloc de cinq rangées à intitulés — huit champs, huit
+  // étiquettes, et la même étiquette réécrite à chaque article. En tableau, un
+  // intitulé se lit UNE fois en tête de colonne et l'œil descend une colonne de
+  // cases, comme sur une feuille de calcul.
+  //
+  // IL DÉFILE HORIZONTALEMENT, ET LA DÉSIGNATION RESTE. C'est la seule colonne
+  // qui dit DE QUOI on parle : sans elle sous les yeux, un prix corrigé à
+  // droite se corrige sur la ligne d'à côté. Elle se fige donc à gauche —
+  // exactement ce que fait une feuille de calcul avec sa première colonne.
+  const tab = el('div', 'dvf-tab');
+  const tete = el('div', 'dvf-tab__tete');
+  tete.id = 'dvf-tab-tete';
+  for (const nom of COLONNES) tete.append(el('span', 'fa-lab', nom));
+  tab.append(tete);
   const liste = el('div', 'dvf-liste');
   liste.id = 'dvf-liste';
-  c.append(liste);
+  tab.append(liste);
+  corps.append(tab);
 
   // LA LISTE DES PRODUITS EST POSÉE UNE FOIS POUR TOUT L'ÉCRAN. Chaque rangée
   // la vise par son `list=` : un <datalist> par article, c'est cent trente
   // options recopiées autant de fois qu'il y a de lignes au devis.
   const produits = el('datalist');
   produits.id = ID_PRODUITS;
-  c.append(produits);
+  corps.append(produits);
 
   // ⚠ LE CHOIX DU PRODUIT A QUITTÉ CETTE BARRE (01/09). Elle portait une liste
   // déroulante « Ajouter un article du catalogue » — cent trente entrées sans
@@ -512,11 +633,11 @@ function carteArticles() {
   bTransport.type = 'button';
   bTransport.id = 'dvf-transport';
   barre.append(bLigne, bTransport);
-  c.append(barre);
+  corps.append(barre);
 
   const aide = el('p', 'dvf-aide');
   aide.id = 'dvf-aide-cat';
-  c.append(aide);
+  corps.append(aide);
 
   bLigne.addEventListener('click', () => ajouterLigne({}));
   bTransport.addEventListener('click', ajouterTransport);
@@ -648,17 +769,6 @@ const MARQUAGE_AUCUN = 'Aucun';
 // ligne, c'est dire une fois ce qu'on facture une fois.
 const TRANSPORT_MOTEUR = 'Maritime';
 
-// LA RANGÉE EST CONSTRUITE UNE FOIS ET NE SE REFAIT PAS ; quand le moteur pose
-// un prix, il faut pourtant que la case le montre. Chaque rangée dépose donc
-// ici de quoi se remettre à jour — dans une `WeakMap`, pour qu'une ligne
-// supprimée s'oublie toute seule, et surtout pour que rien de tout ça ne parte
-// dans le brouillon ni dans l'archive du devis.
-const MAJ_LIGNE = new WeakMap();
-function majPrixLigne(ligne) {
-  const maj = MAJ_LIGNE.get(ligne);
-  if (maj) maj();
-}
-
 // LE MARQUAGE DEVIENT UNE LISTE LE JOUR OÙ LA LIGNE DEVIENT UN TEXTILE.
 // ===========================================================================
 // Il décide du prix : « coeur+dos » tapé à la main n'est plus un emplacement
@@ -783,6 +893,10 @@ function ajouterTransport() {
 function ajouterLigne(modele) {
   saisie.lignes.push({
     designation: '', reference: '', couleur: '', tailles: '', marquage: '', note: '',
+    // `parTaille` : les six cases. `tailles` reste le TEXTE du devis, et il en
+    // est dérivé — une seule source, sinon le papier dit une répartition et
+    // l'écran une autre.
+    parTaille: {},
     quantite: 1, unitaireHt: 0,
     // `textile` : la référence et le genre du moteur, quand la ligne se chiffre.
     // `puManuel` : le prix a été repris à la main, le moteur n'y touche plus.
@@ -795,6 +909,7 @@ function ajouterLigne(modele) {
     if (vide) vide.remove();
     hote.append(rangeeArticle(saisie.lignes[saisie.lignes.length - 1]));
   }
+  majTeteTableau();
   redessiner();
   // On ouvre la frappe sur la désignation : c'est le premier mot qu'on tape
   // après avoir cliqué « Ligne libre ».
@@ -803,10 +918,21 @@ function ajouterLigne(modele) {
   if (premier && !modele.designation) premier.focus();
 }
 
+// UN EN-TÊTE SANS LIGNE NE COIFFE RIEN. Six intitulés au-dessus d'un message
+// « aucun article », c'est un tableau qui prétend porter des données. Une seule
+// fonction pour le dire, appelée à chaque fois que le nombre de lignes bouge :
+// écrit dans `poserLignes` seul, l'en-tête restait caché après le premier
+// « Ajouter un article » — mesuré au rendu, le tableau sortait sans colonnes.
+function majTeteTableau() {
+  const tete = $('#dvf-tab-tete');
+  if (tete) tete.hidden = !saisie.lignes.length;
+}
+
 function poserLignes() {
   const hote = $('#dvf-liste');
   if (!hote) return;
   hote.replaceChildren();
+  majTeteTableau();
   if (!saisie.lignes.length) {
     hote.append(el('div', 'dvf-vide', 'Aucun article. Pioche dans le catalogue, ou ajoute une ligne libre.'));
     return;
@@ -826,31 +952,13 @@ function rangeeArticle(ligne) {
   // dit donc que l'état de DÉPART, celui d'un brouillon relu ; partout ailleurs
   // c'est `ligne.textile` qui fait foi, au moment où on le lit.
   const estTextile = !!(ligne.textile && ligne.textile.ref);
+  if (!ligne.parTaille || typeof ligne.parTaille !== 'object') ligne.parTaille = {};
 
-  const tete = el('div', 'dvf-art__tete');
-  const nom = el('span', 'dvf-art__nom');
-  const total = el('span', 'dvf-art__total');
-  // « Recalculer » ne s'affiche QUE si le prix a été repris à la main : le reste
-  // du temps il n'y a rien à reprendre, le moteur suit déjà la quantité et le
-  // marquage. C'est le composant de la charte, celui de « Renommer » et de
-  // « Retirer » — pas un bouton de plus.
-  const reprendre = el('button', 'action-ligne', 'Recalculer');
-  reprendre.type = 'button';
-  reprendre.hidden = true;
-  const sup = el('button', 'reg-tarif-del');
-  sup.type = 'button';
-  sup.setAttribute('aria-label', 'Retirer cet article');
-  sup.append(ic('delete'));
-  // ⚠ IL EST DANS LA RANGÉE DÈS LE DÉPART, MASQUÉ. Une ligne devient un textile
-  // quand on choisit son produit — après sa construction — et une rangée ne se
-  // reconstruit pas : elle reprendrait le curseur à qui écrit.
-  tete.append(nom, total, reprendre, sup);
-  bloc.append(tete);
+  // LA RANGÉE DU TABLEAU. Ses cases suivent `COLONNES` dans l'ordre, sans
+  // intitulé : l'en-tête les nomme une fois pour toutes les lignes.
+  const rangee = el('div', 'dvf-tab__rang');
+  bloc.append(rangee);
 
-  // LA DÉSIGNATION PREND SA PROPRE LIGNE. Elle porte une phrase — « T-shirt
-  // Unisexe Bio Léger Premium 155 g » — quand tout le reste porte une référence
-  // ou deux chiffres. Sur la même rangée qu'eux, elle tombait à 59 px de large
-  // au plus petit poste de l'atelier (mesuré à 1280 px).
   const design = entree(`dvf-a-${n}-d`, {
     valeur: ligne.designation,
     exemple: 'Cherche un produit, ou écris la désignation',
@@ -869,20 +977,9 @@ function rangeeArticle(ligne) {
   // seconde zone de frappe pour faire ce qu'on fait déjà en tapant, et il
   // poussait la rangée des deux métiers d'un cran vers le bas.
   design.dataset.menuManuelNon = '';
-  bloc.append(champ('Désignation', design));
-  menuPoser(design);
 
-  const rA = el('div', 'dvf-r3');
   const refe = entree(`dvf-a-${n}-r`, { valeur: ligne.reference, exemple: 'NS300' });
-  const qte = entree(`dvf-a-${n}-q`, { type: 'number', valeur: ligne.quantite, classe: 'dvf-nb' });
-  const pu = entree(`dvf-a-${n}-p`, { type: 'number', valeur: ligne.unitaireHt, classe: 'dvf-nb' });
-  pu.step = '0.01';
-  rA.append(champ('Référence', refe), champ('Qté', qte), champ('PU HT', pu));
-  bloc.append(rA);
-
-  const r3 = el('div', 'dvf-r3');
   const coul = entree(`dvf-a-${n}-c`, { valeur: ligne.couleur, exemple: 'Light Olive Green' });
-  const tail = entree(`dvf-a-${n}-t`, { valeur: ligne.tailles, exemple: '2 × S · 3 × M' });
   // « Marquage » et pas « Personnalisation » : c'est le mot de l'atelier, celui
   // que la fiche de production emploie, et c'est celui qui s'imprime sur le
   // devis. Deux mots pour une chose, c'est une question de plus au comptoir.
@@ -893,16 +990,111 @@ function rangeeArticle(ligne) {
   // zéro mètre de DTF, et la ligne sortirait au prix du vêtement nu.
   const marq = entree(`dvf-a-${n}-m`, { valeur: ligne.marquage, exemple: 'Cœur + dos' });
   marq.id = `dvf-a-${n}-m`;
-  r3.append(champ('Couleur', coul), champ('Tailles', tail), champ('Marquage', marq));
-  bloc.append(r3);
+  const qte = entree(`dvf-a-${n}-q`, { type: 'number', valeur: ligne.quantite, classe: 'dvf-nb' });
+  const pu = entree(`dvf-a-${n}-p`, { type: 'number', valeur: ligne.unitaireHt, classe: 'dvf-nb' });
+  pu.step = '0.01';
+  // LE TOTAL DE LA LIGNE EST UNE CASE, PAS UN CHAMP : il ne se tape pas, il se
+  // lit. Il prend le rail des cases pour tomber sur elles.
+  const total = el('div', 'dvf-tab__lu dvf-nb');
+  const sup = el('button', 'reg-tarif-del');
+  sup.type = 'button';
+  sup.setAttribute('aria-label', 'Retirer cet article');
+  sup.append(ic('delete'));
+  rangee.append(design, refe, qte, pu, total, sup);
+  // ⚠ APRÈS L'INSERTION, JAMAIS AVANT. `menuPoser` REMPLACE le champ par sa peau
+  // dans la page (`hote.replaceWith(peau)`) : habillé hors de la page, le champ
+  // se retrouve dans une peau détachée, et l'append suivant le sortirait de sa
+  // peau — le menu existerait sans plus rien pour l'ouvrir.
+  menuPoser(design);
 
+  // --- LE DÉTAIL DE L'ARTICLE, SOUS SA LIGNE ------------------------------
+  // CE QUE LA TABLE PORTE, C'EST LA LIGNE COMMERCIALE : ce qu'on vend, combien,
+  // à quel prix. Le reste dit comment on le PRODUIT — la couleur, le marquage,
+  // la répartition — et ça ne se lit pas en colonne d'un article à l'autre.
+  //
+  // ⚠ ET C'EST UNE MESURE, pas un goût. Les huit colonnes tenaient 772 px de
+  // large au minimum ; la colonne de saisie en fait 574 au plus petit poste de
+  // l'atelier (1280 px, mesuré dans la coquille). La table aurait défilé de
+  // côté à demeure — y compris pour lire une référence.
+  const detail = el('div', 'dvf-r3');
+
+  // --- LES TAILLES --------------------------------------------------------
+  // LES TAILLES SONT DES CASES, PAS UNE PHRASE (01/09). Charlie : « des inputs
+  // par défaut pour chaque taille de t-shirt, de XS à 2XL ». Elles s'écrivaient
+  // à la main — « 2 × S · 3 × M » — dans un champ de texte : la répartition ne
+  // se comptait donc pas, elle se recopiait, et la quantité d'à côté pouvait la
+  // contredire sans que rien ne le dise.
+  //
+  // C'EST LA GRILLE DE LA FICHE DE PRODUCTION (`.fa-tailles`, fiche-atelier.css)
+  // — celle où l'atelier compte déjà ses pièces, à un clic d'ici. Pas une grille
+  // qui lui ressemble.
+  //
+  // PAS D'INTITULÉ « TAILLES » AU-DESSUS : chaque case porte le sien, et six
+  // lettres de taille sous un article ne se confondent avec rien.
+  // LES TAILLES SONT DES CASES, PAS UNE PHRASE (01/09). Charlie : « des inputs
+  // par défaut pour chaque taille de t-shirt, de XS à 2XL ». Elles s'écrivaient
+  // à la main — « 2 × S · 3 × M » — dans un champ de texte : la répartition ne
+  // se comptait donc pas, elle se recopiait, et la quantité d'à côté pouvait la
+  // contredire sans que rien ne le dise.
+  //
+  // C'EST LA GRILLE DE LA FICHE DE PRODUCTION (`.fa-tailles`, fiche-atelier.css)
+  // — celle où l'atelier compte déjà ses pièces, à un clic d'ici. Pas une grille
+  // qui lui ressemble.
+  //
+  // ELLES SONT SOUS LA RANGÉE, PAS DEDANS. Six colonnes de plus dans le tableau
+  // le poussaient à ~1220 px : il aurait défilé horizontalement à tous les
+  // postes, y compris pour lire la référence. Sous la ligne, elles ne coûtent
+  // rien à la largeur — et elles se lisent avec la note, qui parle du même
+  // article.
+  const cases = el('div', 'fa-tailles');
+  const champsTaille = new Map();
+  for (const t of TAILLES) {
+    const boite = el('div', 'fa-taille');
+    const c = entree(`dvf-a-${n}-t-${t}`, {
+      type: 'number', valeur: Number(ligne.parTaille && ligne.parTaille[t]) || '', classe: 'dvf-nb',
+    });
+    c.placeholder = '0';
+    boite.append(el('label', 'fa-lab fa-taille__k', t), c);
+    boite.firstChild.setAttribute('for', c.id);
+    cases.append(boite);
+    champsTaille.set(t, c);
+  }
   const note = entree(`dvf-a-${n}-n`, { valeur: ligne.note, exemple: 'Précision qui figurera sur le devis' });
-  bloc.append(champ('Note du devis', note));
+  // « Recalculer » ne s'affiche QUE si le prix a été repris à la main : le reste
+  // du temps il n'y a rien à reprendre, le moteur suit déjà la quantité et le
+  // marquage. C'est le composant de la charte, celui de « Renommer » et de
+  // « Retirer » — pas un bouton de plus.
+  // ⚠ IL EST DANS LA RANGÉE DÈS LE DÉPART, MASQUÉ. Une ligne devient un textile
+  // quand on choisit son produit — après sa construction — et une rangée ne se
+  // reconstruit pas : elle reprendrait le curseur à qui écrit.
+  const reprendre = el('button', 'action-ligne', 'Recalculer');
+  reprendre.type = 'button';
+  reprendre.hidden = true;
+  const caseNote = champ('Note du devis', note);
+  // Le bouton vit DANS la boîte de la note, à sa droite : c'est la seule case
+  // du détail qui a de la place à revendre, et il tombe sur le rail des champs
+  // plutôt que sur une rangée à lui.
+  caseNote.lastChild.append(reprendre);
+  detail.append(champ('Couleur', coul), champ('Marquage', marq), caseNote);
+  bloc.append(detail, cases);
+
+  // LA QUANTITÉ SE COMPTE QUAND LES TAILLES SONT REMPLIES, et elle se tape
+  // sinon. Une tasse n'a pas de taille : sa case reste une saisie. Un t-shirt
+  // réparti en six tailles en a une, et c'est leur somme — deux nombres qui
+  // disent la même chose et qui peuvent se contredire, c'est le devis qui
+  // annonce 24 pièces et en détaille 22.
+  const rafraichirQte = () => {
+    const somme = totalTailles(ligne.parTaille);
+    qte.readOnly = somme > 0;
+    qte.classList.toggle('dvf-tab__calc', somme > 0);
+    if (somme > 0) {
+      ligne.quantite = somme;
+      if (document.activeElement !== qte) qte.value = String(somme);
+    }
+    ligne.tailles = texteTailles(ligne.parTaille);
+  };
 
   const rafraichirTete = () => {
-    const vide = !String(ligne.designation || '').trim();
-    nom.textContent = vide ? 'Article sans désignation' : ligne.designation;
-    nom.classList.toggle('dvf-art__vide', vide);
     total.textContent = euro((Number(ligne.quantite) || 0) * (Number(ligne.unitaireHt) || 0));
     reprendre.hidden = !(ligne.textile && ligne.puManuel);
   };
@@ -916,7 +1108,6 @@ function rangeeArticle(ligne) {
     if (document.activeElement === pu) return;
     pu.value = String(ligne.unitaireHt);
   };
-  MAJ_LIGNE.set(ligne, () => { majPu(); rafraichirTete(); });
 
   const recalculer = () => {
     chiffrerTextile(ligne).then((prix) => {
@@ -927,9 +1118,23 @@ function rangeeArticle(ligne) {
     });
   };
 
-  for (const [n2, cle] of [[refe, 'reference'], [coul, 'couleur'],
-    [tail, 'tailles'], [note, 'note']]) {
+  for (const [n2, cle] of [[refe, 'reference'], [coul, 'couleur'], [note, 'note']]) {
     n2.addEventListener('input', () => { ligne[cle] = n2.value; rafraichirTete(); redessiner(); });
+  }
+
+  // UNE CASE DE TAILLE ÉCRIT TROIS CHOSES : sa part, le texte du devis, et la
+  // quantité. Le prix suit, parce que le coefficient est dégressif — dix
+  // t-shirts et cent t-shirts n'ont pas le même prix à la pièce.
+  for (const [t, c] of champsTaille) {
+    c.addEventListener('input', () => {
+      const v = Math.max(0, Math.round(Number(c.value) || 0));
+      if (v) ligne.parTaille[t] = v;
+      else delete ligne.parTaille[t];
+      rafraichirQte();
+      rafraichirTete();
+      redessiner();
+      if (ligne.textile) recalculer();
+    });
   }
 
   // LA DÉSIGNATION ÉCRIT, ET ELLE CHOISIT. La frappe pose le texte tel quel —
@@ -1002,7 +1207,6 @@ function rangeeArticle(ligne) {
   sup.addEventListener('click', () => {
     const i = saisie.lignes.indexOf(ligne);
     if (i >= 0) saisie.lignes.splice(i, 1);
-    MAJ_LIGNE.delete(ligne);
     bloc.remove();
     if (!saisie.lignes.length) poserLignes();
     redessiner();
@@ -1012,6 +1216,7 @@ function rangeeArticle(ligne) {
   // liste de marquages sans qu'on ait à rechoisir le produit.
   if (estTextile) poserMarquages(marq);
 
+  rafraichirQte();
   rafraichirTete();
   return bloc;
 }
@@ -1020,20 +1225,20 @@ function rangeeArticle(ligne) {
 // CARTE 4 — FISCALITÉ, ACOMPTE, ARRONDI, ET CE QUE ÇA DONNE
 // ===========================================================================
 function carteArgent() {
-  const c = carte('receipt_long', 'Fiscalité et règlement',
+  const [c, corps] = carte('receipt_long', 'Fiscalité et règlement',
     'Le taux de TGCA vient des Réglages. L’arrondi commercial porte sur le TTC — '
-    + 'c’est le nombre que le client paie.');
+    + 'c’est le nombre que le client paie.', 'argent');
 
-  const r3 = el('div', 'dvf-r3');
   const regime = menu('dvf-regime', REGIMES, saisie.regime);
   const acompte = menu('dvf-acompte', ACOMPTES.map((p) => ({ id: p, label: p ? `${p} %` : 'Aucun' })), saisie.acompte);
   const arrondi = menu('dvf-arrondi', ARRONDIS, saisie.arrondi);
-  r3.append(champ('Régime TGCA', regime), champ('Acompte', acompte), champ('Arrondi commercial', arrondi));
-  c.append(r3);
+  corps.append(feuille(
+    rang('Régime TGCA', regime), rang('Acompte', acompte), rang('Arrondi commercial', arrondi),
+  ));
 
   const totaux = el('div', 'dvf-totaux');
   totaux.id = 'dvf-totaux';
-  c.append(totaux);
+  corps.append(totaux);
 
   regime.addEventListener('change', () => { saisie.regime = regime.value; redessiner(); });
   acompte.addEventListener('change', () => { saisie.acompte = Number(acompte.value); redessiner(); });
@@ -1053,8 +1258,29 @@ function redessiner() {
   attendu = requestAnimationFrame(() => { attendu = 0; peindre(); });
 }
 
+// CE QU'UNE CATÉGORIE REPLIÉE DIT D'ELLE-MÊME. Une ligne, la plus courte
+// possible : ce qu'on vérifierait en la rouvrant. Vide, elle ne dit rien —
+// une catégorie qu'on n'a pas remplie n'a pas de résumé, elle a un vide, et
+// c'est déjà lisible à la flèche.
+function resumes(compte) {
+  const appro = APPROS.find((a) => a.id === saisie.appro) || APPROS[0];
+  const n = saisie.lignes.length;
+  const pieces = saisie.lignes.reduce((t, l) => t + (Number(l.quantite) || 0), 0);
+  return {
+    client: [saisie.client.nom, saisie.client.ville].filter(Boolean).join(' · '),
+    projet: [saisie.projet, appro.court].filter(Boolean).join(' · '),
+    articles: n ? `${n} ligne${n > 1 ? 's' : ''} · ${pieces} pièce${pieces > 1 ? 's' : ''}` : '',
+    argent: `${euro(compte.ttc)} TTC`,
+  };
+}
+
 function peindre() {
   const compte = calculerDevis(saisie);
+
+  const dits = resumes(compte);
+  for (const n of ROOT.querySelectorAll('.dvf-cat__resume')) {
+    n.textContent = dits[n.dataset.resume] || '';
+  }
 
   // L'état du délai : la seule couleur de l'écran, et elle dit un ÉTAT.
   const appro = APPROS.find((a) => a.id === saisie.appro) || APPROS[0];

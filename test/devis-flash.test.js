@@ -518,6 +518,97 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
   'aucune règle du papier dans la feuille de l’écran : le papier a la sienne');
 
 // ---------------------------------------------------------------------------
+// 4 bis. LE TABLEAU, LES VOLETS ET LES SIX TAILLES (01/09/2026)
+// ---------------------------------------------------------------------------
+// Charlie : « une présentation façon tableau, avec menu dépliant pour chaque
+// catégorie ; en dessous les lignes simples à remplir façon Google Sheet ; des
+// inputs par défaut pour chaque taille de t-shirt, de XS à 2XL. »
+//
+// Ce qui coûte cher si ça dérive : que les tailles disent au papier autre chose
+// que l'écran, qu'un volet soit réécrit au lieu d'être celui du comptoir, et
+// qu'un en-tête de tableau coiffe la mauvaise colonne.
+const AIDE_JS = lire('public/aide-bulle.js');
+{
+  // LE VOLET EST CELUI DE LA CHARTE — `.volet-plus`, un <details> — pas un
+  // repli écrit pour l'écran.
+  assert.ok(/el\('details', 'reg-card dvf-cat volet-plus'\)/.test(ECRAN),
+    'une catégorie est la carte des Réglages ET le volet du comptoir, sur le même nœud');
+  assert.ok(/el\('summary', 'reg-card__head'\)/.test(ECRAN),
+    'la poignée du volet est l’en-tête de la carte : pas une rangée de plus');
+  assert.ok(!/\.volet-plus\s*(,|\{)/.test(FEUILLE) && !/::details-content/.test(FEUILLE),
+    'devis-flash.css ne redéclare pas le volet : c’est charte.css qui le porte');
+  // LE « i » DANS UN <summary> : sans `preventDefault`, demander l'aide replie
+  // la carte sous la bulle.
+  assert.ok(/bouton\.addEventListener\('click', \(e\) => \{[\s\S]{0,600}e\.preventDefault\(\);/.test(AIDE_JS),
+    'le clic sur le « i » ne remonte pas au volet qui le porte');
+  // LE CORPS PORTE L'ÉCART DE LA CARTE : `.reg-card` est une colonne flex, et
+  // sur un <details> elle ne compte que deux enfants.
+  assert.ok(/\.dvf-cat \{ display: block; \}/.test(FEUILLE)
+    && /\.dvf-cat__corps \{[^}]*gap: var\(--pas-3\)/.test(FEUILLE),
+    'le corps du volet reprend l’écart de la carte, une seule fois');
+  // L'ÉTAT DES VOLETS SUIT LE BROUILLON, par appareil.
+  assert.ok(/JSON\.stringify\(\{ saisie, dossierId, replis \}\)/.test(ECRAN),
+    'le pli de chaque catégorie part avec le brouillon');
+}
+{
+  // LA FEUILLE : intitulé à gauche (`.fa-lab`), case à droite (`.fa-in`), et
+  // l'écran garde aussi le champ à intitulé au-dessus pour le détail d'un
+  // article — deux mises en place, UNE grammaire.
+  assert.ok(/el\('label', 'fa-lab dvf-rang__k', nom\)/.test(ECRAN), 'l’intitulé d’une rangée est celui de l’application');
+  assert.ok(/\.dvf-grille \{[^}]*grid-template-columns: var\(--dvf-k\) minmax\(0, 1fr\)/.test(FEUILLE),
+    'la feuille a deux colonnes : les intitulés sur un rail, les cases sur l’autre');
+  assert.ok(/\.dvf-rang \{ display: contents; \}/.test(FEUILLE),
+    'une rangée ne fait pas sa propre grille : elle tombe dans celle de la feuille');
+}
+{
+  // LE TABLEAU : les pistes sont écrites UNE fois et lues par l'en-tête et par
+  // la rangée — deux écritures, c'est un intitulé sur la mauvaise colonne.
+  const pistes = FEUILLE.match(/--dvf-cols:/g) || [];
+  assert.strictEqual(pistes.length, 1, 'les colonnes du tableau sont déclarées une seule fois');
+  assert.ok(/\.dvf-tab__tete,\n\.dvf-tab__rang \{[^}]*grid-template-columns: var\(--dvf-cols\)/.test(FEUILLE),
+    'l’en-tête et la rangée lisent la même déclaration, dans la même règle');
+  // Six colonnes : ce qu'on vend, sa référence, combien, à quel prix, le total,
+  // la corbeille. Couleur, marquage, note et tailles sont SOUS la ligne — les
+  // huit colonnes demandaient 772 px là où la colonne de saisie en fait 574.
+  const colonnes = ECRAN.match(/const COLONNES = \[([^\]]*)\]/);
+  assert.ok(colonnes, 'les intitulés de colonne sont une liste, écrite une fois');
+  assert.strictEqual(colonnes[1].split(',').length, 6, 'six colonnes, pas une de plus');
+  assert.ok(/rangee\.append\(design, refe, qte, pu, total, sup\)/.test(ECRAN),
+    'la rangée remplit les six colonnes dans l’ordre de l’en-tête');
+  // LE MENU S'HABILLE APRÈS L'INSERTION : `menuPoser` remplace le champ dans la
+  // page, et un champ habillé hors de la page perd sa peau à l'append suivant.
+  assert.ok(ECRAN.indexOf('rangee.append(design, refe, qte, pu, total, sup)') < ECRAN.indexOf('menuPoser(design)'),
+    'la désignation entre dans la rangée AVANT d’être habillée par le menu');
+  // L'en-tête se tait quand il n'y a rien dessous, et il se réveille au premier
+  // article — c'est une fonction, appelée des deux côtés.
+  assert.strictEqual((ECRAN.match(/majTeteTableau\(\);/g) || []).length, 2,
+    'l’en-tête suit le nombre de lignes, à l’ajout comme à la pose');
+}
+{
+  // LES SIX TAILLES, de XS à 2XL, dans la grille de la fiche de production.
+  assert.ok(/const TAILLES = \['XS', 'S', 'M', 'L', 'XL', '2XL'\]/.test(ECRAN), 'XS, S, M, L, XL, 2XL — et dans cet ordre');
+  assert.ok(ECRAN.includes("el('div', 'fa-tailles')") && ECRAN.includes("'fa-lab fa-taille__k'"),
+    'les cases de taille sont celles de la fiche de production, pas une grille qui leur ressemble');
+  assert.ok(!/\.fa-tailles?\s*(,|\{)/.test(FEUILLE), 'devis-flash.css ne redéclare pas la grille des tailles');
+  // LE TEXTE DU DEVIS EST DÉRIVÉ DES CASES — une seule source.
+  assert.ok(/ligne\.tailles = texteTailles\(ligne\.parTaille\)/.test(ECRAN),
+    'ce que le papier dit des tailles sort des cases, jamais d’un champ à part');
+  assert.ok(/`\$\{Number\(parTaille\[t\]\)\} × \$\{t\}`/.test(ECRAN) && /\.join\(' · '\)/.test(ECRAN),
+    'et c’est la grammaire de la maison : « 2 × S · 3 × M »');
+  // LA QUANTITÉ SE COMPTE dès qu'une taille est remplie, et la case le DIT.
+  assert.ok(/qte\.readOnly = somme > 0/.test(ECRAN), 'la quantité devient la somme des tailles, et ne se tape plus');
+  assert.ok(/qte\.classList\.toggle\('dvf-tab__calc', somme > 0\)/.test(ECRAN)
+    && /\.dvf-tab__calc \{ background: var\(--zone-bg\)/.test(FEUILLE),
+    '… et elle prend le gris des zones qu’on lit : sinon on tape dedans et rien ne bouge');
+  // Le prix suit : le coefficient est dégressif, et une taille de plus est une
+  // pièce de plus.
+  assert.ok(/for \(const \[t, c\] of champsTaille\) \{[\s\S]{0,500}if \(ligne\.textile\) recalculer\(\);/.test(ECRAN),
+    'une case de taille qui bouge fait rechiffrer un textile');
+  // UN BROUILLON D'AVANT LES CASES se relit : ses tailles étaient un texte.
+  assert.ok(/l\.parTaille = lireTailles\(l\.tailles\)/.test(ECRAN), 'un vieux brouillon retrouve ses tailles depuis son texte');
+}
+
+// ---------------------------------------------------------------------------
 // 5. L'ÉCRAN EST BRANCHÉ, ET SON ONGLET MÈNE QUELQUE PART
 // ---------------------------------------------------------------------------
 assert.ok(/'#devis-flash': 'devisflash',/.test(APP), 'le hash pilote la vue');
@@ -532,4 +623,4 @@ assert.ok(/dfModule\.refreshDevisFlash\(\)/.test(APP),
   'revenir sur l’onglet relit les réglages, il ne reconstruit pas le devis');
 
 console.log('✓ devis : l’addition tombe juste sur trois arrondis, le papier tient son A4, '
-  + 'et l’écran ne réinvente aucun composant');
+  + 'l’écran ne réinvente aucun composant, et les six tailles comptent la quantité');

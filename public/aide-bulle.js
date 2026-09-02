@@ -92,7 +92,13 @@ export function poserAide(hote, ligne, texte) {
   bulle.textContent = t;
   bulle.hidden = true;
 
-  bouton.addEventListener('click', () => {
+  bouton.addEventListener('click', (e) => {
+    // LE « i » PEUT VIVRE DANS UN `<summary>` (01/09) : depuis que les cartes du
+    // devis sont des volets, son titre EST la poignée qui déplie. Un clic sur un
+    // bouton posé là déclencherait AUSSI l'ouverture du volet — on demanderait
+    // l'aide, et la carte se replierait sous la bulle. `preventDefault` ne coûte
+    // rien ailleurs : un `<button type="button">` n'a pas d'autre défaut.
+    e.preventDefault();
     const rouvre = vivante() && ouverte.bouton === bouton;
     fermer();
     if (rouvre) return;
