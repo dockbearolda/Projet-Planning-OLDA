@@ -510,7 +510,13 @@
   line-height: var(--ligne-serre); color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
-.ecran-tete__compte { white-space: nowrap; }
+/* LE COMPTEUR CÈDE AVANT LA RANGÉE (02/09). Il ne s'enroulait pas (`nowrap`)
+   mais il ne rendait pas la place non plus : à quelques pixels près, c'est la
+   rangée de commandes qui passait sous le titre et l'en-tête doublait de
+   hauteur — 82 px de plancher partagé, 122 mesurés sur le devis. Un compteur
+   tronqué se relit d'un coup d'œil ; une barre sur deux lignes déplace tout
+   l'écran. `min-width: 0` sans quoi rien ne se tronque dans un `flex`. */
+.ecran-tete__compte { white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* ------------------------------------------------ L'ACTION POSEE DANS UNE LIGNE
    « Renommer », « Retirer », « revenir au tri par urgence » : une commande qui
