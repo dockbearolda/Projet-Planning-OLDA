@@ -1270,11 +1270,31 @@ function texteFacesTasse(ligne) {
 // Il vaut aussi pour une désignation TAPÉE : si elle tombe exactement sur un
 // produit du catalogue, la ligne gagne sa référence et son prix. Taper le nom
 // exact d'un produit, c'est le désigner.
+//
+// CHOISIR UN PRODUIT, C'EST EN CHANGER — ET LE PRIX SUIT, TOUJOURS.
+// ⚠ DÉFAUT DU 02/09 (Charlie : « peu importe où je clique, c'est toujours le
+// même prix »). Le prix de rayon ne se posait que sur une ligne SANS prix, au nom
+// d'une remise négociée à protéger : une ligne qui avait été une tasse à
+// 15,38 € restait à 15,38 € en devenant une planche à 18,27 € — avec la teinte
+// du décor et la face de la tasse en prime, mesuré sur sa capture d'écran. Ce
+// que la règle protégeait arrive une fois par mois ; ce qu'elle empêchait,
+// c'est de changer d'article. Un prix négocié se retape après, comme sur toute
+// ligne — et une désignation corrigée qui ne tombe sur AUCUN produit du
+// catalogue ne passe pas par ici : elle ne touche à rien.
 function choisirProduit(ligne, nom, apres) {
   const p = parNom.get(String(nom || '').trim());
   if (!p) return false;
+  const etaitTasse = !!ligne.tasse;
+  const etaitTextile = !!ligne.textile;
+  // CE QUI APPARTENAIT À L'ARTICLE D'AVANT NE SUIT PAS : le prix repris à la
+  // main (le moteur et la grille reprennent la main), la référence libre, et
+  // pour une tasse la teinte de son décor et les faces de sa grille.
+  ligne.puManuel = false;
+  ligne.libre = null;
   ligne.reference = p.reference || '';
   if (p.couleur) ligne.couleur = p.couleur;
+  else if (etaitTasse) ligne.couleur = '';
+  if (etaitTasse) ligne.faces = '';
   if (p.famille === FAMILLE_TEXTILE) {
     // UN T-SHIRT N'A PAS DE PRIX DE RAYON, il se CHIFFRE : quantité, marquage
     // et genre. `note` porte le genre du moteur — c'est lui qui choisit la
@@ -1283,9 +1303,16 @@ function choisirProduit(ligne, nom, apres) {
     ligne.textile = { ref: p.reference || '', genre: p.note || '' };
     ligne.tasse = null;
     if (!ligne.marquage) ligne.marquage = MARQUAGE_AUCUN;
+    // Tant que le moteur n'a pas répondu, la ligne est « à chiffrer » — pas au
+    // prix de l'article d'avant. Moteur injoignable : elle le reste, et le dit.
+    ligne.unitaireHt = null;
+    ligne.pleinHt = null;
     chiffrerTextile(ligne).then(() => { if (apres) apres(); redessiner(); });
     return true;
   }
+  // « Aucun » avait été posé pour le moteur : un objet de rayon n'a pas
+  // d'emplacement de marquage, la case redevient libre.
+  if (etaitTextile && ligne.marquage === MARQUAGE_AUCUN) ligne.marquage = '';
   // UNE TASSE NON PLUS N'A PAS DE PRIX DE RAYON — elle s'additionne. Voir la
   // section « LA TASSE » : le joint avec la grille du comptoir est le nom de la
   // famille, et une famille inconnue de la grille retombe sur le rayon.
@@ -1301,8 +1328,9 @@ function choisirProduit(ligne, nom, apres) {
     };
     // LE DÉCOR EST CE QUE LE CLIENT RELIT. « TC 01 » ne dit pas que la tasse est
     // rouge : le catalogue le range dans la note du produit (« Rouge / Blanc »,
-    // extérieur / intérieur), et c'est la couleur de la ligne.
-    if (p.note && !ligne.couleur) ligne.couleur = p.note;
+    // extérieur / intérieur), et c'est la couleur de la ligne — celle de CE
+    // décor, pas de celui d'avant.
+    if (p.note) ligne.couleur = p.note;
     ligne.faces = texteFacesTasse(ligne);
     chiffrerTasse(ligne);
     if (apres) apres();
@@ -1311,15 +1339,20 @@ function choisirProduit(ligne, nom, apres) {
   ligne.textile = null;
   ligne.tasse = null;
   // UN PRIX DE CATALOGUE EST TTC (c'est le prix de rayon). Le devis compte en
-  // HT : la conversion se fait ici, au taux du moment.
-  //
-  // ⚠ ET IL NE REMPLACE PAS UN PRIX DÉJÀ POSÉ. On négocie devant le client :
-  // corriger la désignation d'une ligne dont on vient d'accorder le prix ne
-  // doit pas rendre la remise. C'est la même règle qu'à la vente directe.
-  if (p.prixVenteTtc != null && !ligne.unitaireHt && !ligne.puManuel) {
-    ligne.unitaireHt = saisie.tauxTgca
+  // HT : la conversion se fait ici, au taux du moment. LA REMISE DE LA LIGNE
+  // RESTE : elle s'applique au prix du nouvel article, depuis son prix plein —
+  // c'est la même mécanique que la case « Remise % ».
+  if (p.prixVenteTtc != null) {
+    const ht = saisie.tauxTgca
       ? Math.round((Number(p.prixVenteTtc) / (1 + saisie.tauxTgca)) * 100) / 100
       : Number(p.prixVenteTtc);
+    ligne.pleinHt = ht;
+    ligne.unitaireHt = ligne.remise ? Math.round(ht * (1 - ligne.remise / 100) * 100) / 100 : ht;
+  } else {
+    // UN PRODUIT SANS PRIX SE DIT « À CHIFFRER » — pas au prix de l'article
+    // d'avant, qui n'a plus rien à voir avec lui.
+    ligne.pleinHt = null;
+    ligne.unitaireHt = null;
   }
   if (apres) apres();
   return true;
@@ -1781,13 +1814,16 @@ function rangeeArticle(ligne) {
     // qu'on croit avoir oublié de choisir.
     if (ligne.textile) marq.value = ligne.marquage || '';
     // LA LIGNE VIENT PEUT-ÊTRE DE CHANGER DE FAMILLE — un t-shirt corrigé en
-    // tasse, ou l'inverse. Ce sont ses cases qui changent, pas sa hauteur.
+    // tasse, ou l'inverse. Ce sont ses cases qui changent, pas sa hauteur — et
+    // TOUTES se relisent, pas seulement celles de la tasse : une planche qui
+    // succède à une tasse ne garde ni sa teinte, ni ses faces, ni son « Aucun ».
     if (ligne.tasse) {
       for (const [n5, cle] of [[face1, 'face1Id'], [face2, 'face2Id'],
         [dessous, 'dessousId'], [bat, 'batId']]) n5.value = String(ligne.tasse[cle] || '');
-      faces.value = ligne.faces || '';
-      coul.value = ligne.couleur || '';
     }
+    marq.value = ligne.marquage || '';
+    faces.value = ligne.faces || '';
+    coul.value = ligne.couleur || '';
     majFamille();
     rafraichirTete();
     redessiner();
