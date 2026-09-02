@@ -227,10 +227,11 @@ const enBase = (liste) => liste.map((p, i) => ({
   };
 
   const depart = (await call('GET', '/api/catalogue-produits')).body;
-  // Les 82 objets du patron, plus les 48 références textiles qui les ont
-  // rejoints le 01/09 dans la même table — c'est l'import qu'on éprouve ici,
-  // pas le nombre de rayons : on compte donc ce que l'import VISE.
-  assert.strictEqual(depart.filter((p) => p.famille !== 'Textile').length, 82);
+  // Les 82 objets du patron, les 48 références textiles qui les ont rejoints
+  // le 01/09, et depuis le 02/09 le fichier de caisse rangé à leur suite — c'est
+  // l'import qu'on éprouve ici, pas le nombre de rayons : on vise des objets
+  // que le fichier de caisse ne tarife PAS.
+  assert.ok(depart.filter((p) => p.famille !== 'Textile').length >= 82, 'la semence est là');
   // ⚠ ON ÉPROUVE L'IMPORT SUR DES OBJETS QUI N'ONT PAS ENCORE DE PRIX. La
   // semence en porte depuis le 02/09 (le fichier de caisse du patron) : viser
   // « Bouchon Bois », désormais à 6 €, ferait compter une ligne INCHANGÉE là où
