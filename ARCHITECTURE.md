@@ -318,6 +318,40 @@ Vérifiés sains : la précache de `sw.js` (48 entrées, toutes présentes ; `bu
 
 Dans l'ordre : ce qui part sans discussion, puis ce qui demande d'adapter des tests ou de regarder la prod, enfin ce qui engage une décision du patron ou des données.
 
+### ✅ Fait le 01/09 (lot 4) — l'histoire d'un dossier, et les décisions assumées
+
+**L'historique se lit enfin.** Deux journaux s'écrivaient depuis des mois sans
+qu'aucun écran ne les montre : ce qui change sur une commande, et les documents
+remplacés. Ils sortent maintenant par la même porte, mêlés et datés, avec les
+valeurs mises en français par le serveur (« Moyenne → Haute », pas « 2 → 3 »).
+Un bouton dans l'entête de la fiche, une fenêtre par-dessus, le module chargé au
+premier clic. Deux écarts de mise en forme ont été trouvés **en mesurant** au
+rendu, comme la règle du dépôt l'exige, et corrigés.
+
+**Ligne 17 faite** : les neuf assertions « ce fichier n'existe plus », dispersées
+dans six tests, tiennent dans `test/ce-qui-ne-revient-pas.test.js` — avec la date
+de chaque retrait et ce qu'on défait en le remettant.
+
+**Ligne 20 tranchée sans rien supprimer.** Les trois colonnes soupçonnées sont
+mesurées vides sur les 205 dossiers de production, et elles restent : ce sont des
+demandes du patron (§8, §22, §23) prêtes à recevoir un écran. Ce qui manquait,
+c'était de le DIRE — c'est écrit dans `schema.sql`, colonne par colonne, avec le
+doublon vivant quand il y en a un (`retrait_creneau` contre
+`fiche.heureSouhaitee`).
+
+### ⛔ Lignes 18 et 21 : pas faites, et c'est un choix
+
+**Projets** (ligne 18) et **Tâches** (ligne 21) demandent un ÉCRAN, pas un
+branchement. Pour les tâches, tout existe sauf de quoi les poser : les modèles
+sont dans Réglages, « Mon travail » les affiche et les coche, le serveur sait en
+créer — mais la fiche ne les montre pas, donc poser une liste ne se verrait
+nulle part. Construire ce chaînon, c'est décider d'un écran de production, ce qui
+appartient à Charlie. Pour Projets, c'est un écran entier.
+
+Les retirer aurait été aussi arbitraire : le patron les a demandés (§1, §5, §28,
+§30), et la table `projects` porte six lignes réelles. Elles restent, comptées et
+nommées.
+
 ### ✅ Fait le 01/09 (lot 3) — les 950 lignes sans écran
 
 Le point 12 du plan, celui que l’audit avait cru intouchable, est fait — dans
