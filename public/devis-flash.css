@@ -103,32 +103,21 @@
    lui qui porte l'écart de la carte, une seule fois.
    =========================================================================== */
 .dvf-cat { display: block; }
+/* LA POIGNÉE PREND LA BOÎTE DE L'APPLICATION. Mesuré à 1280 px : la tête d'une
+   carte des Réglages fait 23 px (elle ne se clique pas) ; ici, le rembourrage du
+   volet la portait à 45 — un nombre que personne n'a choisi, et qui ne tombe sur
+   rien. Elle se CLIQUE : c'est donc `--ctrl-h`, la boîte de tout ce qui se
+   clique et se remplit dans l'application.
+   ⚠ L'ÉCART AVEC LES RÉGLAGES RESTE, ET IL SE DIT : une tête qu'on déplie n'est
+   pas une tête qu'on lit. Ce qui est égalisé, c'est ce qui est comparable — les
+   quatre poignées de cet écran entre elles, et la boîte de l'application. */
+.dvf-cat > summary { min-height: var(--ctrl-h); }
 .dvf-cat__corps {
   display: flex;
   flex-direction: column;
   gap: var(--pas-3);
   padding-top: var(--pas-3);
 }
-/* CE QU'UNE CATÉGORIE REPLIÉE DIT D'ELLE-MÊME : une ligne, à droite de son
-   titre, au cran des mentions. Elle ne pousse rien — le titre rend la place
-   (`min-width: 0` sur `.reg-card__t`) — et elle s'efface quand il n'y a rien à
-   dire, plutôt que d'afficher un tiret. */
-.dvf-cat__resume {
-  margin-left: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-note);
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
-/* Le résumé ne se lit QUE volet fermé : ouvert, la carte dit déjà tout ce
-   qu'il résume, et deux écritures de la même chose sur la même rangée, c'est
-   la carte qui se répète. */
-.dvf-cat[open] > .reg-card__head > .reg-card__t > .dvf-cat__resume { display: none; }
-
 /* ===========================================================================
    LA FEUILLE DE SAISIE — une rangée par champ (01/09/2026)
    ---------------------------------------------------------------------------

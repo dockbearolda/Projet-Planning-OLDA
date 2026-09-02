@@ -342,8 +342,14 @@ assert.ok(/\.error\.msg-flottant,\s*\.field-error\.msg-flottant,\s*\.msg-flottan
 assert.ok(!/reg-card__desc/.test(ECRAN) && !/reg-card__desc/.test(REGLAGES_JS)
   && !/reg-card__desc/.test(REGLAGES_CSS),
   'plus une seule phrase d’explication posée sous un titre de carte');
-assert.ok(/poserAide/.test(ECRAN) && /poserAide/.test(REGLAGES_JS),
-  'les deux écrans passent par la MÊME fabrique : la carte est commune, la bulle aussi');
+// ⚠ LE DEVIS NE POSE PLUS D'AIDE DU TOUT (02/09, Charlie : « supprime les points
+// d'information »). Ses quatre « i » sont partis avec les paragraphes qu'ils
+// remplaçaient : ce qu'ils disaient s'apprend une fois, et se franchit à chaque
+// devis. Le composant reste — les Réglages s'en servent — et c'est ce qui est
+// vérifié ici : il n'a pas été réécrit, il a cessé d'être appelé.
+assert.ok(/poserAide/.test(REGLAGES_JS), 'les Réglages gardent la bulle du « i »');
+assert.ok(!/poserAide|aide-b/.test(ECRAN),
+  'le devis ne pose plus de « i » : ni la fabrique, ni un bouton qui lui ressemble');
 // LA BULLE NE POUSSE PERSONNE NON PLUS. Dépliée dans le flux, elle descendrait
 // toute la carte — et l'écran de saisie du devis est précisément celui qu'on
 // remplit devant le client.
@@ -527,7 +533,6 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
 // Ce qui coûte cher si ça dérive : que les tailles disent au papier autre chose
 // que l'écran, qu'un volet soit réécrit au lieu d'être celui du comptoir, et
 // qu'un en-tête de tableau coiffe la mauvaise colonne.
-const AIDE_JS = lire('public/aide-bulle.js');
 {
   // LE VOLET EST CELUI DE LA CHARTE — `.volet-plus`, un <details> — pas un
   // repli écrit pour l'écran.
@@ -537,10 +542,6 @@ const AIDE_JS = lire('public/aide-bulle.js');
     'la poignée du volet est l’en-tête de la carte : pas une rangée de plus');
   assert.ok(!/\.volet-plus\s*(,|\{)/.test(FEUILLE) && !/::details-content/.test(FEUILLE),
     'devis-flash.css ne redéclare pas le volet : c’est charte.css qui le porte');
-  // LE « i » DANS UN <summary> : sans `preventDefault`, demander l'aide replie
-  // la carte sous la bulle.
-  assert.ok(/bouton\.addEventListener\('click', \(e\) => \{[\s\S]{0,600}e\.preventDefault\(\);/.test(AIDE_JS),
-    'le clic sur le « i » ne remonte pas au volet qui le porte');
   // LE CORPS PORTE L'ÉCART DE LA CARTE : `.reg-card` est une colonne flex, et
   // sur un <details> elle ne compte que deux enfants.
   assert.ok(/\.dvf-cat \{ display: block; \}/.test(FEUILLE)

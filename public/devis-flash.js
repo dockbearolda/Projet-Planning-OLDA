@@ -35,9 +35,6 @@ import {
   APPROS, APPRO_DEFAUT, ACOMPTES, ARRONDIS, REGIMES,
   calculerDevis, modeleDevis, dessinerDevis, CSS_DEVIS, jourAtelier, jourPlus,
 } from './devis.js';
-// L'AIDE D'UNE CARTE SE DEMANDE (01/09) : le « i » a cote du titre, et la meme
-// fabrique que les Reglages — la carte est la leur, la bulle doit l'etre aussi.
-import { poserAide } from './aide-bulle.js';
 // LE MENU DÉROULANT AVEC RECHERCHE, celui des deux écrans du comptoir. Charlie,
 // 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
 // TOUS LES INPUTS avec un menu déroulant ». Il a déménagé de `pont.js` pour
@@ -203,8 +200,15 @@ function relireBrouillon() {
 // enfants — le résumé et la boîte de contenu — et l'écart entre les rangées de
 // la carte disparaîtrait. Le corps le reprend donc à son compte.
 //
+// ⚠ PAS DE « i » SUR CES CARTES (retire le 02/09, Charlie : « supprime les
+// points d'information »). Chaque titre en portait un, qui depliait une bulle
+// de deux a quatre lignes. Le composant reste — les Reglages s'en servent — mais
+// cet ecran ne le pose plus : ce qu'il expliquait, on l'apprend une fois, et
+// ensuite on le franchit a chaque devis. « A egalite, celle qui montre MOINS
+// gagne. »
+//
 // Rend `[bloc, corps]` : on empile dans le corps, jamais dans le bloc.
-function carte(icone, titre, aide, cle) {
+function carte(icone, titre, cle) {
   const c = el('details', 'reg-card dvf-cat volet-plus');
   c.open = replis[cle] !== false;
   if (cle) {
@@ -221,13 +225,13 @@ function carte(icone, titre, aide, cle) {
   // deux a quatre lignes tenaient le haut de la colonne de saisie : on les lit
   // une fois, et ensuite on les franchit a chaque devis. Ils sont dans la bulle
   // du « i » — meme fabrique que les Reglages, la carte est la leur.
-  poserAide(t, ligne, aide);
-  // CE QUE LA CATÉGORIE DIT QUAND ELLE EST REPLIÉE. Un volet fermé qui ne dit
-  // rien de ce qu'il contient oblige à le rouvrir pour vérifier — c'est-à-dire
-  // à défaire ce qu'on vient de faire. Rempli par `peindre()`.
-  const resume = el('span', 'dvf-cat__resume');
-  if (cle) resume.dataset.resume = cle;
-  ligne.append(resume);
+  // ⚠ PAS DE RÉSUMÉ À DROITE DU TITRE NON PLUS (retiré le 02/09). Une catégorie
+  // repliée portait une ligne de rappel — le nom du client, l'état du délai, le
+  // total. Mesuré au rendu : « Dépend de la prochaine commande groupée » ne
+  // tient pas sur la rangée, elle se replie sur deux lignes, et c'est le TITRE
+  // qui rend la place (`min-width: 0`) — « Projet et délai » passait donc sur
+  // deux lignes pour qu'un rappel tienne sur deux. Le volet dit déjà ce qu'il
+  // faut : sa flèche, et ce qu'on voit en l'ouvrant.
   c.append(t);
   const corps = el('div', 'dvf-cat__corps');
   c.append(corps);
@@ -428,9 +432,7 @@ function mettreALEchelle() {
 // choisi remplit les quatre champs ; un client inconnu se tape à la main et
 // entre en base à l'enregistrement — c'est la règle de tous les parcours.
 function carteClient() {
-  const [c, corps] = carte('contacts', 'Client',
-    'Cherche dans la base clients. Un client inconnu se saisit ici et entre en base '
-    + 'quand le devis part au planning.', 'client');
+  const [c, corps] = carte('contacts', 'Client', 'client');
 
   const cherche = el('div', 'dvf-cherche');
   const pilule = el('div', 'champ-recherche');
@@ -545,9 +547,7 @@ function prendreClient(cl) {
 // CARTE 2 — LE PROJET ET CE QU'ON PEUT PROMETTRE
 // ===========================================================================
 function carteProjet() {
-  const [c, corps] = carte('event', 'Projet et délai',
-    'La date demandée par le client reste indicative tant que l’acompte, le BAT et '
-    + 'l’approvisionnement ne sont pas sécurisés.', 'projet');
+  const [c, corps] = carte('event', 'Projet et délai', 'projet');
 
   const projet = entree('dvf-projet', { valeur: saisie.projet, exemple: 'STAFF, Terrasse, Rentrée…' });
   const appro = menu('dvf-appro', APPROS, saisie.appro);
@@ -584,13 +584,7 @@ function carteProjet() {
 const COLONNES = ['Désignation', 'Référence', 'Qté', 'PU HT', 'Total', ''];
 
 function carteArticles() {
-  const [c, corps] = carte('local_grocery_store', 'Articles',
-    'Le produit se cherche dans la DÉSIGNATION de la ligne : on tape, la liste '
-    + 'filtre, et les deux métiers de la maison — Textile et Boutique — se '
-    + 'basculent en haut du menu. Rien n’oblige à choisir : une désignation '
-    + 'écrite à la main reste une ligne valable. Les prix affichés sont HT — le '
-    + 'devis est le seul document de la maison qui les montre ainsi ; un prix de '
-    + 'catalogue, lui, est TTC, et il est converti au taux en vigueur.', 'articles');
+  const [c, corps] = carte('local_grocery_store', 'Articles', 'articles');
 
   // LE TABLEAU (01/09). Charlie : « une présentation façon tableau ». Un article
   // tenait dans un bloc de cinq rangées à intitulés — huit champs, huit
@@ -1225,9 +1219,7 @@ function rangeeArticle(ligne) {
 // CARTE 4 — FISCALITÉ, ACOMPTE, ARRONDI, ET CE QUE ÇA DONNE
 // ===========================================================================
 function carteArgent() {
-  const [c, corps] = carte('receipt_long', 'Fiscalité et règlement',
-    'Le taux de TGCA vient des Réglages. L’arrondi commercial porte sur le TTC — '
-    + 'c’est le nombre que le client paie.', 'argent');
+  const [c, corps] = carte('receipt_long', 'Fiscalité et règlement', 'argent');
 
   const regime = menu('dvf-regime', REGIMES, saisie.regime);
   const acompte = menu('dvf-acompte', ACOMPTES.map((p) => ({ id: p, label: p ? `${p} %` : 'Aucun' })), saisie.acompte);
@@ -1258,29 +1250,8 @@ function redessiner() {
   attendu = requestAnimationFrame(() => { attendu = 0; peindre(); });
 }
 
-// CE QU'UNE CATÉGORIE REPLIÉE DIT D'ELLE-MÊME. Une ligne, la plus courte
-// possible : ce qu'on vérifierait en la rouvrant. Vide, elle ne dit rien —
-// une catégorie qu'on n'a pas remplie n'a pas de résumé, elle a un vide, et
-// c'est déjà lisible à la flèche.
-function resumes(compte) {
-  const appro = APPROS.find((a) => a.id === saisie.appro) || APPROS[0];
-  const n = saisie.lignes.length;
-  const pieces = saisie.lignes.reduce((t, l) => t + (Number(l.quantite) || 0), 0);
-  return {
-    client: [saisie.client.nom, saisie.client.ville].filter(Boolean).join(' · '),
-    projet: [saisie.projet, appro.court].filter(Boolean).join(' · '),
-    articles: n ? `${n} ligne${n > 1 ? 's' : ''} · ${pieces} pièce${pieces > 1 ? 's' : ''}` : '',
-    argent: `${euro(compte.ttc)} TTC`,
-  };
-}
-
 function peindre() {
   const compte = calculerDevis(saisie);
-
-  const dits = resumes(compte);
-  for (const n of ROOT.querySelectorAll('.dvf-cat__resume')) {
-    n.textContent = dits[n.dataset.resume] || '';
-  }
 
   // L'état du délai : la seule couleur de l'écran, et elle dit un ÉTAT.
   const appro = APPROS.find((a) => a.id === saisie.appro) || APPROS[0];
