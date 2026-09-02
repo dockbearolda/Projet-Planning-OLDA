@@ -63,18 +63,31 @@ CREATE TABLE IF NOT EXISTS requests (
   -- D'OÙ VIENT LA DEMANDE (§8). Bouche-à-oreille, Instagram, passage, client
   -- existant… C'est la seule information qui dit où mettre l'effort, et elle ne
   -- se retrouve nulle part une fois la demande passée.
+  -- ⚠ MESURÉ VIDE SUR LES 205 DOSSIERS DE PRODUCTION, le 01/09/2026 : pas une
+  -- valeur. La colonne est acceptée par PATCH, aucun écran ne la remplit. Elle
+  -- n'est pas retirée pour autant — c'est une demande du patron (§8), prête à
+  -- recevoir un champ le jour où l'écran le pose. Ce qui est mort, ce serait de
+  -- la garder sans le dire.
   provenance      text,
   -- LA DATE PRÉVUE (§23), à ne pas confondre avec `deadline` : celle-là est la
   -- date SOUHAITÉE par le client, celle-ci est le jour où l'atelier compte
   -- vraiment le faire. Les confondre, c'est soit promettre ce qu'on ne tiendra
   -- pas, soit déplacer une promesse en croyant déplacer un planning.
   -- Down : ALTER TABLE requests DROP COLUMN IF EXISTS date_prevue;
+  -- ⚠ MESURÉE VIDE SUR LES 205 DOSSIERS (01/09/2026). La fiche atelier a cessé
+  -- de l'éditer le 29/08 : elle et `deadline` disaient la même chose à l'écran,
+  -- et c'est la date SOUHAITÉE par le client qui a gagné. La colonne reste —
+  -- elle porte l'historique, et le §23 distingue toujours les deux dates.
   date_prevue     date,
   -- LE CRÉNEAU DE RETRAIT (§22). L'heure vivait dans le JSON de la fiche
   -- comptoir : illisible depuis la liste, donc inutilisable pour préparer une
   -- journée de retraits. Bornée 9 h–17 h par l'écran, pas par la base — un
   -- retrait exceptionnel à 18 h ne doit pas être impossible à enregistrer.
   -- Down : ALTER TABLE requests DROP COLUMN IF EXISTS retrait_creneau;
+  -- ⚠ MESURÉE VIDE SUR LES 205 DOSSIERS (01/09/2026), et elle a un DOUBLON
+  -- vivant : `fiche.heureSouhaitee`, que le comptoir remplit et que la fiche
+  -- atelier édite. Deux endroits pour le même fait — quand le client passe.
+  -- Celui-ci ne reçoit plus rien depuis le 29/08.
   retrait_creneau text,
   -- LE COÛT DE REVIENT de la ligne (§11, §13). Sans lui, aucune marge n'est
   -- calculable : le moteur sort un PRIX, et un prix seul ne dit pas ce qu'on

@@ -334,11 +334,8 @@ assert.ok(/db\.refs\.filter\(r=>r\.genre&&r\.designation&&r\.designation!=='TEST
   assert.ok(/input,select,textarea,button\{font-family:inherit!important\}/.test(src),
     `${nom} : champs, listes et boutons prennent la police de la page`);
 });
-// LE FICHIER ET SA LICENCE SONT PARTIS AVEC ELLE : une police qu'on ne sert
-// plus n'a pas à dormir dans public/, et sa licence n'a plus rien à couvrir.
-for (const f of ['public/manrope-latin-variable.woff2', 'public/manrope-LICENCE.txt']) {
-  assert.ok(!fs.existsSync(path.join(RACINE, f)), `${f} ne doit plus être là`);
-}
+// (Le fichier lui-même est tenu par `test/ce-qui-ne-revient-pas.test.js`, avec
+// les huit autres retraits : ce sont tous des poids servis, pas des sujets.)
 assert.ok(!/manrope/i.test(fs.readFileSync(path.join(RACINE, 'public/sw.js'), 'utf8')),
   'la police de texte a quitté la coquille hors ligne');
 // LES ICÔNES, ELLES, RESTENT SERVIES PAR NOUS : un nom de glyphe absent

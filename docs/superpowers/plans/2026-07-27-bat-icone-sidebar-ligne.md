@@ -1,3 +1,9 @@
+> ⚠ **DOCUMENT HISTORIQUE.** Écrit avant le 01/09/2026 et jamais relu depuis.
+> Il cite des fichiers qui n'existent plus (`public/projet.js`, `public/commande.js`,
+> `public/guide.js`), des tables retirées (`production_sectors`) ou des décisions
+> annulées depuis. Il dit ce qu'on a pensé ce jour-là, pas ce que le code fait
+> aujourd'hui : pour ça, `ARCHITECTURE.md` et `README.md` font foi.
+
 # BAT Icon + Side Bar Détail de Ligne — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

@@ -258,13 +258,22 @@ const TE = global.window.TextileEngine;
   assert.ok(!/\blogo\b/i.test(sansCom(lire('public/comptoir/textile-catalog.js'))),
     'le moteur conforme au fichier V9 reste hors du sujet : rien n’y parle de logo');
 
-  // --- 9. L'ÉCRAN, ENTRE LA BASE CLIENTS ET LES RÉGLAGES ---------------------
+  // --- 9. L'ÉCRAN FERME LA RANGÉE, APRÈS LA BASE CLIENTS --------------------
+  // Il était JUSTE AVANT Réglages jusqu'au 01/09, jour où Réglages a quitté la
+  // rangée d'onglets pour rejoindre les commandes de l'appareil : « Tailles
+  // logos » ferme donc la marche, et c'est toujours le dernier écran de
+  // travail de la barre.
   const nav = INDEX.slice(INDEX.indexOf('class="nav-switch"'), INDEX.indexOf('</nav>'));
   const iLogos = nav.indexOf('id="viewTaillesLogos"');
-  const iReglages = nav.indexOf('id="viewReglages"');
-  assert.ok(iLogos > 0 && iReglages > 0 && iLogos < iReglages, 'l’onglet est JUSTE AVANT Réglages');
-  assert.match(nav.slice(iLogos, iReglages), /material-symbols-outlined"[^>]*>draw</,
-    '« draw » est vérifié présent dans le sous-ensemble figé de la police');
+  const iClients = nav.indexOf('id="viewClients"');
+  assert.ok(iLogos > 0 && iClients > 0 && iClients < iLogos, 'l’onglet vient après la Base clients');
+  assert.ok(!/id="view/.test(nav.slice(iLogos + 20)), '… et plus rien après lui : il ferme la rangée');
+  // L'onglet portait « draw », vérifié présent dans le sous-ensemble figé de la
+  // police. Les onglets sont devenus des MOTS le 01/09 : plus de glyphe, donc
+  // plus de piège — un nom absent de la police se rendait en TEXTE réduit à sa
+  // première lettre, sans la moindre erreur.
+  assert.match(nav.slice(iLogos), /<span class="nav-switch-label">Tailles logos</,
+    'l’onglet se nomme, il ne se dessine plus');
   // VUE ET HASH DOIVENT RESTER ALIGNÉS : un hash absent de la table rend
   // l'onglet MORT (il retombe sur le planning sans rien dire).
   assert.match(APP, /'#tailles-logos': 'tailleslogos'/);
@@ -293,8 +302,8 @@ const TE = global.window.TextileEngine;
   }
   assert.ok(!/rafraichir/.test(ECRAN) && !/taille-logo-app/.test(ECRAN),
     'plus rien ne va chercher l’ancien site');
-  assert.ok(!fs.existsSync(path.join(RACINE, 'tailles-logo.js')),
-    'le client vers l’ancien site n’a plus lieu d’être');
+  // (Le fichier lui-même est tenu par `test/ce-qui-ne-revient-pas.test.js`, avec
+  // les huit autres retraits : ce sont tous des poids servis, pas des sujets.)
   assert.ok(!/tailles-logo/.test(REGLAGES), 'et les Réglages n’en gardent pas un morceau');
 
   // --- 10. LA SAISIE SE COMPORTE COMME UN TABLEUR ---------------------------

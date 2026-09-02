@@ -40,6 +40,7 @@ import {
 // TOUS LES INPUTS avec un menu déroulant ». Il a déménagé de `pont.js` pour
 // qu'il n'en existe qu'UN — voir l'en-tête de `menu-recherche.js`.
 import { menuPoser, menuRafraichir, poserStyleMenu } from './menu-recherche.js';
+import { api } from './reseau.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT && ROOT.querySelector(sel);
@@ -61,18 +62,6 @@ const ic = (nom) => {
 const EURO = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
 const euro = (n) => EURO.format(Number(n) || 0);
 
-async function api(method, chemin, corps) {
-  const r = await fetch(chemin, {
-    method,
-    headers: corps ? { 'Content-Type': 'application/json' } : undefined,
-    body: corps ? JSON.stringify(corps) : undefined,
-  });
-  const t = await r.text();
-  let d = null;
-  try { d = t ? JSON.parse(t) : null; } catch (_) { d = null; }
-  if (!r.ok) throw new Error((d && (d.error || d.erreur)) || `${method} ${chemin} : ${r.status}`);
-  return d;
-}
 
 // ===========================================================================
 // CE QUE L'ÉCRAN TIENT

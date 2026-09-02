@@ -1,73 +1,26 @@
 {
   "commande": {
-    "types": [
-      { "id": "demande", "label": "Demande", "hint": "à chiffrer, devis à faire", "stage": "demande_chiffrage", "subStage": "demande_recue" },
-      { "id": "commande", "label": "Commande", "hint": "validée par le client", "stage": "demande_chiffrage", "subStage": "a_chiffrer" }
-    ],
-    "delais": [
-      { "id": "jour_j", "label": "Jour J", "note": "+20 %", "jours": 0, "majoration": 20 },
-      { "id": "express", "label": "Sous 3 jours", "note": "+10 %", "jours": 3, "majoration": 10 },
-      { "id": "j5", "label": "5 jours", "jours": 5, "majoration": 0 },
-      { "id": "j10", "label": "10 jours", "jours": 10, "majoration": 0 },
-      { "id": "j15", "label": "15 jours", "jours": 15, "majoration": 0 }
-    ],
-    "vetements": [
-      "T-shirt",
-      "T-shirt sans manches",
-      "Débardeur",
-      "Crop top",
-      "Débardeur crop top",
-      "Polo",
-      "Sweat",
-      "Sweat à capuche",
-      "Chemise",
-      "Short",
-      "Casquette",
-      "Bob",
-      "Tote bag",
-      "Serviette",
-      "Tablier",
-      "Sac"
-    ],
-    "taillesGrille": ["XS", "S", "M", "L", "XL", "2XL"],
-    "typos": [
-      "Arial", "Bebas Neue", "Brush Script", "Great Vibes", "Impact",
-      "Montserrat", "Pacifico", "Typo du logo"
-    ],
-    "zones": [
-      { "id": "coeur", "label": "Cœur", "hint": "poitrine gauche", "principal": true },
-      { "id": "dos", "label": "Dos", "principal": true },
-      { "id": "avant", "label": "Avant", "principal": true },
-      { "id": "manche_d", "label": "Manche droite", "court": "Manche Dr", "principal": true },
-      { "id": "manche_g", "label": "Manche gauche", "court": "Manche Ga", "principal": true },
-      { "id": "poitrine", "label": "Poitrine", "hint": "centré", "principal": true },
-      { "id": "haut_dos", "label": "Haut du dos", "court": "Haut dos", "hint": "sous la nuque" },
-      { "id": "capuche", "label": "Capuche" },
-      { "id": "poche", "label": "Poche" },
-      { "id": "avant_g", "label": "Avant gauche" },
-      { "id": "arriere", "label": "Arrière" },
-      { "id": "cote", "label": "Côté" }
-    ],
-    "techniques": [
-      { "id": "serigraphie", "label": "Sérigraphie" },
-      { "id": "broderie", "label": "Broderie" },
-      { "id": "dtf", "label": "DTF" },
-      { "id": "flex", "label": "Flex" }
-    ],
-    "typeLogos": [
-      { "id": "logo_client", "label": "Logo client" },
-      { "id": "logo_olda", "label": "Logo OLDA" },
-      { "id": "texte", "label": "Texte" },
-      { "id": "qr_code", "label": "QR code" },
-      { "id": "photo", "label": "Photo" },
-      { "id": "autre", "label": "Autre" }
-    ],
     "paiementModes": [
-      { "id": "cb", "label": "CB" },
-      { "id": "especes", "label": "Espèces" },
-      { "id": "virement", "label": "Virement" },
-      { "id": "cheque", "label": "Chèque" },
-      { "id": "mixte", "label": "Mixte (CB + espèces)" }
+      {
+        "id": "cb",
+        "label": "CB"
+      },
+      {
+        "id": "especes",
+        "label": "Espèces"
+      },
+      {
+        "id": "virement",
+        "label": "Virement"
+      },
+      {
+        "id": "cheque",
+        "label": "Chèque"
+      },
+      {
+        "id": "mixte",
+        "label": "Mixte (CB + espèces)"
+      }
     ]
   }
 }

@@ -17,7 +17,7 @@
 //
 // Chargé À LA DEMANDE par app.js au premier passage sur l'onglet.
 
-import { fetchBorne } from './reseau.js';
+import { api } from './reseau.js';
 import { ecranTete } from './ecran-tete.js';
 
 let ROOT = null;
@@ -29,21 +29,6 @@ const el = (tag, cls, text) => {
   return n;
 };
 
-async function api(method, chemin, corps) {
-  const res = await fetchBorne(chemin, {
-    method,
-    headers: corps !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: corps !== undefined ? JSON.stringify(corps) : undefined,
-  });
-  const texte = await res.text();
-  // Le statut AVANT le corps : une page d'erreur du proxy (HTML) ferait échouer
-  // l'analyse JSON d'abord, et l'écran afficherait « Unexpected token < » au
-  // lieu de « Erreur 502 ».
-  let data = null;
-  try { data = texte ? JSON.parse(texte) : null; } catch (_) { data = null; }
-  if (!res.ok) throw new Error((data && data.error) || `Erreur ${res.status}`);
-  return data;
-}
 
 let table = { familles: [] };
 let familleNom = '';

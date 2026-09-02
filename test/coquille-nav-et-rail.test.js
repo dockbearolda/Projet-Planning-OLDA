@@ -505,55 +505,108 @@ console.log('✓ flèche : une seule dans l’application, et plus aucune dans l
   assert.ok(!/\.nav-switch-btn--base\s*\{[^}]*margin/.test(sansCommentaire(CLIENTS)),
     '« Base clients » n’a plus de marge à elle : les sept onglets sont sur la ligne');
 
-  // (2) LE PLI EST L'ÉTAT DE BASE, ET IL NE REGARDE PLUS LE RAIL.
-  // Il se décidait sur la largeur de la BARRE (`@container barre`), donc sur
-  // celle du rail. Mesuré en 1440 : rail sorti, barre 1260 → deux rangées ;
-  // rail rentré, barre 1440 → une rangée. Ranger le rail réorganisait donc
+  // (2) LA BARRE NE DÉCIDE PLUS DE SA FORME — ELLE N'EN A PLUS QU'UNE.
+  // Elle se mesurait elle-même (`@container barre`), donc son pli dépendait de
+  // sa propre largeur, donc du rail. Mesuré en 1440 : rail sorti, barre 1260 →
+  // deux rangées ; rail rentré, 1440 → une rangée. Ranger le rail réorganisait
   // l'ossature : onglets de la 2e rangée à la 1re, recherche de 940 à 391 px,
   // et les quatre actions sous la recherche CONTRE LE BORD GAUCHE.
+  // Depuis le 01/09 il n'y a plus de pli du tout : UNE rangée, à toutes les
+  // largeurs. Ce qui reste vrai, et que ce bloc tient, c'est qu'aucune mesure
+  // de la barre ni aucune requête média ne choisit sa disposition.
   const CSSNET = sansCommentaire(CSS);
   assert.ok(!/@container barre/.test(CSSNET),
-    'le pli ne se décide plus sur la largeur de la barre : elle dépend du rail');
+    'la forme de la barre ne se décide pas sur sa largeur : elle dépend du rail');
   assert.ok(!/\.topbar \{[^}]*container-type/.test(CSSNET),
     '… la barre ne se mesure donc plus elle-même');
 
-  // La disposition PLIÉE est posée sans condition : une largeur inconnue, un
-  // écran de plus, un rail élargi à la main retombent sur celle qui tient
-  // toujours — jamais sur celle qui déborde.
-  const pli = CSSNET.match(/\.topbar \.nav-switch \{\n(?:.*\n)*?\}/);
-  assert.ok(pli && /order: 4/.test(pli[0]), 'la rangée d’onglets pliée est l’état de base');
-  assert.ok(/justify-content: safe center/.test(pli[0]),
-    'la rangée pliée centre ses onglets');
-  // `safe` n'est pas décoratif : la rangée peut DÉFILER, et un `center` sec rend
-  // le début du contenu inatteignable dès qu'il déborde — même famille de piège
-  // que `justify-content: flex-end`.
-  assert.ok(/overflow-x: auto/.test(pli[0]),
-    '… et elle défile, ce qui est exactement pourquoi le centrage doit être `safe`');
-  // LA RANGÉE REPREND LES DEUX FLANCS DE LA BARRE (26/08). Elle rendait
-  // seulement celui de droite, par un rembourrage de 16 px : l'axe tombait
-  // juste, mais la rangée perdait 16 px de large — sur une ligne qui n'en a pas
-  // à perdre. En reprenant les DEUX flancs par une marge négative, elle gagne
-  // 48 px ET sa boîte se cale sur celle de la barre : le centrage tombe alors
-  // sur l'axe réel, sans compensation. Par les JETONS, jamais par des nombres
-  // recopiés — les flancs sont asymétriques, et écrits deux fois ils
-  // divergeraient.
-  assert.ok(/margin-left: calc\(-1 \* var\(--topbar-flanc-g\)\)/.test(pli[0])
-    && /margin-right: calc\(-1 \* var\(--topbar-flanc-d\)\)/.test(pli[0]),
-    '… et la rangée reprend les deux flancs, pour que l’axe tombe juste');
-  assert.ok(!/padding-inline-end/.test(pli[0]),
-    '… l’ancienne compensation d’un seul côté s’en va avec');
-  // UNE MARGE AUTO MANGE TOUTE LA PLACE LIBRE AVANT `justify-content` : sans la
-  // rendre, le centrage ne prend pas. Mesuré : 67,4 px résolus sur le premier
-  // onglet, la rangée 33,7 px à droite de l’axe malgré le centrage demandé.
-  assert.ok(/\.topbar \.nav-switch > :first-child \{ margin-left: 0; \}/.test(CSSNET),
-    '… et le premier onglet rend sa marge automatique, sinon le centrage ne prend pas');
+  // DEUX RANGÉES, ET C'EST UN CHOIX TENU (01/09, Charlie : « ces catégories
+  // sauf réglages doivent rester sous la barre de recherche »). Elles avaient
+  // été fondues en une le matin même pour rendre 60 px de hauteur ; les onglets
+  // y devenaient neuf pictogrammes muets jusqu'à des largeurs qu'aucun poste
+  // n'a. Sur leur rangée ils retrouvent leurs mots dès 1 440 — mesuré : 1 028
+  // px de libellés pour 1 028 disponibles, ça tient tout juste, et à 1 280 ce
+  // sont les libellés qui cèdent, jamais la rangée.
+  const barreRegle = CSSNET.match(/(?:^|\n)\.topbar \{\n(?:.*\n)*?\}/);
+  assert.ok(barreRegle && /flex-wrap: wrap/.test(barreRegle[0]),
+    'la barre porte ses deux rangées, et le pli est son état de base');
+  assert.ok(/min-height: calc\(var\(--ctrl-h\)/.test(barreRegle[0]),
+    '… sa hauteur est sa RECETTE, pas un nombre : la boîte plus ses flancs');
+  // DEUX RANGÉES COLLÉES SONT UNE BARRE, deux rangées espacées sont deux
+  // barres. L'écart vertical est le plus petit de l'échelle, et il est LU :
+  // écrit en dur il aurait divergé du reste.
+  assert.ok(/gap: var\(--pas-1\) var\(--topbar-gap\)/.test(barreRegle[0]),
+    '… et l’écart de ses deux rangées est un jeton');
+  assert.ok(/--topbar-gap:/.test(barreRegle[0]),
+    'l’écart horizontal est un jeton lui aussi : la rangée d’onglets le REPREND pour tomber sous la recherche');
 
-  // PLUS D'EXCEPTION « RANGÉE UNIQUE » (26/08). Au-dessus de 1 720 px, les
-  // onglets remontaient sur la ligne de la recherche — et s'y repliaient en
-  // deux rangées, puisqu'ils la partageaient. La barre changeait donc de forme
-  // au milieu de la plage de largeurs, et se pliait justement là où il y a le
-  // plus de place. UNE SEULE DISPOSITION, à toutes les largeurs : la recherche
-  // en haut, les onglets sur leur ligne.
+  const pli = CSSNET.match(/\.topbar \.nav-switch \{\n(?:.*\n)*?\}/);
+  assert.ok(pli && /order: 3/.test(pli[0]),
+    'les onglets viennent après la recherche et les actions : ils sont la rangée du bas');
+  assert.ok(/flex: 1 1 100%/.test(pli[0]),
+    'pleine largeur, ET capable de rétrécir : une base de 100 % AJOUTE ses marges par-dessus');
+  // ELLE COMMENCE SOUS LA RECHERCHE, ET ÇA NE S'ÉCRIT PAS. Le décalage est ce
+  // que le bouton du rail occupe (`--ctrl-h`) plus l'écart de la barre. Écrit
+  // en dur, il se décollerait le jour où l'un des deux bouge — et un alignement
+  // raté d'un pixel se voit précisément parce que les deux rangées sont l'une
+  // sous l'autre. Mesuré au rendu : 0 px d'écart, à 1 280 comme à 1 440.
+  assert.ok(/margin: 0 calc\(-1 \* var\(--topbar-flanc-d\)\) 0 calc\(var\(--ctrl-h\) \+ var\(--topbar-gap\)\)/.test(pli[0]),
+    'la rangée tombe sous la recherche par les jetons, et reprend le flanc droit qu’elle ne partage avec personne');
+  // ALIGNÉE, DONC PAS CENTRÉE : un centrage la ferait flotter au milieu d'une
+  // rangée dont le bord gauche est justement ce qu'on veut voir tomber sous
+  // celui de la recherche.
+  assert.ok(/justify-content: flex-start/.test(pli[0]),
+    'elle s’aligne, elle ne se centre pas');
+  assert.ok(/overflow-x: auto/.test(pli[0]),
+    '… et elle défile en tout dernier recours, après que les libellés sont partis');
+  // LES ONGLETS NE SE COMPRIMENT PAS, et c'est ce qui fait tenir la mesure :
+  // comprimés, ils coupent leurs libellés en silence, `scrollWidth` retombe sur
+  // `clientWidth`, et `ajusterLesOnglets` conclut « ça tient » sur une rangée
+  // illisible. Vérifié au rendu le 01/09 : nav à 515 px pour 1 070 de contenu,
+  // aucun débordement signalé.
+  assert.ok(/\.topbar \.nav-switch-btn \{ flex: 0 0 auto; \}/.test(CSSNET),
+    'un onglet ne rétrécit pas : sinon le débordement ne se voit plus, et les libellés restent');
+  // LA RECHERCHE EST LE SEUL ÉLÉMENT ÉLASTIQUE, et son plancher est un JETON —
+  // elle s'en sert deux fois (base et minimum), et deux nombres divergent.
+  const rech = CSSNET.match(/\.topbar \.grid-search \{\n(?:.*\n)*?\}/);
+  assert.ok(rech && /flex: 1 1 var\(--rech-plancher\)/.test(rech[0])
+    && /min-width: var\(--rech-plancher\)/.test(rech[0]),
+    'la recherche absorbe la place en trop et la rend, sans descendre sous son plancher');
+  assert.ok(/--rech-plancher:/.test(barreRegle[0]), 'le plancher est déclaré par la barre');
+
+  // UNE SEULE MARGE AUTOMATIQUE DANS LA BARRE, sur les actions. Deux se
+  // partageraient la place libre et creuseraient un trou au milieu ; aucune, et
+  // les 332 px que la recherche ne prend pas une fois à sa borne (mesuré à
+  // 1 920) restent derrière elles — le poste flottait à 332 px du bord.
+  assert.ok(/\.topbar-right \{ margin-left: auto;/.test(CSSNET),
+    'les actions tiennent le bord droit');
+  assert.ok(/\.topbar \.nav-switch > :first-child \{ margin-left: 0; \}/.test(CSSNET),
+    '… et le premier onglet ne reprend pas la sienne, sinon le centrage de la rangée ne prendrait plus');
+
+  // RÉGLAGES A QUITTÉ LA RANGÉE D'ONGLETS. Son ancienne règle le disait déjà :
+  // « on n'y va pas pour travailler, on y va pour régler l'outil », et elle le
+  // détachait par un filet. Il est du côté des commandes de l'appareil, en
+  // rond comme elles, et le filet est devenu `.topbar-sep`.
+  const NAV_HTML = HTML.slice(HTML.indexOf('class="nav-switch"'), HTML.indexOf('</nav>'));
+  assert.ok(!NAV_HTML.includes('id="viewReglages"'),
+    'Réglages n’est plus un onglet d’écran');
+  const DROITE = HTML.slice(HTML.indexOf('<div class="topbar-right">'), HTML.indexOf('</header>'));
+  assert.ok(DROITE.includes('id="viewReglages"'), '… il est avec les commandes de l’appareil');
+  assert.ok(DROITE.indexOf('id="viewReglages"') < DROITE.indexOf('topbar-sep')
+    && DROITE.indexOf('topbar-sep') < DROITE.indexOf('id="fullscreenToggle"'),
+    '… et le filet le sépare d’elles : lui mène à un écran, elles agissent sur l’appareil');
+  assert.ok(/class="icon-btn" id="viewReglages"/.test(DROITE),
+    '… il en prend la forme, le rond de --ctrl-h — pas un onglet égaré parmi quatre cercles');
+  assert.ok(/<a class="icon-btn" id="viewReglages" href="#reglages"/.test(DROITE),
+    '… et il reste un LIEN : il mène à une adresse, donc il s’ouvre à la molette comme les autres écrans');
+  // `hidden` NE SUFFIT PAS SUR UN `.icon-btn` non plus : la règle de classe
+  // pose `display: inline-flex`, plus spécifique que la feuille du navigateur.
+  // Réglages se cache à qui n'y a pas droit, le plein écran naît caché.
+  assert.ok(/\.icon-btn\[hidden\] \{ display: none; \}/.test(CSSNET),
+    'un rond caché disparaît vraiment');
+  assert.ok(/\.icon-btn\.active \{/.test(CSSNET),
+    '… et celui qui mène à un écran sait dire qu’on y est');
+
   assert.ok(!/@media \(min-width: 1720px\)/.test(CSSNET),
     'la barre ne change plus de forme au milieu de la plage de largeurs');
   assert.ok(!/\.nav-switch \{[^}]*justify-content:\s*flex-end/.test(CSSNET),
@@ -563,9 +616,18 @@ console.log('✓ flèche : une seule dans l’application, et plus aucune dans l
   // changerait au rangement du rail serait le même défaut en plus petit.
   assert.ok(/@media \(max-width: 1100px\) \{\n  \.topbar \.nav-switch \{ gap: 2px; \}/.test(CSSNET),
     'le resserrement des onglets ne dépend pas du rail');
+
+  // L'ONGLET À DEUX ÉTAGES EST PARTI (01/09) : icône au-dessus du mot, posé
+  // pour le doigt (« au doigt il n'y a pas de survol pour révéler une
+  // infobulle »). L'atelier n'a plus de tablette, et il faisait 60 px de haut
+  // dans une barre qui en fait 66.
+  assert.ok(!/\.nav-switch-btn \{[^}]*flex-direction: column/.test(CSSNET),
+    'plus d’onglet à deux étages : c’était une réponse au doigt, et le doigt n’est plus une cible');
+  assert.ok(!/#viewProjet/.test(CSSNET),
+    '« Nouveau Projet » n’existe plus depuis le 29/08 : sa règle non plus');
 }
 
-console.log('✓ barre : les onglets sur UNE ligne, la rangée centrée sur l’axe');
+console.log('✓ barre : UNE rangée pour tout — 126 px de barre ramenés à 66');
 
 // --- 10. ACTUALISER, ET LE POSTE RÉDUIT À SA LETTRE ------------------------
 {

@@ -119,23 +119,33 @@ function bloc(src, signature) {
   // =========================================================================
   // 2. Les techniques de marquage voyagent dans la liste
   // =========================================================================
-  // Une commande de polos marqués en DTF, prise par Nouveau Projet : elle entre
-  // au chiffrage, donc bien AVANT la production — c'est tout l'enjeu.
-  const projet = await call('POST', '/api/projets', {
-    kind: 'commande',
-    delai: 'j5',
-    client: { type: 'pro', societe: 'Audit Technique' },
-    lignes: [{
-      type: 'textile', quantite: 3, designation: 'Polo', prixUnitaireTtc: 30,
-      faces: { avant: { emplacement: 'coeur', technique: 'dtf' } },
-    }],
-  });
-  assert.strictEqual(projet.status, 201, JSON.stringify(projet.body));
-  assert.strictEqual(projet.body.projet.stage, 'demande_chiffrage');
+  // Une commande de polos marqués en DTF : elle entre au chiffrage, donc bien
+  // AVANT la production — c'est tout l'enjeu de la pondération « machine ».
+  //
+  // LA FICHE EST POSÉE EN BASE, PAS PAR UNE ROUTE (01/09). Elle l'était par
+  // `POST /api/projets`, seule porte qui savait écrire `lignes[].faces[]`, et
+  // cette porte est partie avec ses neuf cents lignes. Aucune autre ne la
+  // remplace : les dossiers du comptoir n'ont jamais porté de technique, et
+  // la production n'en compte que six, tous d'avant le 31/07.
+  // Ce qui se vérifie ici est donc exactement ce qui compte encore : que la
+  // liste allégée sache TRANSPORTER une technique quand la fiche en porte une —
+  // pour ces six dossiers-là, et pour le jour où une porte les réécrira.
+  const { pool } = require('../db');
+  const ficheDtf = {
+    kind: 'projet-simple',
+    client: { societe: 'Audit Technique' },
+    lignes: [{ type: 'textile', quantite: 3, designation: 'Polo', faces: [{ emplacement: 'coeur', technique: 'dtf' }] }],
+  };
+  const { rows: pose } = await pool.query(
+    `INSERT INTO requests (stage, sub_stage, billing_company, quantity, product, fiche)
+     VALUES ('demande_chiffrage', 'a_chiffrer', 'Audit Technique', 3, 'Polo', $1) RETURNING id`,
+    [JSON.stringify(ficheDtf)],
+  );
+  const idDtf = pose[0].id;
 
   const liste = (await call('GET', '/api/requests?stage=demande_chiffrage')).body;
-  const ligne = liste.find((r) => r.id === projet.body.id);
-  assert.ok(ligne, 'la ligne du projet est bien au planning');
+  const ligne = liste.find((r) => r.id === idDtf);
+  assert.ok(ligne, 'la ligne est bien au planning');
   assert.deepStrictEqual(
     ligne.fiche.techniques, ['dtf'],
     'la liste allégée transporte la technique de marquage',

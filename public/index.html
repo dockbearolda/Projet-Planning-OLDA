@@ -100,9 +100,15 @@
         <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
       </button>
 
+      <!-- « Rechercher » tout court depuis le 01/09 : la barre tient sur une
+           seule rangée et la pilule descend à 196 px sur une fenêtre de 1 280.
+           « Rechercher une commande » s'y coupait au milieu d'un mot, sans
+           points de suspension — un `placeholder` ne s'élide pas. Ce qu'on
+           cherche exactement reste dit à voix haute par `aria-label`, et le
+           badge ⌘K dit que c'est la palette. -->
       <div class="champ-recherche grid-search" id="gridSearch">
         <span class="material-symbols-outlined grid-search-ic" aria-hidden="true">search</span>
-        <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher une commande" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
+        <input id="gridSearchInput" class="grid-search-input" type="text" placeholder="Rechercher" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filtrer : société, référent, produit" />
         <button class="grid-search-clear" id="gridSearchClear" type="button" aria-label="Effacer la recherche" hidden>×</button>
         <kbd class="grid-search-kbd" id="searchKbd">⌘K</kbd>
       </div>
@@ -113,25 +119,29 @@
            de vue qui se contredit. Nouveau Projet = LA porte d'entrée (toute
            commande y naît) ; Base clients (CRM) = le socle. -->
       <nav class="nav-switch" aria-label="Navigation">
-        <!-- LES DEUX PARCOURS SONT DEUX ONGLETS, plus un menu (29/08/2026).
-             « je veux retrouver directement vente et devis, ils doivent être
-             cliquables direct ». Il y avait un onglet « Nouveau Projet » qui
-             n'allait nulle part : il dépliait un panneau de deux lignes pour
-             poser une question à deux réponses. Deux clics, un panneau à caler
-             au pixel sur le rail de son onglet, et un état de plus à fermer.
-             Les deux réponses sont maintenant DANS la barre, chacune avec son
-             adresse (#vente, #devis) : un clic ouvre le parcours, et l'adresse
-             dit lequel — donc un rechargement le rouvre au même endroit.
-             Toute icône Material posée ici doit figurer dans olda-icones.woff2
-             (91 glyphes) : un nom absent s'affiche en TEXTE réduit à sa
-             première lettre, sans erreur. Ce sont les deux mêmes que portaient
-             les rangées du menu. -->
-        <a class="nav-switch-btn nav-switch-btn--projet" id="viewVente" href="#vente">
-          <span class="material-symbols-outlined" aria-hidden="true">point_of_sale</span>
+        <!-- LES ONGLETS SONT DES MOTS, PAS DES PICTOGRAMMES (01/09/2026,
+             Charlie : « je ne veux pas des icône mais les texte »).
+             Ils portaient les deux : une icône et son mot. À neuf onglets, ça
+             demandait 1 028 px et la rangée ne tenait qu'à partir de 1 440 —
+             en dessous les mots partaient et il ne restait que neuf
+             pictogrammes muets, chacun avec son mot en infobulle qu'il fallait
+             aller chercher au survol. Sans les icônes, la rangée demande
+             810 px : elle tient dès 1 280, avec ses mots, et il reste 58 px.
+             C'est aussi la fin d'un piège : toute icône posée ici devait
+             figurer dans olda-icones.woff2 (91 glyphes), sous peine d'être
+             rendue en TEXTE réduit à sa première lettre, sans la moindre
+             erreur.
+             Le hash de l'URL fait foi (voir applyHash dans app.js) : un seul
+             pilote, donc pas de vue qui se contredit.
+
+             LES DEUX PARCOURS SONT DEUX ONGLETS (29/08/2026) : « je veux
+             retrouver directement vente et devis, ils doivent être cliquables
+             direct ». Un filet les détache du reste — ce sont les deux seules
+             entrées qui CRÉENT quelque chose. -->
+        <a class="nav-switch-btn" id="viewVente" href="#vente">
           <span class="nav-switch-label">Vente</span>
         </a>
-        <a class="nav-switch-btn nav-switch-btn--projet nav-switch-btn--projet-fin" id="viewDevis" href="#devis">
-          <span class="material-symbols-outlined" aria-hidden="true">request_quote</span>
+        <a class="nav-switch-btn nav-switch-btn--projet-fin" id="viewDevis" href="#devis">
           <span class="nav-switch-label">Devis</span>
         </a>
         <!-- LE DEVIS CHIFFRÉ (01/09/2026), l'écran du patron rentré dans le CRM.
@@ -139,77 +149,59 @@
              DEMANDE prise au comptoir, sans prix — c'est ce qu'on doit
              chiffrer. Celui-ci EST le chiffrage : on compose le devis devant le
              client, la feuille se fait sur la moitié droite de l'écran, on
-             imprime, et le dossier part au planning à « Tarif / Devis envoyé ».
-             `receipt_long` est vérifié présent dans le sous-ensemble figé de la
-             police (un glyphe présent mesure une case, un nom absent mesure la
-             longueur de son texte). -->
+             imprime, et le dossier part au planning à « Tarif / Devis envoyé ». -->
         <a class="nav-switch-btn" id="viewDevisFlash" href="#devis-flash">
-          <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
           <span class="nav-switch-label">Devis flash</span>
         </a>
-        <!-- `work` EST dans la police (91 glyphes) : déjà utilisé par la fiche
-             client. Un nom absent ne lève rien, il s'affiche en texte tronqué. -->
         <a class="nav-switch-btn nav-switch-btn--montravail" id="viewMonTravail" href="#mon-travail" hidden>
-          <span class="material-symbols-outlined" aria-hidden="true">work</span>
           <span class="nav-switch-label">Mon travail</span>
         </a>
         <a class="nav-switch-btn" id="viewPlanning" href="#planning">
-          <span class="material-symbols-outlined" aria-hidden="true">view_kanban</span>
           <span class="nav-switch-label">Planning</span>
         </a>
-        <!-- `bar_chart` n'est PAS dans la police : le nom absent se rendrait en
-             TEXTE, sans erreur ni message. On avait donc repris `dashboard` —
-             mais l'onglet d'à côté le portait déjà, et deux onglets voisins
-             avec le même pictogramme ne se distinguent plus que par leur mot.
-             Puis `request_quote`, jusqu'au 29/08 : c'est le glyphe du DEVIS, et
-             l'onglet « Devis » est arrivé dans la même barre. Un devis se
-             demande au comptoir, il ne se pilote pas — le nom revient donc à
-             l'écran qui le porte, et le pilotage prend `overview` : la vue
-             d'ensemble, ce que cet écran est. (Dans la police, vérifié : un
-             glyphe présent mesure une case, un nom absent mesure sa longueur.) -->
+        <!-- LE PILOTAGE N'EXISTE QUE POUR QUI VOIT LES MARGES — la Direction.
+             Sans comptes, personne ne le voit. -->
         <a class="nav-switch-btn nav-switch-btn--pilotage" id="viewPilotage" href="#pilotage" hidden>
-          <span class="material-symbols-outlined" aria-hidden="true">overview</span>
           <span class="nav-switch-label">Pilotage</span>
         </a>
         <a class="nav-switch-btn" id="viewDashboard" href="#dashboard">
-          <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
           <span class="nav-switch-label">Dashboard</span>
         </a>
         <!-- Deux raccourcis sortis du rail des étapes : ce sont les deux listes
              qu'on ouvre le plus souvent dans la journée, elles méritent un
              onglet à elles plutôt qu'une ligne perdue au milieu du pipeline.
              Elles ouvrent le planning, filtré sur leur catégorie. -->
-        <!-- La MARQUE, pas un stylo : c'est le même badge que le bouton
-             « Envoyer vers Fiverr » des lignes du planning — on reconnaît d'un
-             coup d'œil que l'un mène à l'autre. Tracé identique à fiverrIcon()
-             dans app.js. -->
         <a class="nav-switch-btn" id="viewFiverr" href="#fiverr">
-          <svg class="nav-switch-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M6 2h12a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4zM6.6 10.4h2.6V9.3c0-2.2 1.5-3.6 3.7-3.6h1.6v2.4h-1.2c-.9 0-1.4.5-1.4 1.3v1h2.4v2.3h-2.4V19H9.2v-6.3H6.6zM15.9 12.7h1.9V19h-1.9zM15.9 5.8h1.9v2.1h-1.9z"/></svg>
           <span class="nav-switch-label">Fiverr</span>
         </a>
         <a class="nav-switch-btn" id="viewACommander" href="#a-commander">
-          <span class="material-symbols-outlined" aria-hidden="true">shopping_cart</span>
           <span class="nav-switch-label">À commander</span>
         </a>
         <a class="nav-switch-btn nav-switch-btn--base" id="viewClients" href="#clients">
-          <span class="material-symbols-outlined" aria-hidden="true">contacts</span>
           <span class="nav-switch-label">Base clients</span>
         </a>
         <!-- TAILLES DES LOGOS — le tableau de l'atelier, rentré dans le CRM le
-             26/08. « draw » est vérifié présent dans le sous-ensemble figé de
-             la police (un glyphe présent mesure une case, un nom absent mesure
-             la longueur de son texte). -->
+             26/08. Il ferme la rangée depuis que Réglages en est sorti. -->
         <a class="nav-switch-btn nav-switch-btn--logos" id="viewTaillesLogos" href="#tailles-logos">
-          <span class="material-symbols-outlined" aria-hidden="true">draw</span>
           <span class="nav-switch-label">Tailles logos</span>
-        </a>
-        <a class="nav-switch-btn nav-switch-btn--reglages" id="viewReglages" href="#reglages">
-          <span class="material-symbols-outlined" aria-hidden="true">settings</span>
-          <span class="nav-switch-label">Réglages</span>
         </a>
       </nav>
 
       <div class="topbar-right">
+        <!-- RÉGLAGES A QUITTÉ LA RANGÉE D'ONGLETS (01/09/2026, demande de
+             Charlie). L'onglet le disait déjà de lui-même — « on n'y va pas
+             pour travailler, on y va pour régler l'outil » — et il le disait
+             avec un filet qui le détachait des huit autres. Il est donc du côté
+             des commandes de l'appareil (plein écran, thème, actualiser, qui
+             est au poste), pas du côté des écrans de travail, et il en prend la
+             forme : le rond de `--ctrl-h`, comme les quatre autres.
+             C'est un LIEN, pas un bouton : il mène à une adresse (`#reglages`),
+             donc il s'ouvre dans un nouvel onglet à la molette comme les huit
+             autres écrans. -->
+        <a class="icon-btn" id="viewReglages" href="#reglages" title="Réglages" aria-label="Réglages">
+          <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+        </a>
+        <span class="topbar-sep" aria-hidden="true"></span>
         <button class="icon-btn" id="fullscreenToggle" type="button" aria-label="Passer en plein écran" hidden>
           <span class="material-symbols-outlined" aria-hidden="true">fullscreen</span>
         </button>

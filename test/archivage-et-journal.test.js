@@ -30,6 +30,11 @@ const DB = lire('db.js');
 const SQL = lire('schema.sql');
 const APP = lire('public/app.js');
 const PONT = lire('public/comptoir/pont.js');
+const RESEAU = lire('public/reseau.js');
+const CLIENTS = lire('public/clients.js');
+const REGLAGES = lire('public/reglages.js');
+const TAILLES = lire('public/tailles-logos.js');
+const DEVIS_FLASH = lire('public/devis-flash.js');
 
 // Base en mémoire, accès ouvert : mêmes conditions que les autres tests.
 delete process.env.DATABASE_URL;
@@ -200,29 +205,45 @@ delete process.env.APP_PASSWORD;
   // =========================================================================
   // 5. INTERRUPTEURS DE FONCTIONNALITÉ (§41)
   // =========================================================================
+  // IL N'EN RESTE QU'UN, ET C'EST VOULU (01/09). Ils étaient trois ; deux ne
+  // commandaient rien — on les cochait dans Réglages et rien ne changeait. Le
+  // seul qui décide de quelque chose est `comptes`. Ce qui se vérifie ici est
+  // la MÉCANIQUE : la liste est déclarée, tout part éteint, un nom inconnu
+  // n'entre pas, et un corps qui n'est pas un objet est refusé.
   const f0 = await call('GET', '/api/flags');
   assert.strictEqual(f0.status, 200);
-  assert.ok(f0.body.connus && f0.body.connus.projets, 'la liste des interrupteurs est DÉCLARÉE, pas devinée');
+  assert.ok(f0.body.connus && f0.body.connus.comptes,
+    'la liste des interrupteurs est DÉCLARÉE, pas devinée');
   for (const [nom, valeur] of Object.entries(f0.body.flags)) {
     assert.strictEqual(valeur, false, `« ${nom} » part éteint : au pire on n’a pas la nouveauté, jamais un écran cassé`);
   }
 
-  const f1 = await call('PUT', '/api/flags', { projets: true });
-  assert.strictEqual(f1.body.flags.projets, true);
-  assert.strictEqual(f1.body.flags.marges, false, 'allumer l’un n’allume pas les autres');
-
-  // Fusion, pas remplacement : deux postes ouverts sur les réglages ne doivent
-  // pas s'effacer l'un l'autre.
-  const f2 = await call('PUT', '/api/flags', { marges: true });
-  assert.strictEqual(f2.body.flags.projets, true, 'le drapeau posé par l’autre poste tient');
-  assert.strictEqual(f2.body.flags.marges, true);
+  // ON N'ALLUME PAS `comptes` ICI, ET C'EST LE SUJET : il commande vraiment
+  // quelque chose. L'allumer exigerait une session de tous les appels qui
+  // suivent, y compris celui qui le rééteint. Le test se ferait tomber lui-même.
+  // C'est aussi pourquoi la mécanique se vérifiait sur deux interrupteurs
+  // inoffensifs — retirés le 01/09 parce qu'ils ne commandaient rien.
 
   // Un nom inconnu est ignoré, pas rangé : sinon une faute de frappe crée un
-  // drapeau fantôme que personne ne lit et qui ne s'éteint jamais.
-  const f3 = await call('PUT', '/api/flags', { projetss: true });
-  assert.strictEqual(f3.body.flags.projetss, undefined, 'un interrupteur inconnu n’entre pas en base');
+  // drapeau fantôme que personne ne lit et qui ne s'éteint jamais. C'est aussi
+  // ce qui fait qu'un interrupteur RETIRÉ du code disparaît de la réponse même
+  // s'il traîne encore en base — le cas de `projets` et `marges` depuis le 01/09.
+  const f3 = await call('PUT', '/api/flags', { projets: true, comptess: true });
+  assert.strictEqual(f3.body.flags.projets, undefined, 'un interrupteur retiré ne revient pas');
+  assert.strictEqual(f3.body.flags.comptess, undefined, 'une faute de frappe n’entre pas en base');
+  assert.strictEqual(f3.body.flags.comptes, false, '… et rien d’autre n’a bougé au passage');
   assert.strictEqual((await call('PUT', '/api/flags', [1, 2])).status, 400, 'un tableau n’est pas un objet');
-  await call('PUT', '/api/flags', { projets: false, marges: false });
+
+  // FUSION, PAS REMPLACEMENT — deux postes ouverts sur les réglages ne doivent
+  // pas s'effacer l'un l'autre. Avec un seul interrupteur déclaré, ça ne se
+  // montre plus par un aller-retour : ça se lit dans `setFlags`, qui repart de
+  // l'état COURANT et n'écrase que les noms reçus.
+  const setFlags = DB.match(/async function setFlags\(patch\) \{[\s\S]*?\n\}/);
+  assert.ok(setFlags, 'setFlags se lit dans db.js');
+  assert.match(setFlags[0], /\{ \.\.\.\(await getFlags\(\)\) \}/,
+    'setFlags repart de ce qui est en place : un envoi partiel ne remet rien à zéro');
+  assert.match(setFlags[0], /for \(const s of FLAGS_SLUGS\) if \(s in src\)/,
+    '… et n’écrit que les interrupteurs CONNUS et effectivement reçus');
 
   // =========================================================================
   // 6. LE FILTRE EST POSÉ PARTOUT — LU DANS LE SOURCE
@@ -268,8 +289,19 @@ delete process.env.APP_PASSWORD;
     'le filtre porte sur toutes les lectures : il lui faut son index, et partiel');
 
   // Le poste signe, des DEUX côtés, et toujours encodé.
-  assert.ok(/opts\.headers\['X-Qui'\] = encodeURIComponent\(qui\)/.test(APP),
+  // CÔTÉ CRM, LA SIGNATURE EST DANS `reseau.js` DEPUIS LE 01/09 : les cinq
+  // écrans avaient chacun leur copie de `api()`, et celle du devis flash ne
+  // signait rien — ses écritures arrivaient au journal sans nom. Une seule
+  // fonction, donc une seule signature, donc plus d'écran qui l'oublie.
+  assert.ok(/opts\.headers\['X-Qui'\] = encodeURIComponent\(qui\)/.test(RESEAU),
     'le CRM signe ses appels — encodés, sinon `fetch` lève sur un prénom hors latin-1');
+  assert.ok(!/async function api\(/.test(APP),
+    '… et le planning ne se refait pas la sienne à côté');
+  for (const [nom, src] of [['clients', CLIENTS], ['réglages', REGLAGES],
+    ['tailles de logos', TAILLES], ['devis flash', DEVIS_FLASH]]) {
+    assert.ok(/import \{[^}]*\bapi\b[^}]*\} from '\.\/reseau\.js'/.test(src),
+      `l’écran « ${nom} » prend l’appel commun, il n’en réécrit pas un`);
+  }
   assert.ok(/'X-Qui': encodeURIComponent\(nom\)/.test(PONT),
     'le comptoir aussi : c’est là que naissent les dossiers');
 

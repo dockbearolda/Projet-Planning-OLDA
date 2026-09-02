@@ -42,7 +42,7 @@ export function lirePoste() {
   try { return localStorage.getItem(CLE_POSTE) || secours; } catch (_) { return secours; }
 }
 
-export function poserPoste(nom) {
+function poserPoste(nom) {
   secours = nom || null;
   try {
     if (nom) localStorage.setItem(CLE_POSTE, nom);

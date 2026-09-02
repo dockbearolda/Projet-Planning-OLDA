@@ -752,27 +752,6 @@ function resetCreateClientForm(){
   setCreateClientType("Particulier");
 }
 
-function editSelectedClient(){
-  if(!selectedClient) return;
-
-  showCreateClient();
-  setCreateClientType(selectedClient.type);
-
-  if(selectedClient.type==="Particulier"){
-    document.getElementById("newIndividualName").value=selectedClient.name||"";
-    document.getElementById("newIndividualPhone").value=selectedClient.phone||"";
-    document.getElementById("newIndividualEmail").value=selectedClient.email||"";
-  }else{
-    document.getElementById("newCompanyName").value=selectedClient.company||"";
-    document.getElementById("newCompanySector").value=selectedClient.sector||"";
-    document.getElementById("newCompanyAddress").value=selectedClient.address||"";
-    document.getElementById("newCompanyCity").value=selectedClient.city||"";
-    document.getElementById("newCompanyPostal").value=selectedClient.postal||"";
-    document.getElementById("newCompanyContact").value=selectedClient.contact||"";
-    document.getElementById("newCompanyPhone").value=selectedClient.phone||"";
-    document.getElementById("newCompanyEmail").value=selectedClient.email||"";
-  }
-}
 
 function generateOrderNumber(){
   const now=new Date();
@@ -1612,20 +1591,6 @@ renderProducts();
   const deliveryDate=document.getElementById("deliveryDate");
   const deliveryTime=document.getElementById("deliveryTime");
 
-  function localDateValue(date){
-    const y=date.getFullYear();
-    const m=String(date.getMonth()+1).padStart(2,"0");
-    const d=String(date.getDate()).padStart(2,"0");
-    return `${y}-${m}-${d}`;
-  }
-
-  function closestFullHour(date){
-    let hour=date.getHours();
-    if(date.getMinutes()>0) hour+=1;
-    hour=Math.max(9,Math.min(17,hour));
-    return `${String(hour).padStart(2,"0")}:00`;
-  }
-
   if(!deliveryTime.value){
     deliveryTime.value="14:00";
   }
@@ -2358,37 +2323,21 @@ renderProducts();
 
      Le supplément d'urgence est une décision commerciale, pas une constante :
      il bouge avec la charge de l'atelier. Il vit donc en base (app_meta), se
-     règle ici même sous la ligne qui l'annonce, et vaut aussitôt pour tous les
+     règle dans Réglages (depuis le 27/08) et vaut aussitôt pour tous les
      postes. `getDeadlineRate()` (plus haut) ne lit plus que ce barème.
 
+     L'ÉDITEUR A QUITTÉ CET ÉCRAN LE 27/08 ; son script, resté derrière, est
+     parti le 01/09. Ce qui reste est le CHARGEMENT, et il est obligatoire :
+     sans lui, l'écran tournerait sur les pourcentages par défaut sans que rien
+     ne le dise, et le supplément affiché au client serait faux.
+
      Bloc isolé À DESSEIN : quand une nouvelle version de cet écran arrive du
-     patron, c'est cette section + les trois retouches balisées « barème » qu'il
+     patron, c'est cette section + les retouches balisées « barème » qu'il
      faut reporter, rien d'autre. -->
 <script>
 (function(){
-  const CHAMPS = { j5:"bareme-j5", j10:"bareme-j10", j15:"bareme-j15" };
-  const el = (id) => document.getElementById(id);
-  const box = () => el("baremeBox");
-
-  function message(texte, ok){
-    const m = el("baremeMsg");
-    if(!m) return;
-    m.textContent = texte || "";
-    m.className = "bareme-msg" + (texte ? (ok ? " ok" : " ko") : "");
-  }
-
-  // Recopie le barème courant dans les champs. Appelé à chaque ouverture : on ne
-  // veut jamais éditer par-dessus une valeur qu'un autre poste a changée entre-temps.
-  function remplir(){
-    for(const [cle, id] of Object.entries(CHAMPS)){
-      const champ = el(id);
-      if(champ) champ.value = window.OLDA_SUPPLEMENTS[cle];
-    }
-    message("");
-  }
-
   // Tout ce que le barème touche à l'écran : la ligne de délai, les badges des
-  // articles déjà saisis et le total. Un article ajouté AVANT la modification
+  // articles déjà saisis et le total. Un article ajouté AVANT une modification
   // garde son taux (c'est le prix annoncé au client) — seul le prochain suit le
   // nouveau barème.
   function rafraichir(){
@@ -2405,55 +2354,7 @@ renderProducts();
     }catch(_){ /* hors ligne : on garde les valeurs par défaut */ }
   }
 
-  async function enregistrer(){
-    const envoi = {};
-    for(const [cle, id] of Object.entries(CHAMPS)){
-      const brut = String((el(id)||{}).value ?? "").trim().replace(",",".");
-      const n = Number(brut);
-      if(brut === "" || !Number.isFinite(n) || n < 0 || n > 100){
-        message("Chaque palier attend un pourcentage entre 0 et 100.", false);
-        return;
-      }
-      envoi[cle] = n;
-    }
-    message("Enregistrement…", true);
-    try{
-      const r = await fetch("/api/supplements-express", {
-        method:"PUT",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(envoi),
-      });
-      const data = await r.json().catch(()=>({}));
-      if(!r.ok) throw new Error(data.error || ("erreur "+r.status));
-      window.OLDA_SUPPLEMENTS = data;
-      rafraichir();
-      message("Barème enregistré — il vaut pour tous les postes.", true);
-    }catch(err){
-      // Jamais d'échec muet : la vendeuse croirait le nouveau barème appliqué.
-      message("Enregistrement impossible : "+err.message+". Le barème n'a pas changé.", false);
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", function(){
-    // LE BARÈME SE CHARGE TOUJOURS, l'éditeur n'est plus là. Il partait après
-    // la garde ci-dessous : retirer le bouton aurait fait tourner l'écran sur
-    // les pourcentages PAR DÉFAUT, sans que rien ne le dise — le supplément
-    // affiché au client aurait été faux.
-    charger();
-    const ouvrir = el("baremeOpen");
-    if(!ouvrir || !box()) return;
-    ouvrir.addEventListener("click", function(){
-      const ferme = box().classList.contains("hidden");
-      if(ferme) remplir();
-      box().classList.toggle("hidden", !ferme);
-      ouvrir.textContent = ferme ? "Fermer le barème" : "Modifier le barème";
-    });
-    el("baremeCancel")?.addEventListener("click", function(){
-      box().classList.add("hidden");
-      ouvrir.textContent = "Modifier le barème";
-    });
-    el("baremeSave")?.addEventListener("click", enregistrer);
-  });
+  document.addEventListener("DOMContentLoaded", charger);
 })();
 </script>
 <!-- Le pont avec le CRM : base clients réelle et numéro de ticket du jour

@@ -13,6 +13,8 @@
 //
 // Le parcours du comptoir avait déjà son minuteur, posé le jour où une vente
 // est restée en suspens sans message. Il vaut pour tout le reste.
+import { lirePoste } from './poste.js';
+
 export const DELAI_DEFAUT = 20000;
 // Un PDF de plusieurs mégaoctets sur l'ADSL de l'atelier prend légitimement du
 // temps : lui appliquer le délai des requêtes courtes couperait des envois qui
@@ -22,7 +24,7 @@ export const DELAI_ENVOI = 60000;
 // Le message est en français et sans jargon : il traverse `estPanneReseau`, qui
 // le range avec « Failed to fetch » — pour l'atelier, un serveur qui ne répond
 // pas et un réseau tombé, c'est la même chose et la même conduite à tenir.
-export const MESSAGE_DELAI = 'le serveur ne répond pas';
+const MESSAGE_DELAI = 'le serveur ne répond pas';
 
 export async function fetchBorne(url, opts = {}, ms = DELAI_DEFAUT) {
   const minuteur = new AbortController();
@@ -35,4 +37,63 @@ export async function fetchBorne(url, opts = {}, ms = DELAI_DEFAUT) {
   } finally {
     clearTimeout(stop);
   }
+}
+
+// L'APPEL À L'API, UNE SEULE FOIS (01/09). Cinq écrans en portaient chacun une
+// copie — trois identiques au mot près, une sans délai ni signature (le devis
+// flash), une avec les deux (le planning). Une correction se faisait donc cinq
+// fois, ou quatre, ou une : c'est ici qu'elle se fait désormais.
+//
+// LE POSTE SIGNE CE QU'IL FAIT. Le prénom choisi une fois par appareil part
+// avec chaque appel : c'est ce que le journal enregistre dans « qui ».
+// Déclaratif, jamais une preuve — mais « Mélina, hier à 16 h » répond à une
+// question à laquelle « hier à 16 h » ne répondait pas. Sur les lectures
+// aussi : ça ne coûte rien et ça évite d'avoir à se demander, à chaque nouvel
+// appel, s'il fallait le mettre.
+// ⚠ ENCODÉ, et ce n'est pas de la coquetterie : `fetch` REFUSE un en-tête qui
+// sort du latin-1 et lève une TypeError. Un prénom saisi avec un caractère
+// exotique ferait alors échouer NON PAS la signature, mais l'appel entier —
+// toutes les écritures de l'application, pour un champ décoratif. En pourcent,
+// c'est de l'ASCII quoi qu'on tape ; le serveur le décode.
+//
+// LE STATUT AVANT LE CORPS : une page d'erreur du proxy (HTML) faisait échouer
+// l'analyse JSON d'abord, et le message affiché devenait « Unexpected token < »
+// au lieu de « Erreur 502 ».
+//
+// LE CORPS DU REFUS VOYAGE AVEC L'ERREUR (`err.detail`, `err.status`) : sans
+// lui, un 409 « BAT non validé » n'est qu'un texte, et l'écran ne peut rien
+// proposer d'autre que de le lire. C'est ce qui permet à la Direction de
+// forcer le passage.
+//
+// 401 EN PLEIN TRAVAIL : la session a expiré, ou les comptes viennent d'être
+// allumés depuis un autre poste. Le planning enregistre ici ce qu'il faut
+// faire alors (redemander qui est là) ; l'erreur est MARQUÉE `aConnecter` pour
+// que le reste de l'application se taise — le voile de connexion dit déjà quoi
+// faire.
+let surNonConnecteFn = null;
+export function surNonConnecte(fn) { surNonConnecteFn = typeof fn === 'function' ? fn : null; }
+
+export async function api(method, url, body, ms = DELAI_DEFAUT) {
+  const opts = { method, headers: {} };
+  const qui = lirePoste();
+  if (qui) opts.headers['X-Qui'] = encodeURIComponent(qui);
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetchBorne(url, opts, ms);
+  const texte = await res.text();
+  let data = null;
+  try { data = texte ? JSON.parse(texte) : null; } catch (_) { data = null; }
+  if (!res.ok) {
+    const err = new Error((data && (data.error || data.erreur)) || `Erreur ${res.status}`);
+    err.detail = data;
+    err.status = res.status;
+    if (res.status === 401 && data && data.connexion && surNonConnecteFn) {
+      surNonConnecteFn();
+      err.aConnecter = true;
+    }
+    throw err;
+  }
+  return data;
 }

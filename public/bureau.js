@@ -61,7 +61,17 @@ function dateSeule(iso) {
 
 // La TGCA de Saint-Martin. Le HT ne se stocke jamais : il se déduit du TTC et
 // du taux du moment — un HT figé mentirait le jour où le taux change.
-const TGCA = 0.04;
+//
+// ET LE TAUX LUI-MÊME EST UN RÉGLAGE (01/09). Il vivait ici en dur : le jour où
+// le patron changeait le taux dans Réglages, tout l'écran suivait SAUF ce
+// papier, qui continuait d'imprimer un HT à 4 %. La valeur ci-dessous n'est
+// plus qu'un REPLI — celui d'un appelant qui ne dit rien — et le taux retenu
+// voyage DANS le modèle (`argent.taux`), pour que la feuille, le texte copié et
+// le calcul disent tous les trois la même chose.
+const TGCA_REPLI = 0.04;
+// On écrit « 4 », pas la longue traîne de décimales que 0,04 × 100 donne en
+// virgule flottante — elle s'imprimerait telle quelle sur le papier.
+const arrondiTaux = (t) => Math.round(Number(t) * 10000) / 100;
 
 const MODES = {
   cb: 'Carte bancaire', especes: 'Espèces', virement: 'Virement', mixte: 'Mixte',
@@ -145,15 +155,16 @@ const nombre = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
-function argentDe(l, fiche) {
+function argentDe(l, fiche, taux) {
   const ttc = nombre(l.project_value);
   const aPrix = ttc != null;
   const revient = nombre(l.cout_revient);
   const aRevient = revient != null;
-  const ht = aPrix ? Math.round((ttc / (1 + TGCA)) * 100) / 100 : null;
+  const ht = aPrix ? Math.round((ttc / (1 + taux)) * 100) / 100 : null;
   const pay = (fiche && fiche.paiement) || {};
   const acompte = nombre(l.acompte_montant);
   return {
+    taux,
     // « Pas encore chiffré » n'est PAS « gratuit » : sans prix, on l'écrit.
     ttc,
     ht,
@@ -251,7 +262,7 @@ const maisonDe = maisonPapier;
 
 // LE MODÈLE DU BON DE COMMANDE. `l` est une ligne du planning avec sa fiche
 // COMPLÈTE (celle de la liste est allégée du détail — voir allegerFiche).
-export function modeleBureau(l, entreprise) {
+export function modeleBureau(l, entreprise, tauxTgca) {
   const r = l && typeof l === 'object' ? l : {};
   const f = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
   const demande = f.source === 'Demande de devis' || r.order_kind === 'demande';
@@ -338,7 +349,7 @@ export function modeleBureau(l, entreprise) {
     dossier,
     // Ce que la vendeuse a noté pour nous, et pour personne d'autre.
     notes,
-    argent: argentDe(r, f),
+    argent: argentDe(r, f, Number.isFinite(Number(tauxTgca)) ? Number(tauxTgca) : TGCA_REPLI),
     // Ce que la vendeuse a écrit de sa main sur la ligne — SAUF quand elle ne
     // l'a pas écrite. La colonne `description` d'un dossier du comptoir est
     // remplie par l'écran (« Délai souhaité : Sous 10 jours ouvrés »), et cette
@@ -704,7 +715,7 @@ export function dessinerBureau(t, doc) {
     // lettres plutôt que d'imprimer 0,00 € sur un document qui sert à facturer.
     boite.append(el('div', 'bu__achiffrer', 'À chiffrer'));
   } else {
-    boite.append(paire('Total HT', euro(arg.ht)), paire(`TGCA ${TGCA * 100} %`, euro(arg.taxe)));
+    boite.append(paire('Total HT', euro(arg.ht)), paire(`TGCA ${arrondiTaux(arg.taux)} %`, euro(arg.taxe)));
     const ttc = el('div', 'bu__ttc');
     ttc.append(el('span', 'bu__k', 'TTC'), el('span', 'bu__ttc-v', euro(arg.ttc)));
     boite.append(ttc);
@@ -797,7 +808,7 @@ export function bureauTexte(t) {
   out.push(sep);
   if (arg.ttc == null) out.push('Total : à chiffrer');
   else {
-    out.push(`Total HT : ${euro(arg.ht)}`, `TGCA ${TGCA * 100} % : ${euro(arg.taxe)}`, `TOTAL TTC : ${euro(arg.ttc)}`);
+    out.push(`Total HT : ${euro(arg.ht)}`, `TGCA ${arrondiTaux(arg.taux)} % : ${euro(arg.taxe)}`, `TOTAL TTC : ${euro(arg.ttc)}`);
     out.push(`Règlement : ${arg.paye ? (arg.mode || 'payé') : 'à encaisser'}`);
   }
   if (t.dossier.length) {

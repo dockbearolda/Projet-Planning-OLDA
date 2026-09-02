@@ -170,43 +170,58 @@ for (const [nom, src, sel] of [['styles.css', CRM, '.grid-search'], ['clients.cs
   assert.ok(regle, 'la rangée d’onglets a bien sa règle de barre');
   assert.match(regle[1], /flex-wrap:\s*nowrap/,
     'la rangée est VERROUILLÉE sur une ligne : rien ne repasse en dessous');
-  // Elle reprend les deux flancs de la barre, par les JETONS et pas par des
-  // nombres recopiés : les flancs sont ASYMÉTRIQUES (32 à gauche, 16 à droite)
-  // et, écrits deux fois, ils divergeraient — la rangée retomberait à côté de
-  // l'axe qu'elle prétend viser.
-  assert.match(regle[1], /margin-left:\s*calc\(-1 \* var\(--topbar-flanc-g\)\)/);
-  assert.match(regle[1], /margin-right:\s*calc\(-1 \* var\(--topbar-flanc-d\)\)/);
+  // ELLE COMMENCE SOUS LA RECHERCHE, ET ÇA NE S'ÉCRIT PAS (01/09). Le décalage
+  // est ce que le bouton du rail occupe plus l'écart de la barre : écrit en
+  // dur, il se décollerait le jour où l'un des deux bouge — et un alignement
+  // raté d'un pixel se voit précisément parce que les deux rangées sont l'une
+  // sous l'autre. Mesuré au rendu : 0 px d'écart avec le bord de la recherche.
+  assert.match(regle[1], /margin: 0 calc\(-1 \* var\(--topbar-flanc-d\)\) 0 calc\(var\(--ctrl-h\) \+ var\(--topbar-gap\)\)/,
+    'la rangée tombe sous la recherche par les jetons, jamais par un nombre');
+  // À DROITE ELLE REPREND LE FLANC : elle est seule sur sa ligne, personne
+  // d'autre n'en a besoin, et ça lui rend 16 px. Par le JETON — les flancs sont
+  // ASYMÉTRIQUES (32 à gauche, 16 à droite) et, écrits deux fois, ils
+  // divergeraient.
+  assert.match(regle[1], /flex: 1 1 100%/,
+    'et elle peut rétrécir : une base de 100 % AJOUTE ses marges par-dessus, elle sortait 44 px à droite');
   const barre = sansCom(CRM).match(/(?:^|\n)\.topbar\s*\{([^}]*padding[^}]*)\}/);
   assert.ok(barre, 'la barre déclare son rembourrage');
   assert.match(barre[1], /--topbar-flanc-g:/, 'et ses flancs sont des jetons');
   assert.match(barre[1], /padding:[^;]*var\(--topbar-flanc-d\)[^;]*var\(--topbar-flanc-g\)/,
     'le rembourrage LIT les jetons — sinon les deux nombres se séparent');
+  assert.match(barre[1], /min-height:\s*calc\(var\(--ctrl-h\)/,
+    'et sa hauteur est sa recette — la boîte de l’application plus ses deux flancs');
 }
-// LE REPLI DES LIBELLÉS SE MESURE, IL NE SE DEVINE PAS. Une requête média ne
-// peut pas voir combien d'onglets sont affichés : allumer les comptes en ajoute
+// LE RESSERREMENT SE MESURE, IL NE SE DEVINE PAS. Une requête média ne peut
+// pas voir combien d'onglets sont affichés : allumer les comptes en ajoute
 // deux, et un seuil en pixels serait juste pour un cas et faux pour l'autre.
 {
   const src = sansCom(APP);
   const f = src.slice(src.indexOf('function ajusterLesOnglets('));
   const corps = f.slice(0, f.indexOf('\n}'));
   assert.ok(corps, 'la mesure existe');
-  // ON MESURE AVEC LES LIBELLÉS : mesurer la rangée déjà réduite dirait
-  // « ça tient » et on ne les remettrait jamais.
+  // ON MESURE DESSERRÉ : mesurer la rangée déjà réduite dirait « ça tient » et
+  // on ne la rouvrirait jamais.
   const iRetire = corps.indexOf("classList.remove('est-serree')");
   const iMesure = corps.indexOf('scrollWidth');
   assert.ok(iRetire >= 0 && iMesure > iRetire,
-    'les libellés reviennent AVANT la mesure, sinon la barre reste muette pour toujours');
+    'la rangée se rouvre AVANT la mesure, sinon elle reste serrée pour toujours');
   assert.match(corps, /classList\.add\('est-serree'\)/);
-  assert.match(corps, /a\.title = mot\.textContent/,
-    'sans libellé, chaque icône reprend son mot en infobulle');
-  assert.match(corps, /removeAttribute\('title'\)/,
-    '… et le rend quand les libellés reviennent');
+  // ET IL N'Y A PLUS D'INFOBULLE À POSER. Elle rendait son mot à un
+  // pictogramme muet ; les mots sont là, une infobulle qui répète le libellé
+  // visible est du bruit.
+  assert.ok(!/\.title\s*=/.test(corps),
+    'plus d’infobulle : le mot est écrit, il n’a pas à être redit au survol');
   // Et la mesure repart quand le NOMBRE d'onglets change, pas seulement quand
   // la fenêtre bouge.
   const droits = src.slice(src.indexOf('function appliquerDroits('));
   assert.match(droits.slice(0, droits.indexOf('\n}')), /ajusterLesOnglets\(\)/,
     'allumer les comptes ajoute deux onglets : la rangée se remesure');
-  assert.match(sansCom(CRM), /\.nav-switch\.est-serree \.nav-switch-label \{ display: none/);
+  // CE QUI CÈDE, CE SONT LES FLANCS — plus les mots (01/09, Charlie : « je ne
+  // veux pas des icône mais les texte »).
+  assert.ok(!/\.est-serree \.nav-switch-label \{ display: none/.test(sansCom(CRM)),
+    'la rangée serrée ne perd plus ses libellés');
+  assert.match(sansCom(CRM), /\.topbar \.nav-switch\.est-serree \.nav-switch-btn \{ padding-inline: var\(--pas-1\); \}/,
+    '… elle referme ses flancs, par un jeton');
 }
 // UN ONGLET EST UN INTITULÉ, pas du texte courant : en 17 px les huit onglets
 // ne tenaient sur une ligne qu'à partir de 1 440.
@@ -216,14 +231,23 @@ for (const [nom, src, sel] of [['styles.css', CRM, '.grid-search'], ['clients.cs
   assert.match(regle[1], /font-size:\s*var\(--taille-note\)/,
     'les onglets prennent la taille des intitulés — pas une taille de plus');
 }
-// … et deux onglets voisins ne portent pas le même pictogramme : « Pilotage »
-// et « Dashboard » se suivent, et tous deux disaient `dashboard`.
+// … ET IL N'Y A PLUS DE PICTOGRAMME DU TOUT DANS LA RANGÉE (01/09). Il y en
+// avait un par onglet, et deux voisins qui partageaient le même ne se
+// distinguaient plus que par leur mot — « Pilotage » et « Dashboard » disaient
+// tous deux `dashboard`. Le contrôle d'unicité tombe avec eux, et un piège
+// entier tombe avec : toute icône posée là devait figurer dans
+// olda-icones.woff2 (91 glyphes), sous peine d'être rendue en TEXTE réduit à sa
+// première lettre, sans la moindre erreur.
 {
-  const icones = [...INDEX.matchAll(/<a class="nav-switch-btn[^"]*"[^>]*>\s*<span class="material-symbols-outlined"[^>]*>([a-z_]+)</g)]
-    .map((m) => m[1]);
-  assert.ok(icones.length >= 7, 'on lit bien les pictogrammes des onglets');
-  assert.strictEqual(new Set(icones).size, icones.length,
-    'deux onglets ne partagent pas un pictogramme — ils ne se distingueraient plus que par leur mot');
+  const nav = INDEX.slice(INDEX.indexOf('class="nav-switch"'), INDEX.indexOf('</nav>'));
+  assert.ok(!/material-symbols-outlined/.test(nav),
+    'un onglet est un MOT : plus un seul glyphe de la police dans la rangée');
+  assert.ok(!/nav-switch-mark/.test(nav),
+    '… ni la marque dessinée de Fiverr, qui tenait la place d’un glyphe');
+  const mots = [...nav.matchAll(/<span class="nav-switch-label">([^<]+)</g)].map((m) => m[1]);
+  assert.ok(mots.length >= 9, 'on lit bien les libellés des onglets');
+  assert.strictEqual(new Set(mots).size, mots.length,
+    'deux onglets ne portent pas le même mot — ce serait la seule chose qui les distingue');
 }
 
 // ===========================================================================

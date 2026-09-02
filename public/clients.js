@@ -14,7 +14,7 @@ import { groupDigits } from './whatsapp.js';
 import { confirmerAction } from './confirmer.js';
 // Un enregistrement de fiche client ne doit pas rester en suspens : sans
 // minuteur, le bouton « Enregistrer » se désarme et ne se réarme jamais.
-import { fetchBorne } from './reseau.js';
+import { api } from './reseau.js';
 // Le focus suit la fenêtre qui s'ouvre, et revient d'où il venait à la
 // fermeture. Le tiroir se déclarait modal en laissant le clavier DERRIÈRE lui.
 import { armerModale } from './modale.js';
@@ -42,7 +42,7 @@ const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/\p{Diac
 
 // Champs éditables de la fiche (ordre d'affichage). `list` = suggestions
 // (datalist) construites depuis les valeurs déjà présentes dans la base.
-export const FIELDS = [
+const FIELDS = [
   { key: 'entreprise', label: 'Nom entreprise', icon: 'apartment', ph: '', required: true },
   { key: 'raison_sociale', label: 'Raison sociale EBP', icon: 'gavel', ph: '' },
   { key: 'code', label: 'Identifiant', icon: 'tag', ph: '—' },
@@ -65,7 +65,7 @@ export const FIELDS = [
 // Choisir l'une d'elles remplit Pays et Code postal (voir `applyVilleDefaults`).
 // Sint Maarten n'utilise pas de code postal : le champ reste vide, pas rempli
 // d'une valeur inventée.
-export const VILLES = [
+const VILLES = [
   { label: 'SAINT-MARTIN', pays: 'France', code_postal: '97150' },
   { label: 'SINT MAARTEN', pays: 'Sint Maarten', code_postal: '' },
   { label: 'SAINT-BARTHÉLEMY', pays: 'France', code_postal: '97133' },
@@ -78,7 +78,7 @@ const villeByLabel = (v) => VILLES.find((x) => fold(x.label) === fold(String(v |
 // Casse imposée à la saisie : « DUPONT » pour un nom, « Jean-Marc » pour un
 // prénom. Appliquée au blur seulement — jamais pendant la frappe, sinon le
 // curseur saute et corriger devient pénible.
-export function applyCasse(mode, raw) {
+function applyCasse(mode, raw) {
   const s = String(raw == null ? '' : raw).trim();
   if (s === '') return '';
   if (mode === 'majuscules') return s.toLocaleUpperCase('fr-FR');
@@ -92,30 +92,30 @@ export function applyCasse(mode, raw) {
 
 // Le TIRET veut dire « je n'ai pas l'info » : il fait passer l'étape et part
 // vide au serveur.
-export const estTiret = (v) => String(v == null ? '' : v).trim() === '-';
+const estTiret = (v) => String(v == null ? '' : v).trim() === '-';
 // Sur l'IDENTITÉ, le tiret ne vaut pas davantage : il ne reste pas non plus
 // tel quel. Il partait en base, et « - » (ou « - - » pour un particulier)
 // devenait le nom du dossier — clé de rapprochement vide, fiche impossible à
 // retrouver, auto-complétion polluée.
-export const valeurSaisie = (key, v) => (estTiret(v) ? '' : String(v == null ? '' : v).trim());
+const valeurSaisie = (key, v) => (estTiret(v) ? '' : String(v == null ? '' : v).trim());
 // Un champ d'identité rempli d'un tiret est donc VIDE au regard de la saisie :
 // c'est ce que voit la validation, qui le surligne comme manquant.
-export const champVide = (key, v) => valeurSaisie(key, v) === '';
+const champVide = (key, v) => valeurSaisie(key, v) === '';
 
 // Champs affichés à la CRÉATION (et à l'édition) selon la nature du client.
 // `code` (identifiant serveur) est géré à part : jamais dans ces listes, montré
 // en lecture seule uniquement en édition. `type` (texte libre "Boutique,
 // Hôtel…") n'est plus proposé dans les formulaires — redondant avec Secteur —
 // mais la colonne reste lisible pour les fiches qui en ont déjà une.
-export const PERSO_FIELDS = ['prenom', 'nom', 'telephone', 'email'];
+const PERSO_FIELDS = ['prenom', 'nom', 'telephone', 'email'];
 // Ordre demandé par le patron : l'identité, puis l'adresse complète (la ville
 // entraîne pays et code postal), puis le contact.
-export const PRO_FIELDS = [
+const PRO_FIELDS = [
   'entreprise', 'raison_sociale', 'adresse', 'ville', 'pays', 'code_postal',
   'zone', 'secteur', 'referent_prenom', 'telephone', 'email',
 ];
 
-export function fieldsForNature(nat) {
+function fieldsForNature(nat) {
   const keys = nat === 'perso' ? PERSO_FIELDS : PRO_FIELDS;
   return keys.map((k) => FIELDS.find((f) => f.key === k));
 }
@@ -124,7 +124,7 @@ export function fieldsForNature(nat) {
 // patron l'ajuste depuis Base clients. Ce cache est partagé avec Nouveau Projet
 // pour que les deux formulaires proposent exactement la même chose. La valeur
 // de départ est le repli quand l'appel échoue — pas la référence.
-export let SECTEURS = [
+let SECTEURS = [
   'Hôtel / Restaurant', 'Hôtel', 'Restaurant', 'Bar', 'Boutique', 'Agence immobilière',
   'Conciergerie', 'Villa de location', 'Nautisme', 'BTP', 'Artisan', 'Événementiel',
   'Association', 'École', 'Salle de sport', 'Santé', 'Tourisme', 'Transport',
@@ -136,7 +136,7 @@ export let SECTEURS = [
 // recharger l'application.
 const SECTEUR_DATALISTS = new Set();
 
-export function registerSecteurDatalist(dl) {
+function registerSecteurDatalist(dl) {
   SECTEUR_DATALISTS.add(dl);
   dl.replaceChildren(...SECTEURS.map((s) => new Option(s)));
 }
@@ -148,7 +148,7 @@ function paintSecteurs() {
   }
 }
 
-export async function loadSecteurs() {
+async function loadSecteurs() {
   try {
     const list = await api('GET', '/api/clients/secteurs');
     if (Array.isArray(list) && list.length) SECTEURS = list;
@@ -157,14 +157,14 @@ export async function loadSecteurs() {
   return SECTEURS;
 }
 
-export async function addSecteur(label) {
+async function addSecteur(label) {
   const list = await api('POST', '/api/clients/secteurs', { label });
   if (Array.isArray(list)) SECTEURS = list;
   paintSecteurs();
   return SECTEURS;
 }
 
-export async function removeSecteur(label) {
+async function removeSecteur(label) {
   const list = await api('DELETE', `/api/clients/secteurs/${encodeURIComponent(label)}`);
   if (Array.isArray(list)) SECTEURS = list;
   paintSecteurs();
@@ -200,21 +200,6 @@ let drawer = null;         // { id | null, mode, draft?, notes? }
 let noteKind = 'note';
 
 // --- API -------------------------------------------------------------------
-async function api(method, path, body) {
-  const res = await fetchBorne(path, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  // Le statut AVANT le corps : une page d'erreur du proxy (HTML) faisait échouer
-  // l'analyse JSON d'abord, et le message affiché devenait « Unexpected token
-  // '<' » au lieu de « Erreur 502 ».
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch (_) { data = null; }
-  if (!res.ok) throw new Error((data && data.error) || `Erreur ${res.status}`);
-  return data;
-}
 
 // --- Petits utilitaires d'affichage ---------------------------------------
 function initials(name) {
@@ -472,7 +457,7 @@ function renderList() {
 // Reformate un champ téléphone à la frappe (chiffres groupés par deux, comme
 // « 06 90 66 24 00 ») en conservant la position du curseur, pour ne pas gêner
 // la saisie en cours de numéro.
-export function formatPhoneAsTyped(input) {
+function formatPhoneAsTyped(input) {
   // Le tiret « je n'ai pas l'info » n'est pas un numéro : le groupeur de
   // chiffres l'effacerait, et le champ ne pourrait jamais être marqué comme
   // volontairement vide.
@@ -533,7 +518,7 @@ export function fieldRow(field, value, opts) {
 // enregistre en place. `sel` laisse un formulaire au balisage différent (Nouveau
 // Projet) réutiliser la règle de non-écrasement plutôt que d'en recopier une
 // deuxième, forcément divergente à la longue.
-export function wireVilleDefaults(fieldsWrap, onFilled, sel = '.cl-f__input') {
+function wireVilleDefaults(fieldsWrap, onFilled, sel = '.cl-f__input') {
   const byKey = (k) => fieldsWrap.querySelector(`${sel}[data-key="${k}"]`);
   const ville = byKey('ville');
   if (!ville) return;
@@ -572,7 +557,7 @@ export function wireVilleDefaults(fieldsWrap, onFilled, sel = '.cl-f__input') {
 // bloque jamais la création. Un 1er clic avec des champs vides arme une
 // confirmation (le bouton change de libellé/couleur quelques secondes) ;
 // un 2e clic — ou le même clic une fois tout rempli — déclenche `onSubmit`.
-export function wireCreateValidation(fieldsWrap, submitBtn, onSubmit) {
+function wireCreateValidation(fieldsWrap, submitBtn, onSubmit) {
   const inputs = [...fieldsWrap.querySelectorAll('.cl-f__input')];
   const idleLabel = submitBtn.textContent;
   let armed = false;

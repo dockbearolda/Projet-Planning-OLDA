@@ -3555,10 +3555,22 @@ async function toucherConnexion(id) {
 // Tous à `false` par défaut. Un interrupteur absent d'`app_meta` vaut « éteint »,
 // jamais « allumé » : au pire on n'a pas la nouveauté, jamais un écran cassé.
 // Down : DELETE FROM app_meta WHERE key = 'flags'.
+// UN INTERRUPTEUR QUI NE COMMANDE RIEN EST PIRE QU'UN MANQUE (01/09/2026).
+// Il y en avait trois. Un seul en commandait quelque chose : `comptes`, qui
+// décide si la connexion nominative existe (voir `flags()` dans server.js).
+// Les deux autres s'affichaient dans Réglages, se cochaient, se retenaient en
+// base — et ne changeaient RIEN :
+//   · `projets` (« Regroupement Projet et liste de tâches ») : les routes
+//     existent côté serveur, aucun écran ne les appelle. L'allumer ne faisait
+//     apparaître aucun regroupement.
+//   · `marges` (« Décomposition des coûts et marge ») : ce qui garde vraiment
+//     la marge, c'est la CAPACITÉ du rôle (`peut(moi, 'marge')`), pas ce
+//     drapeau. L'écran Pilotage s'ouvrait déjà sans lui, et restait fermé avec.
+// Ils sont retirés de la liste. `getFlags` repart toujours des noms CONNUS :
+// une valeur restée en base pour l'un d'eux disparaît d'elle-même de la
+// réponse. Le jour où l'un revient, il revient avec ce qu'il commande.
 const FLAGS_CONNUS = {
   comptes: 'Connexion nominative et rôles',
-  projets: 'Regroupement Projet et liste de tâches',
-  marges: 'Décomposition des coûts et marge',
 };
 const FLAGS_SLUGS = Object.keys(FLAGS_CONNUS);
 const FLAGS_ETEINTS = Object.fromEntries(FLAGS_SLUGS.map((s) => [s, false]));
@@ -3773,31 +3785,33 @@ module.exports = {
   ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
   getCategoryReferents, setCategoryReferents,
-  DEFAULT_MACHINES, getMachines, setMachines,
-  getCatalogueProduits, setCatalogueProduits, nettoyerProduit,
+  getMachines, setMachines,
+  getCatalogueProduits, setCatalogueProduits, 
   corrigerTarifsTasseMagasin,
   // Exportées pour être rejouées SEULES : pg-mem ne relit pas `schema.sql` deux
   // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
   semerCatalogueProduits, semerCatalogueTextile, poserUniciteCatalogue,
-  apercuImportCatalogue, appliquerImportCatalogue, reglesImportCatalogue,
+  apercuImportCatalogue, appliquerImportCatalogue, 
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,
-  DEFAULT_TARIFS_TASSE_ARTICLES, DEFAULT_TARIFS_TASSE_PARAMETRES,
-  DEFAULT_SUPPLEMENTS_EXPRESS, getSupplementsExpress, setSupplementsExpress,
-  DEFAULT_TARIFS_TRANSPORT, getTarifsTransport, setTarifsTransport,
-  getCommandeZones, getHiddenCommandeZones,
-  SECTEURS_AMORCE, getClientSecteurs, addClientSecteur, removeClientSecteur,
+  getSupplementsExpress, setSupplementsExpress,
+  getTarifsTransport, setTarifsTransport,
+  // `getHiddenCommandeZones` n'est plus exportée (01/09) : son seul lecteur
+  // était la route du catalogue de commande, qui n'avait plus d'écran. La
+  // fonction reste dans le fichier, et le réglage reste en base.
+  getCommandeZones,
+  getClientSecteurs, addClientSecteur, removeClientSecteur,
   WHATSAPP_MESSAGE_MAX, DEFAULT_WHATSAPP_MESSAGE, getWhatsappMessage, setWhatsappMessage,
-  TEXTILE_DEFAULTS, getReglagesTextile, setReglagesTextile,
-  ENTREPRISE_CHAMPS, ENTREPRISE_DEFAULTS, ENTREPRISE_MAX, getEntreprise, setEntreprise,
-  getTaillesLogo, majTailleLogo, compterTaillesLogo, nettoyerTaillesLogo,
+  getReglagesTextile, setReglagesTextile,
+  getEntreprise, setEntreprise,
+  getTaillesLogo, majTailleLogo, compterTaillesLogo, 
   creerFamilleLogo, majFamilleLogo, retirerFamilleLogo,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
   JOURNAL_FIELDS, logRequestChanges, logFicheChange, logCycleDeVie, getRequestJournal,
-  FLAGS_CONNUS, FLAGS_SLUGS, getFlags, setFlags,
-  ROLES, ROLE_LABELS, EQUIPE, CODE_MIN, CODE_MAX,
-  DEFAULT_MODELES, getModeles, setModeles,
-  DEFAULT_MARGES, getMarges, setMarges,
+  FLAGS_CONNUS, getFlags, setFlags,
+  ROLES, ROLE_LABELS, CODE_MIN, CODE_MAX,
+  getModeles, setModeles,
+  getMarges, setMarges,
   getSecretSession, getUtilisateurs, getUtilisateur, getUtilisateurParPrenom,
   poserCode, toucherConnexion, codeCorrect,
   clientKey, nextClientCode,

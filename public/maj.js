@@ -34,7 +34,7 @@ import { fetchBorne } from './reseau.js';
 // Le filet, pour un poste dont le flux temps réel ne revient pas : dix minutes.
 // Ce n'est pas une course — un déploiement du patron n'a jamais eu à être connu
 // à la seconde — et c'est 30 octets à l'heure sur six postes.
-export const VERIF_MS = 10 * 60 * 1000;
+const VERIF_MS = 10 * 60 * 1000;
 // Un `update()` de service worker sur un wifi qui décroche peut ne jamais
 // revenir : il ne doit pas retenir le rechargement qu'on vient de promettre.
 const DELAI_COQUILLE_MS = 2500;
@@ -63,7 +63,7 @@ export function noterVersion(version) {
 }
 
 // Le filet : uniquement pour un poste qui ne reçoit plus rien de son flux.
-export async function verifierVersion() {
+async function verifierVersion() {
   try {
     const r = await fetchBorne('/api/version', { cache: 'no-store' }, 8000);
     if (!r || !r.ok) return;

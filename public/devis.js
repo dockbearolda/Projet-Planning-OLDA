@@ -116,7 +116,7 @@ export const APPRO_DEFAUT = 'groupe';
 // part sur les machines avant un accord écrit sur les visuels : c'est ce qui
 // évite de refaire trente textiles pour une couleur que personne n'avait
 // validée.
-export const TEXTE_BAT = 'Après acceptation du devis, un BAT vous sera transmis pour validation '
+const TEXTE_BAT = 'Après acceptation du devis, un BAT vous sera transmis pour validation '
   + 'des visuels, couleurs, dimensions et positionnements. La production débutera après votre '
   + 'validation.';
 

@@ -49,9 +49,9 @@ const RACINE = path.join(__dirname, '..');
 // Un fichier absent de cette table doit être à ZÉRO : c'est ce qui rend le
 // cliquet valable pour les fichiers À VENIR.
 const PLAFONDS = {
-  'public/comptoir/demande-devis.css': 99,
-  'public/comptoir/vente-directe.css': 42,
-  'public/styles.css': 25,
+  'public/comptoir/demande-devis.css': 98,
+  'public/comptoir/vente-directe.css': 41,
+  'public/styles.css': 21,
   'public/dashboard.css': 4,
   'public/clients.css': 2,
   'public/montravail.css': 4,
@@ -59,9 +59,18 @@ const PLAFONDS = {
   'public/projet.css': 3,
 };
 
+// REDESCENDU TROIS FOIS LE 01/09 : 180 → 177, 177 → 175, puis 175 → 174 quand
+// les onglets sont devenus des mots (la boîte de la marque Fiverr, écrite en
+// dur, est partie avec eux). Détail de la deuxième : quand la barre du
+// haut est passée sur une rangée unique (une hauteur en dur de moins dans la
+// barre, une autre de moins dans l'onglet à deux étages qui est parti avec).
+// Le nettoyage du matin a emporté trois
+// écarts avec le code mort qui les portait (le barème de la vente directe, les
+// règles de priorité du devis, `.modal`). Un cliquet qu'on ne resserre pas se
+// desserre : il laisserait réintroduire ce qu'on vient de retirer.
 // LE TOTAL EST UN CLIQUET, LUI AUSSI. Sans lui, découper un fichier en deux
 // permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
-const TOTAL_MAX = 180;
+const TOTAL_MAX = 174;
 
 const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public'], {
   cwd: RACINE, encoding: 'utf8',

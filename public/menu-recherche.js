@@ -1004,6 +1004,12 @@ function menuDefilementExterieur(ev){
 }
 window.addEventListener('scroll',menuDefilementExterieur,{capture:true,passive:true});
 window.addEventListener('resize',()=>{menus.forEach(a=>menuFermer(a,false))},{passive:true});
+/* ON CHANGE D'ECRAN, LE PANNEAU RESTE (01/09). Il est en `position:fixed`, hors
+   de la vue qui l'a ouvert : le CRM masque sa section, et la liste deroulee se
+   retrouve posee sur l'ecran suivant, au-dessus de tout. Le module se protege
+   lui-meme plutot que de demander a chaque ecran d'y penser — c'est la meme
+   raison qui lui fait deja fermer ses menus au redimensionnement. */
+window.addEventListener('hashchange',()=>{menuFermerTous()},{passive:true});
 
 function menuFermer(etat,rendreFocus){
   if(!etat.ouvert)return;
@@ -1066,8 +1072,12 @@ export function menusRafraichirTous() { menus.forEach((etat) => menuRafraichir(e
    `menuPoser` habille UN champ : c'est ce dont se sert un ecran qui construit
    ses rangees lui-meme, comme le devis. `menuOuvrirDe` ouvre la liste d'un
    champ sans clic — l'etape 5 du comptoir arrive avec ses clients deja
-   deroules. `menuFermerTous` sert au CRM, qui demonte ses ecrans : un panneau
-   reste ouvert sur un ecran qu'on quitte se retrouve pose sur le suivant. */
+   deroules.
+   `menuFermerTous` n'est PAS de ceux-la : elle etait prevue pour que le CRM
+   l'appelle en demontant ses ecrans, et personne ne l'a jamais appelee — le
+   panneau restait donc pose sur l'ecran suivant. Depuis le 01/09 le module s'en
+   charge seul (voir l'ecouteur `hashchange` plus haut) : la fonction reste,
+   son `export` part. */
 export { menuPoser };
 
 export function menuOuvrirDe(hote) {
@@ -1076,6 +1086,6 @@ export function menuOuvrirDe(hote) {
   if (etat) menuOuvrir(etat);
 }
 
-export function menuFermerTous() {
+function menuFermerTous() {
   menus.forEach((etat) => { if (etat.ouvert) menuFermer(etat, false); });
 }

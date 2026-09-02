@@ -369,8 +369,8 @@ for (const jeton of ['--rail-taille-note', '--rail-taille-etape', '--rail-taille
 }
 assert.ok(!/font-family:\s*'Plus Jakarta Sans'/.test(sansCom(CRM)),
   'une seule police : le rail écrit comme le reste');
-assert.ok(!fs.existsSync(path.join(__dirname, '..', 'public/plus-jakarta-sans-latin-variable.woff2')),
-  '… et le fichier de la seconde police ne dort plus dans public/');
+// (Le fichier lui-même est tenu par `test/ce-qui-ne-revient-pas.test.js`, avec
+// les huit autres retraits : ce sont tous des poids servis, pas des sujets.)
 // Chrome impose Arial aux champs et aux boutons : sans cette règle, « Colonnes »
 // — le seul bouton d'icône à porter un mot — sortait en Arial 17 px.
 {

@@ -76,10 +76,12 @@ for (const parti of ['baremeOpen', 'baremeBox', 'bareme-open']) {
 // …MAIS LE BARÈME SE CHARGE TOUJOURS. `charger()` partait APRÈS la garde qui
 // cherchait le bouton : retirer le bouton aurait fait tourner l'écran sur les
 // pourcentages par DÉFAUT, et le supplément affiché au client aurait été faux.
-const gardeBareme = VENTE.indexOf('const ouvrir = el("baremeOpen");');
-const chargeBareme = VENTE.indexOf('    charger();');
-assert.ok(chargeBareme > -1 && chargeBareme < gardeBareme,
-  'le barème se charge AVANT la garde qui cherche son éditeur');
+// Depuis le 01/09 la garde n'existe plus : le script de l'éditeur est parti
+// avec lui, et le chargement est branché seul sur l'ouverture de la page.
+assert.match(VENTE, /document\.addEventListener\("DOMContentLoaded", charger\);/,
+  'le barème se charge à l’ouverture, sans éditeur à chercher');
+assert.ok(!/baremeSave|baremeCancel|baremeMsg/.test(VENTE),
+  'le script de l’éditeur est parti avec ses boutons');
 
 // LE SECOND INTITULÉ ÉTAIT LA CAUSE DE L'EXCEPTION. Une rangée qui contient un
 // champ à deux intitulés renonce au partage de lignes (`label~label`) — c'était

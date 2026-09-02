@@ -104,15 +104,6 @@ export function normaliserTelephone(v) {
   return chiffres.length >= 8 ? chiffres.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : brut;
 }
 
-// « 70 » se relit « 70 mm », comme « 1250,5 » se relit « 1 250,50 € ». L'unite
-// entre DANS le champ : ecrite a cote, elle prenait 34 px par face, et quatre
-// faces ne tenaient plus dans la colonne — les bulles se chevauchaient.
-export function normaliserCote(v) {
-  const brut = String(v == null ? '' : v).trim();
-  const n = brut.replace(/\D/g, '');
-  return n ? `${Number(n)} mm` : '';
-}
-
 // ELLE SERT A LA SAISIE LIBRE DU MENU (30/08). L'heure se CHOISIT dans une
 // liste de creneaux — elle etait donc partie le matin — mais Charlie a demande
 // de pouvoir « ajouter sa propre heure » depuis ce menu : la case qui s'ouvre
@@ -269,7 +260,6 @@ export function dessinerFicheAtelier(r, ctx) {
       const texte = typeof normalise === 'string' ? normalise : normalise.texte;
       if (texte !== champ.value) champ.value = texte;
       if (champ.value === avant) return;
-      const ancien = avant;
       avant = champ.value;
       opts.envoyer(normalise);
       pulser();
@@ -468,6 +458,17 @@ export function dessinerFicheAtelier(r, ctx) {
   // n'y a plus de « a cote » ou cliquer. Sans elle, la seule sortie serait
   // Echap — un cul-de-sac a la souris.
   const outils = el('div', 'fa-outils');
+  // DEUX BOUTONS, ET CHACUN NE PARAIT QUE S'IL MENE QUELQUE PART.
+  //
+  // L'HISTORIQUE S'OUVRE D'ICI (01/09). Le journal du dossier et les versions
+  // de ses documents s'ecrivaient depuis des mois sans qu'aucun ecran ne les
+  // montre. Un BOUTON, pas une quatrieme zone : la fiche a ses trois zones, et
+  // une de plus les aurait toutes retrecies pour un ecran qu'on ouvre une fois
+  // par mois. Il ne parait que si l'ecran hote sait l'ouvrir — la fiche se
+  // relit dans un bac a sable, elle n'importe rien elle-meme.
+  if (ctx.ouvrirHistorique) {
+    outils.append(bouton('fa-btn', 'Historique', () => ctx.ouvrirHistorique()));
+  }
   // REPRENDRE LE DEVIS — la V2, la V3 (02/09/2026). Charlie : « ce devis pourra
   // être modifié directement depuis la ligne pour créer la v2, 3, 4… dans le cas
   // où le client souhaite une modification ».

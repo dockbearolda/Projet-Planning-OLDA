@@ -243,8 +243,17 @@ console.log('✓ fiche atelier : la boîte de l’app, et deux colonnes au même
 
   // ET SA VERTICALE AUSSI. Les quatre abscisses mesurées venaient de quatre
   // rembourrages écrits à la main dans quatre feuilles.
-  assert.match(tete[1], /padding: var\(--pas-3\) var\(--ecran-pad-x\)/,
+  // Le pas VERTICAL est passé de `--pas-3` à `--pas-2` le 01/09 (Charlie :
+  // « cette barre est beaucoup trop grosse ») : 83 px de rangée deviennent 71,
+  // sur les huit écrans à la fois. Ce qui est tenu ici, c'est que les deux
+  // restent des JETONS — l'horizontal est la verticale commune à tout l'écran.
+  assert.match(tete[1], /padding: var\(--pas-[0-9]\) var\(--ecran-pad-x\)/,
     'l’en-tête démarre sur la verticale commune, par son jeton');
+  // ET IL NE SE PLIE PAS. Sur le devis flash à 1 280 il passait à 122 px :
+  // 937 px de contenu pour 918. Un en-tête qui double de hauteur selon l'écran
+  // est le défaut même que ce fichier refuse.
+  assert.match(tete[1], /flex-wrap: nowrap/,
+    'l’en-tête tient sur UNE rangée : c’est le compteur qui s’abrège, pas la hauteur qui double');
   assert.match(nu, /--ecran-pad-x:\s*\d+px;/,
     '… et ce jeton est déclaré une fois, dans la charte');
 

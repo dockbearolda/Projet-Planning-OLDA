@@ -168,6 +168,25 @@ assert.ok(ecouteResize, '… et un redimensionnement aussi');
 assert.ok(/passive:\s*true/.test(ecouteResize[1] || ''),
   '… lui aussi en passif');
 
+// --- 3 bis. ON CHANGE D'ÉCRAN, LE PANNEAU S'EN VA (01/09) ------------------
+// Le panneau est en `position: fixed`, hors de la vue qui l'a ouvert : le CRM
+// masque sa section, et la liste déroulée se retrouve posée sur l'écran
+// suivant, au-dessus de tout. Une fonction existait pour ça (`menuFermerTous`)
+// et personne ne l'appelait — le commentaire du module décrivait le bug depuis
+// le début. Le module s'en charge désormais lui-même, comme il le fait déjà au
+// redimensionnement : un écran de plus n'a pas à y penser.
+// ⚠ La ligne entière, pas `([^)]*)` : la fonction passée à l'écouteur contient
+// elle-même des parenthèses, et la capture s'arrêtait au premier `)` — elle
+// rendait « () » et le test échouait sur un code juste.
+const ecouteHash = PONT.match(/window\.addEventListener\('hashchange',[\s\S]*?\);/);
+assert.ok(ecouteHash, 'le module ferme ses menus quand on change d’écran');
+assert.ok(/menuFermerTous\(\)/.test(ecouteHash[0]),
+  '… en fermant TOUS les menus, pas seulement celui qu’il croit ouvert');
+assert.ok(/passive:\s*true/.test(ecouteHash[0]),
+  '… en passif, comme les deux autres écouteurs de fenêtre du module');
+assert.ok(!/export function menuFermerTous/.test(PONT),
+  '… et il ne demande plus aux écrans de l’appeler : la fonction reste, son export part');
+
 // --- 4. Le bloc CSS vit dans un littéral de gabarit ------------------------
 // UN ACCENT GRAVE Y REFERME LA CHAÎNE. C'est arrivé en écrivant ce correctif :
 // un commentaire qui citait `fixed` entre accents graves a cassé tout pont.js,

@@ -35,8 +35,9 @@
 // Elle posait un TROISIÈME parcours à côté des deux du patron : trois écrans à
 // tenir, trois endroits où une règle métier peut diverger. La bonne réponse
 // était de simplifier les deux qui existent — c'est ce qui a été fait (voir
-// `archives/comptoir-2026-08-27/`). On ne double pas un parcours pour le rendre
-// court : on le raccourcit.
+// `git show comptoir-avant-simplification -- public/comptoir/`, le dossier
+// `archives/` ayant ete retire le 01/09 : git en garde tout). On ne double pas
+// un parcours pour le rendre court : on le raccourcit.
 const FLUX = [
   {
     id: 'vente',
