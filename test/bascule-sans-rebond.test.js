@@ -173,8 +173,8 @@ const INDEX = lire('public/index.html');
 // police retirée pour dire pourquoi elle l'a été.
 const sansCom = (h) => h.replace(/<!--[\s\S]*?-->/g, ' ');
 assert.ok(!/manrope/i.test(sansCom(INDEX)), 'plus de police de texte à précharger');
-assert.ok(!fs.existsSync(path.join(__dirname, '..', 'public/manrope-latin-variable.woff2')),
-  '… et son fichier ne dort plus dans public/');
+// (Le fichier lui-même est tenu par `test/ce-qui-ne-revient-pas.test.js`, avec
+// les huit autres retraits : ce sont tous des poids servis, pas des sujets.)
 // LES ICÔNES, ELLES, RESTENT UNE WEBFONT : un nom absent s'y écrit en toutes
 // lettres, donc elle se précharge ET se met de côté.
 const re = /<link rel="preload" href="olda-icones\.woff2"[^>]*as="font"[^>]*crossorigin/;

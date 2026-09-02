@@ -346,6 +346,11 @@ select.fa-in { appearance: none; cursor: pointer; }
   overflow: hidden; text-overflow: ellipsis;
 }
 .fa-outils { display: flex; align-items: center; gap: var(--pas-2); margin-left: auto; flex-shrink: 0; }
+/* ET ELLE N'A QU'UNE HAUTEUR (01/09). La croix vient de `--rond` (44) ; le
+   bouton « Historique » posé à côté prenait `--fa-h-champ` (50) et cassait la
+   ligne de six pixels. UNE règle pour tous les boutons de la rangée : deux
+   écritures redeviennent deux hauteurs le jour où l'une bouge. */
+.fa-outils .fa-btn { height: var(--rond); }
 .fa-autosave {
   width: var(--fa-point); height: var(--fa-point); border-radius: var(--pilule);
   background: var(--border); transition: background var(--dur-1) var(--ease);
@@ -932,3 +937,85 @@ select.fa-in { appearance: none; cursor: pointer; }
    ecrites ICI, dans UNE regle : deux ecritures redeviennent deux alignements le
    jour ou l'une bouge. */
 .fa-mini, .fa-nb, .fa-mont, .fa-details .fa-date { text-align: center; }
+
+/* --- L'HISTORIQUE DU DOSSIER (01/09/2026) ---------------------------------
+   Le journal et les versions de documents s'écrivaient depuis des mois sans
+   qu'aucun écran ne les montre. Ils s'ouvrent d'ici, dans une fenêtre posée
+   par-dessus la fiche — pas dans une zone de plus : la fiche a ses trois zones
+   et une quatrieme les aurait toutes retrecies pour un ecran qu'on ouvre une
+   fois par mois.
+   Elle emprunte tout a la charte : aucune valeur en dur, aucune hauteur ecrite. */
+.hist {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--pas-4);
+  background: var(--voile);
+}
+.hist__carte {
+  width: min(720px, 100%); max-height: 80vh;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--card-border); border-radius: var(--arrondi-carte);
+  box-shadow: var(--shadow-pop);
+}
+.hist__tete {
+  display: flex; align-items: flex-start; gap: var(--pas-3);
+  padding: var(--pas-4);
+  border-bottom: 1px solid var(--border-soft);
+}
+.hist__titres { flex: 1; min-width: 0; }
+.hist__titre {
+  margin: 0;
+  font-size: var(--taille-titre); font-weight: var(--graisse-forte);
+  line-height: var(--ligne-serre); color: var(--text-1);
+}
+.hist__sous {
+  margin: var(--pas-1) 0 0;
+  font-size: var(--taille-note); line-height: var(--ligne-texte); color: var(--text-2);
+}
+/* La croix prend la boite de toutes les croix de l'application. */
+.hist__croix {
+  flex-shrink: 0;
+  width: var(--rond); height: var(--rond);
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--pilule);
+  background: var(--surface); color: var(--text-2);
+  font: inherit; font-size: var(--fa-val); line-height: var(--ligne-glyphe);
+  cursor: pointer;
+}
+.hist__croix:hover { background: var(--bg); color: var(--text-1); }
+.hist__corps { overflow-y: auto; padding: var(--pas-4); }
+.hist__attente, .hist__vide {
+  margin: 0;
+  font-size: var(--taille-texte); line-height: var(--ligne-texte); color: var(--text-2);
+}
+.hist__liste { margin: 0; padding: 0; list-style: none; }
+/* UNE LIGNE PAR CHANGEMENT, et le filet les separe sans les encadrer : une
+   carte par evenement ferait dix cadres pour dix phrases courtes. */
+.hist__ligne { padding: var(--pas-3) 0; border-bottom: 1px solid var(--border-soft); }
+.hist__ligne:last-child { border-bottom: 0; }
+.hist__quoi {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--pas-3);
+  flex-wrap: wrap;
+}
+.hist__champ {
+  font-size: var(--taille-texte); font-weight: var(--graisse-forte);
+  line-height: var(--ligne-texte); color: var(--text-1);
+}
+.hist__quand {
+  font-size: var(--taille-note); line-height: var(--ligne-texte); color: var(--text-3);
+}
+.hist__valeurs {
+  display: flex; align-items: baseline; gap: var(--pas-2); flex-wrap: wrap;
+  margin-top: var(--pas-1);
+  font-size: var(--taille-texte); line-height: var(--ligne-texte);
+}
+/* L'AVANT S'EFFACE, L'APRES TIENT : c'est la valeur qui compte aujourd'hui. */
+.hist__avant { color: var(--text-3); text-decoration: line-through; }
+.hist__fleche { color: var(--text-3); }
+.hist__apres { color: var(--text-1); font-weight: var(--graisse-note); }
+.hist__doc {
+  display: inline-block; margin-top: var(--pas-1);
+  font-size: var(--taille-texte); line-height: var(--ligne-texte);
+  color: var(--primary); text-decoration: underline; text-underline-offset: 3px;
+}

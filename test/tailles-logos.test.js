@@ -293,8 +293,8 @@ const TE = global.window.TextileEngine;
   }
   assert.ok(!/rafraichir/.test(ECRAN) && !/taille-logo-app/.test(ECRAN),
     'plus rien ne va chercher l’ancien site');
-  assert.ok(!fs.existsSync(path.join(RACINE, 'tailles-logo.js')),
-    'le client vers l’ancien site n’a plus lieu d’être');
+  // (Le fichier lui-même est tenu par `test/ce-qui-ne-revient-pas.test.js`, avec
+  // les huit autres retraits : ce sont tous des poids servis, pas des sujets.)
   assert.ok(!/tailles-logo/.test(REGLAGES), 'et les Réglages n’en gardent pas un morceau');
 
   // --- 10. LA SAISIE SE COMPORTE COMME UN TABLEUR ---------------------------

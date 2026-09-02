@@ -3466,6 +3466,15 @@ function contexteFicheAtelier(r, marquage) {
     // dans l'entête, avec la référence.
     lotDossier: lot ? `Article ${lot.rang} sur ${lot.total} du ticket ${lot.ref}` : '',
     aujourdhui: () => new Date(),
+    // L'HISTOIRE DU DOSSIER, à la demande. Le module part au premier clic et
+    // pas à l'ouverture d'un poste : c'est un écran qu'on consulte quand une
+    // question se pose, pas tous les jours.
+    ouvrirHistorique: () => import('./historique.js')
+      .then((m) => m.ouvrirHistorique(r.id, {
+        ref: (r.fiche && r.fiche.ref) || '',
+        client: nomClientAffiche(r.billing_company, r.client_type) || '',
+      }))
+      .catch(reportError),
     fermer: fermerFicheAtelier,
     patchLigne: (champ, valeur) => {
       patch(r, { [champ]: valeur }, () => { r[champ] = valeur; rafraichirLigne(r); });

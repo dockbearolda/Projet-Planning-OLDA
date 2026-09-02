@@ -29,6 +29,20 @@
 // PUR, comme `chiffrage.js` : aucune base, aucun réseau, aucune horloge. On lui
 // donne la grille et un choix, il rend des nombres. C'est ce qui permet de le
 // mettre à l'épreuve sans monter un serveur.
+//
+// ⚠ AUCUNE ROUTE NE L'APPELLE AUJOURD'HUI, ET C'EST UN CONSTAT, PAS UN OUBLI.
+// La route qui chiffrait est partie avec le reste de l'ancien « Nouveau
+// Projet » ; le comptoir, lui, envoie un prix DÉJÀ calculé à l'écran, que le
+// serveur se contente de valider (`prixComptoir`). Ce module sert donc
+// aujourd'hui à une seule chose, et elle compte : prouver que la GRILLE réglée
+// par le patron sort bien les prix de rayon (voir
+// `test/tarif-tasse-prix-magasin.test.js`). C'est une vérification de DONNÉES.
+//
+// La suite naturelle serait que le serveur revérifie le prix d'une tasse au
+// lieu de croire l'écran sur parole — un poste qui envoie un montant faux
+// n'est refusé par personne aujourd'hui. Ça se décide avec Charlie : le
+// comptoir a le droit de négocier, et un serveur qui refuse une vente est un
+// serveur qu'on contourne sur un papier.
 
 // Les cinq morceaux d'une tasse, dans l'ordre où ils s'additionnent, avec la
 // catégorie de la grille où chacun se cherche.

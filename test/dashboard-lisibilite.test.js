@@ -129,9 +129,8 @@ for (const mort of ['kpiFilter', 'KPI_PRED', 'KPI_LABEL', 'filtreMatin',
   'searchQuery', 'isDimmed', 'buildCharge', 'buildMatin', 'MATIN_MAX']) {
   assert.ok(!DASH.includes(mort), `${mort} : le code qui le servait part avec lui`);
 }
-assert.ok(!fs.existsSync(path.join(__dirname, '..', 'public/matin.js')),
-  'le moteur du briefing est retiré, pas laissé en code mort — il reste dans '
-  + 'l’historique si le patron le redemande');
+// (Le fichier lui-même est tenu par `test/ce-qui-ne-revient-pas.test.js`, avec
+// les huit autres retraits : ce sont tous des poids servis, pas des sujets.)
 assert.ok(!/'\/matin\.js'/.test(lire('public/sw.js')),
   '… et il quitte la coquille hors ligne en même temps');
 

@@ -109,6 +109,10 @@ const COQUILLE = [
   '/format.js',
   '/ligne-faits.js',
   '/fiche-atelier.js',
+  // L'historique d'un dossier : charge au premier clic sur le bouton de la
+  // fiche. Absent du cache, il ne s'ouvre pas hors ligne — et c'est justement
+  // hors ligne qu'on cherche ce qui s'est passe.
+  '/historique.js',
   // Chargés à la demande depuis app.js (import dynamique) : le réseau peut être
   // tombé entre l'ouverture de l'application et le tap sur l'onglet.
   '/nouveau-projet.js',

@@ -20,8 +20,6 @@ const compression = require('compression');
 // corriger « 30 S » en « 100 S » sur la ligne du planning doit appliquer le
 // dégressif du fichier V9, pas garder le prix de trente pièces.
 const chiffrage = require('./chiffrage');
-// Le prix d'une tasse : la somme de ses morceaux dans la grille du patron.
-const { chiffrerTasse } = require('./tarif-tasse');
 const {
   pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS, ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
@@ -2757,8 +2755,92 @@ app.get('/api/recherche', asyncH(async (req, res) => {
 
 // GET /api/requests/:id/journal → ce qui a changé sur cette commande, du plus
 // récent au plus ancien. La fiche l'affiche dans « Historique ».
+// CE QUE LE JOURNAL A GARDÉ, RELU COMME ON LE LIT À L'ÉCRAN.
+// La table stocke des valeurs BRUTES — « 3 » pour une priorité, « prod_dtf »
+// pour une étape, « 648.96 » pour un prix — parce que c'est ce qui a été écrit
+// dans la colonne. Rendues telles quelles, elles donnaient « Priorité : 2 → 3 »,
+// que personne ne sait relire : l'écran, lui, dit « Basse / Moyenne / Haute ».
+// La traduction se fait ICI, à la lecture, et jamais à l'écriture : le journal
+// doit garder ce qui a été écrit, pas la mise en forme du jour.
+const PRIORITES_LUES = { 1: 'Basse', 2: 'Moyenne', 3: 'Haute' };
+const ETAPES_LUES = new Map([
+  ...STAGES.map((e) => [e.slug, e.label]),
+  ...Object.values(SUB_STAGES).flat().map((s) => [s.slug, s.label]),
+]);
+const ALERTES_LUES = { bloque: 'Bloquée', a_voir: 'À voir' };
+const EUROS_LUS = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+const CHAMPS_MONTANT = new Set(['project_value', 'acompte_montant']);
+
+function lisible(champ, brut) {
+  if (brut == null || brut === '') return brut;
+  const v = String(brut);
+  if (champ === 'priority') return PRIORITES_LUES[v] || v;
+  if (champ === 'stage' || champ === 'sub_stage') return ETAPES_LUES.get(v) || v;
+  if (champ === 'flag') return ALERTES_LUES[v] || v;
+  if (v === 'true') return 'oui';
+  if (v === 'false') return 'non';
+  if (CHAMPS_MONTANT.has(champ)) {
+    const n = Number(v);
+    return Number.isFinite(n) ? EUROS_LUS.format(n) : v;
+  }
+  if (champ === 'paiement_mode') {
+    const m = COM.paiementModes.find((p) => p.id === v);
+    return m ? m.label : v;
+  }
+  return v;
+}
+
+// L'HISTOIRE D'UN DOSSIER EN UNE SEULE LISTE (01/09/2026).
+//
+// Elle en faisait deux, et aucune n'avait d'écran. Le JOURNAL enregistrait
+// depuis des mois ce qui change sur une commande — prix, étape, acompte, qui
+// et quand — sans que personne puisse le lire. Les VERSIONS de documents
+// archivaient chaque devis remplacé, dans une table que rien n'ouvrait. Deux
+// historiques écrits pour rien, ce qui est pire que pas d'historique : on croit
+// pouvoir répondre à « qu'est-ce qui s'est passé sur ce dossier ? ».
+//
+// Ils sortent par la même porte, mêlés et datés, parce que c'est UNE histoire :
+// « le prix est passé à 520 €, puis le devis V1 a été remplacé ». Les lire
+// séparément demanderait de recoller deux listes à l'œil.
+//
+// LE LIBELLÉ VIENT D'ICI, PAS DE L'ÉCRAN. `JOURNAL_FIELDS` dit comment un champ
+// s'appelle en français ; le recopier côté navigateur ferait deux tables à tenir
+// et une divergence le jour où l'une bouge.
 app.get('/api/requests/:id/journal', asyncH(async (req, res) => {
-  res.json(await getRequestJournal(req.params.id));
+  const [journal, versions] = await Promise.all([
+    getRequestJournal(req.params.id),
+    pool.query(
+      `SELECT kind, version, filename, qui, created_at FROM attachment_versions
+        WHERE request_id = $1 ORDER BY created_at DESC`, [req.params.id],
+    ).then((r) => r.rows).catch(() => []),
+  ]);
+
+  // `value_before` / `value_after` RESTENT BRUTS — c'est ce que la colonne
+  // contient, et une API qui travestit ce qu'elle a stocké ment à qui la relit.
+  // `avant` / `apres` sont les mêmes, en français, pour l'écran.
+  const champs = journal.map((l) => ({
+    ...l,
+    label: JOURNAL_FIELDS[l.field] || l.field,
+    avant: lisible(l.field, l.value_before),
+    apres: lisible(l.field, l.value_after),
+  }));
+  // Un document remplacé est un évènement comme un autre : même forme, pour que
+  // l'écran n'ait qu'une seule façon d'afficher une ligne. `value_after` porte
+  // de quoi le rouvrir — c'est la seule chose qu'on ne peut pas reconstituer.
+  const documents = versions.map((v) => ({
+    field: 'document',
+    label: `${PDF_LABELS[v.kind] || v.kind} — version ${v.version}`,
+    avant: v.filename,
+    apres: null,
+    // Un document archivé se ROUVRE : c'est tout l'intérêt de l'avoir gardé.
+    lien: `/api/requests/${req.params.id}/pdf/${v.kind}/versions/${v.version}`,
+    who: v.qui,
+    created_at: v.created_at,
+  }));
+
+  const tout = [...champs, ...documents]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  res.json(tout);
 }));
 
 // LES DEUX VALEURS QUE L'ÉTABLI RECTIFIE, et rien d'autre : le nombre d'une
@@ -3142,6 +3224,9 @@ app.post('/api/requests/:id/restaurer', exige('production'), asyncH(async (req, 
 // Stockées en base (base64) ; servies inline pour consultation immédiate.
 // ---------------------------------------------------------------------------
 const PDF_KINDS = ['devis', 'bat', 'facture'];
+// Comment chaque document s'appelle dans une phrase — l'historique en a besoin,
+// et c'est le serveur qui nomme, jamais l'écran (voir GET …/journal).
+const PDF_LABELS = { devis: 'Devis', bat: 'BAT', facture: 'Facture' };
 
 // Marque la commande comme modifiée pour que le temps réel (signature basée sur
 // updated_at) propage l'apparition / suppression d'un PDF aux autres clients.

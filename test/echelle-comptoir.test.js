@@ -555,8 +555,8 @@ assert.ok(!/(?:src|href)\s*=\s*["']https?:\/\//.test(DEVIS.replace(/<!--[\s\S]*?
 const CODE_DEVIS = DEVIS.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 assert.ok(!/jspdf/i.test(CODE_DEVIS),
   'plus une ligne de code qui parle de jsPDF : le ticket s’imprime');
-assert.ok(!fs.existsSync(path.join(RACINE, 'public/jspdf.umd.min.js')),
-  '… et la bibliothèque de 364 Ko ne dort plus dans public/');
+// (Le fichier lui-même est tenu par `test/ce-qui-ne-revient-pas.test.js`, avec
+// les huit autres retraits : ce sont tous des poids servis, pas des sujets.)
 assert.ok(!/jspdf/i.test(SW),
   '… ni dans la coquille hors ligne, où elle coûtait 364 Ko par installation');
 // Le chemin qui RESTE : « PDF » passe par l'impression du navigateur.

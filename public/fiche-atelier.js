@@ -456,6 +456,15 @@ export function dessinerFicheAtelier(r, ctx) {
   // n'y a plus de « a cote » ou cliquer. Sans elle, la seule sortie serait
   // Echap — un cul-de-sac a la souris.
   const outils = el('div', 'fa-outils');
+  // L'HISTORIQUE S'OUVRE D'ICI (01/09). Le journal du dossier et les versions
+  // de ses documents s'ecrivaient depuis des mois sans qu'aucun ecran ne les
+  // montre. Un BOUTON, pas une quatrieme zone : la fiche a ses trois zones, et
+  // une de plus les aurait toutes retrecies pour un ecran qu'on ouvre une fois
+  // par mois. Il ne parait que si l'ecran hote sait l'ouvrir — la fiche se
+  // relit dans un bac a sable, elle n'importe rien elle-meme.
+  if (ctx.ouvrirHistorique) {
+    outils.append(bouton('fa-btn', 'Historique', () => ctx.ouvrirHistorique()));
+  }
   outils.append(etatSauve, bouton('fa-btn fa-btn--carre', '×', () => ctx.fermer()));
   tete.append(ident, outils);
 
