@@ -137,16 +137,22 @@
                        ligne au cran des libellés. */
   display: grid;
   grid-template-columns: var(--dvf-k) minmax(0, 1fr);
-  align-items: center;
+  /* ⚠ PAS D'`align-items: center` ICI (02/09). Il faisait tomber chaque cellule
+     sur SA hauteur de contenu au lieu de la hauteur de la rangée : l'intitulé
+     sortait en 33,3 px, la case en 59, et leurs deux traits de séparation se
+     retrouvaient à 12,9 px l'un de l'autre — mesuré au rendu. Les mots, eux,
+     étaient bien alignés : c'est la ligne sous eux qui ne l'était pas.
+     Les cellules s'étirent donc (le défaut d'une grille), et c'est l'intitulé
+     qui centre son texte DANS sa cellule. */
   column-gap: var(--pas-3);
 }
 .dvf-rang { display: contents; }
-/* L'INTITULÉ EST SUR LE RAIL DE SA CASE. Il se replie plutôt que de pousser sa
-   colonne : un intitulé long ne doit pas rétrécir toutes les cases de la
-   feuille. */
+/* L'INTITULÉ EST SUR LE RAIL DE SA CASE : même rangée, même hauteur, même
+   trait au pied. Il se replie plutôt que de pousser sa colonne — un intitulé
+   long ne doit pas rétrécir toutes les cases de la feuille. */
 .dvf-rang__k {
-  align-self: center;
-  padding: var(--pas-1) 0;
+  display: flex;
+  align-items: center;
   line-height: var(--ligne-texte);
 }
 /* La case remplit sa piste : une grille étire ses enfants, il n'y a donc
@@ -178,7 +184,11 @@
    mauvaise case au premier changement.
    =========================================================================== */
 .dvf-tab {
-  --dvf-cols: minmax(0, 2.4fr) minmax(0, 1fr) 56px 76px 84px var(--ctrl-h);
+  /* CINQ PISTES DEPUIS LE 02/09 : la référence est descendue dans le détail.
+     À six, elle sortait à 50 px au plus petit poste — deux caractères de
+     « NS300 » — et son intitulé chevauchait celui de « Qté ». Ce qu'elle rend,
+     la désignation le prend : c'est la seule colonne qui porte une phrase. */
+  --dvf-cols: minmax(0, 1fr) 56px 76px 84px var(--ctrl-h);
   display: flex;
   flex-direction: column;
   gap: var(--pas-2);
@@ -187,12 +197,22 @@
 .dvf-tab__rang {
   display: grid;
   grid-template-columns: var(--dvf-cols);
-  gap: var(--pas-2);
+  gap: var(--pas-1);
   align-items: center;
 }
-/* L'EN-TÊTE EST UNE LIGNE DE LECTURE, pas une rangée de commandes : il ne
-   prend pas la boîte de l'application, il prend la place de son texte. */
-.dvf-tab__tete { padding: 0 var(--pas-1); }
+/* L'EN-TÊTE TOMBE SUR LE RAIL DES LIGNES, PAS À CÔTÉ. Mesuré au rendu le
+   02/09 : il portait son propre rembourrage (6 px) quand la rangée hérite de
+   celui du bloc d'article (10 px) plus son trait — ses cinq intitulés
+   tombaient 5 px à côté de leurs colonnes. Il reprend donc EXACTEMENT la boîte
+   du bloc : même rembourrage, et un trait transparent pour le pixel du bord.
+   Sans lui, l'écart revient à 1 px, ce qui est pire — on ne le voit plus, et il
+   est toujours là.
+   Il reste une ligne de LECTURE : il ne prend pas la boîte de l'application, il
+   prend la place de son texte. */
+.dvf-tab__tete {
+  padding: 0 var(--pas-2);
+  border: 1px solid transparent;
+}
 .dvf-tab__tete[hidden] { display: none; }
 /* LE NOMBRE QUI NE SE TAPE PAS. Il prend la boîte des cases pour tomber sur
    elles, mais ni fond ni bordure : ce qui a une boîte se remplit, et un total
@@ -227,11 +247,12 @@
   background: var(--zone-bg);
 }
 .dvf-liste { display: flex; flex-direction: column; gap: var(--pas-2); }
-/* LE DÉTAIL D'UN ARTICLE TIENT À TROIS PAR RANGÉE — la couleur, le marquage,
-   la note — avec l'intitulé au-dessus (`.fa-case`) : ce sont des cases isolées,
-   pas des colonnes qui se lisent d'un article à l'autre. Et les six tailles
-   remplissent la rangée suivante : `.fa-tailles` (fiche-atelier.css) fait le
-   reste — c'est la grille où l'atelier compte déjà ses pièces. */
+/* LE DÉTAIL D'UN ARTICLE TIENT À TROIS PAR RANGÉE — la référence, la couleur,
+   le marquage — avec l'intitulé au-dessus (`.fa-case`) : ce sont des cases
+   isolées, pas des colonnes qui se lisent d'un article à l'autre. La note prend
+   la rangée d'après EN ENTIER (c'est une phrase), et les six tailles la
+   suivante : `.fa-tailles` (fiche-atelier.css) fait le reste — c'est la grille
+   où l'atelier compte déjà ses pièces. */
 .dvf-r3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -313,35 +334,13 @@
 .dvf-prop__ou { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); }
 .dvf-prop__qui { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--graisse-note); }
 
-/* --- L'état du délai -------------------------------------------------------
-   LA COULEUR DIT UN ÉTAT, et c'en est un : ce que l'atelier peut promettre.
-   C'est la seule teinte de l'écran. */
-.dvf-etat {
-  display: flex;
-  align-items: center;
-  /* IL SE REPLIE, LUI. C'est un MESSAGE, pas une valeur : la boîte de valeur
-     partagée (`.fa-case__v`) tient ses enfants sur une ligne — c'est ce qu'il
-     faut pour une date ou un montant, et c'est ce qui faisait déborder la
-     colonne de saisie de 150 px, mesuré à 1280 px. Une phrase de délai se
-     replie et rétrécit ; elle garde la boîte de l'application comme plancher,
-     et elle est la dernière rangée de sa carte : en grandissant elle ne pousse
-     rien. */
-  min-width: 0;
-  white-space: normal;
-  min-height: var(--ctrl-h);
-  padding: var(--pas-2) var(--champ-x);
-  border: var(--champ-trait) solid transparent;
-  border-radius: var(--arrondi-champ);
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-note);
-  line-height: var(--ligne-serre);
-}
-.dvf-etat--ok { background: var(--success-bg); border-color: var(--success-line); color: var(--success); }
-.dvf-etat--attention { background: var(--warning-bg); border-color: var(--warning-line); color: var(--warning); }
-.dvf-etat--danger { background: var(--danger-bg); border-color: var(--danger-line); color: var(--danger); }
+/* ⚠ `.dvf-etat` ET `.dvf-aide` SONT PARTIS LE 02/09. La bande colorée du délai
+   redisait sous le menu ce que le menu venait de dire (« Commande groupée » →
+   « Dépend de la prochaine commande groupée »), et le compte du catalogue
+   (« 82 objets, 0 tarifé ») se lisait une fois puis se franchissait à chaque
+   devis. Charlie : « on s'en fout ».
 
-/* --- Le pied d'une carte : une aide, et rien qui pousse ------------------- */
-.dvf-aide { margin: 0; font-size: var(--taille-note); line-height: var(--ligne-texte); color: var(--text-2); }
+   --- Quand la carte des articles est vide -------------------------------- */
 .dvf-vide {
   padding: var(--pas-4);
   border: 1px dashed var(--border);

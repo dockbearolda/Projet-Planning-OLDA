@@ -550,6 +550,10 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
   // L'ÉTAT DES VOLETS SUIT LE BROUILLON, par appareil.
   assert.ok(/JSON\.stringify\(\{ saisie, dossierId, replis \}\)/.test(ECRAN),
     'le pli de chaque catégorie part avec le brouillon');
+  // … ET ELLES SONT FERMÉES AU DÉPART (02/09). Quatre catégories dépliées,
+  // c'est trois écrans à franchir avant d'arriver aux articles.
+  assert.ok(/c\.open = replis\[cle\] === true;/.test(ECRAN),
+    'une catégorie qu’on n’a jamais ouverte est fermée : « par défaut ces bulles doivent être fermé »');
 }
 {
   // LA FEUILLE : intitulé à gauche (`.fa-lab`), case à droite (`.fa-in`), et
@@ -560,6 +564,18 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
     'la feuille a deux colonnes : les intitulés sur un rail, les cases sur l’autre');
   assert.ok(/\.dvf-rang \{ display: contents; \}/.test(FEUILLE),
     'une rangée ne fait pas sa propre grille : elle tombe dans celle de la feuille');
+  // L'INTITULÉ ET SA CASE REMPLISSENT LA MÊME RANGÉE — donc leurs deux traits
+  // tombent au même endroit. `align-items: center` sur la grille faisait tomber
+  // chaque cellule sur SA hauteur de contenu : 33,3 px pour l'intitulé, 59 pour
+  // la case, et 12,9 px entre les deux traits (mesuré au rendu le 02/09).
+  // ⚠ SUR LA FEUILLE DÉPOUILLÉE DE SES COMMENTAIRES : la règle EXPLIQUE
+  // pourquoi elle ne porte pas `align-items: center`, et chercher la phrase
+  // ferait échouer le test sur sa propre note.
+  const grille = FEUILLE.replace(/\/\*[\s\S]*?\*\//g, ' ').match(/\.dvf-grille \{[\s\S]*?\n\}/);
+  assert.ok(grille && !/align-items:\s*center/.test(grille[0]),
+    'la feuille étire ses cellules : deux traits de séparation à des hauteurs différentes, ça se voit');
+  assert.ok(/\.dvf-rang__k \{[^}]*display: flex;[^}]*align-items: center/.test(FEUILLE),
+    '… et c’est l’intitulé qui centre son texte DANS sa cellule');
 }
 {
   // LE TABLEAU : les pistes sont écrites UNE fois et lues par l'en-tête et par
@@ -568,18 +584,33 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
   assert.strictEqual(pistes.length, 1, 'les colonnes du tableau sont déclarées une seule fois');
   assert.ok(/\.dvf-tab__tete,\n\.dvf-tab__rang \{[^}]*grid-template-columns: var\(--dvf-cols\)/.test(FEUILLE),
     'l’en-tête et la rangée lisent la même déclaration, dans la même règle');
-  // Six colonnes : ce qu'on vend, sa référence, combien, à quel prix, le total,
-  // la corbeille. Couleur, marquage, note et tailles sont SOUS la ligne — les
-  // huit colonnes demandaient 772 px là où la colonne de saisie en fait 574.
+  // CINQ COLONNES : ce qu'on vend, combien, à quel prix, le total, la corbeille.
+  // Référence, couleur, marquage, note et tailles sont SOUS la ligne — les huit
+  // colonnes du départ demandaient 772 px là où la colonne de saisie en fait
+  // 574, et à six la référence sortait à 50 px avec son intitulé chevauchant
+  // celui de « Qté » (mesuré au rendu le 02/09).
   const colonnes = ECRAN.match(/const COLONNES = \[([^\]]*)\]/);
   assert.ok(colonnes, 'les intitulés de colonne sont une liste, écrite une fois');
-  assert.strictEqual(colonnes[1].split(',').length, 6, 'six colonnes, pas une de plus');
-  assert.ok(/rangee\.append\(design, refe, qte, pu, total, sup\)/.test(ECRAN),
-    'la rangée remplit les six colonnes dans l’ordre de l’en-tête');
+  assert.strictEqual(colonnes[1].split(',').length, 5, 'cinq colonnes, pas une de plus');
+  assert.ok(/rangee\.append\(design, qte, pu, total, sup\)/.test(ECRAN),
+    'la rangée remplit les cinq colonnes dans l’ordre de l’en-tête');
+  // ⚠ ON COMPTE DES PISTES, PAS DES MOTS : `minmax(0, 1fr)` en fait deux si on
+  // découpe sur l'espace. Les parenthèses se replient d'abord.
+  const pistes5 = FEUILLE.match(/--dvf-cols:([^;]*);/);
+  assert.ok(pistes5, 'les pistes du tableau sont déclarées');
+  assert.strictEqual(pistes5[1].replace(/\([^)]*\)/g, '()').trim().split(/\s+/).length,
+    colonnes[1].split(',').length,
+    'la feuille déclare exactement autant de pistes que l’en-tête a d’intitulés');
   // LE MENU S'HABILLE APRÈS L'INSERTION : `menuPoser` remplace le champ dans la
   // page, et un champ habillé hors de la page perd sa peau à l'append suivant.
-  assert.ok(ECRAN.indexOf('rangee.append(design, refe, qte, pu, total, sup)') < ECRAN.indexOf('menuPoser(design)'),
+  assert.ok(ECRAN.indexOf('rangee.append(design, qte, pu, total, sup)') < ECRAN.indexOf('menuPoser(design)'),
     'la désignation entre dans la rangée AVANT d’être habillée par le menu');
+  // UNE LIGNE SIMPLE S'ARRÊTE À SA RANGÉE : le transport n'a ni référence, ni
+  // couleur, ni marquage, ni tailles — il sortait avec les trois rangées d'un
+  // t-shirt, soit quatre fois la place de ce qu'il dit.
+  assert.ok(/if \(!ligne\.simple\) bloc\.append\(detail, caseNote, cases\)/.test(ECRAN),
+    'une ligne simple ne porte pas le détail de production d’un article');
+  assert.ok(/simple: true,/.test(ECRAN), '… et c’est le transport qui la demande');
   // L'en-tête se tait quand il n'y a rien dessous, et il se réveille au premier
   // article — c'est une fonction, appelée des deux côtés.
   assert.strictEqual((ECRAN.match(/majTeteTableau\(\);/g) || []).length, 2,

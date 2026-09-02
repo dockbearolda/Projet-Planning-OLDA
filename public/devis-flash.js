@@ -210,7 +210,12 @@ function relireBrouillon() {
 // Rend `[bloc, corps]` : on empile dans le corps, jamais dans le bloc.
 function carte(icone, titre, cle) {
   const c = el('details', 'reg-card dvf-cat volet-plus');
-  c.open = replis[cle] !== false;
+  // FERMÉES AU DÉPART (02/09, Charlie : « par défaut ces bulles doivent être
+  // fermé »). Quatre catégories dépliées, c'est trois écrans à franchir avant
+  // d'arriver aux articles — et sur un devis sur trois, le client est déjà en
+  // base et la fiscalité ne bouge pas. Ce qu'on a ouvert reste ouvert : le pli
+  // part avec le brouillon, par appareil.
+  c.open = replis[cle] === true;
   if (cle) {
     c.dataset.cat = cle;
     c.addEventListener('toggle', () => { replis[cle] = c.open; garderBrouillon(); });
@@ -457,25 +462,21 @@ function carteClient() {
   const email = entree('dvf-cl-email', { type: 'email', valeur: saisie.client.email, exemple: 'facultatif' });
   const contact = entree('dvf-cl-contact', { valeur: saisie.client.contact, exemple: 'facultatif' });
   const tel = entree('dvf-cl-tel', { type: 'tel', valeur: saisie.client.tel, exemple: 'facultatif' });
-  const type = menu('dvf-cl-type', [
-    { id: 'professionnel', label: 'Professionnel' }, { id: 'particulier', label: 'Particulier' },
-    { id: 'association', label: 'Association' }, { id: 'revendeur', label: 'Revendeur' },
-  ], saisie.client.type === 'perso' ? 'particulier' : 'professionnel');
+  // ⚠ PAS DE « TYPE DE CLIENT » ICI (retiré le 02/09, Charlie : « c'est en
+  // automatique à la création du client »). Un client choisi dans la base
+  // apporte le sien ; un client inconnu le reçoit quand il entre en base. Une
+  // case de plus à remplir pour une valeur que personne ne corrigeait.
+  // `saisie.client.type` ne bouge pas pour autant : il voyage jusqu'au planning.
   corps.append(feuille(
     rang('Client / société', nom), rang('Code client', code),
     rang('Ville', ville), rang('E-mail', email),
     rang('Personne à contacter', contact), rang('Téléphone', tel),
-    rang('Type', type),
   ));
 
   for (const [n, cle] of [[nom, 'nom'], [code, 'code'], [ville, 'ville'],
     [email, 'email'], [contact, 'contact'], [tel, 'tel']]) {
     n.addEventListener('input', () => { saisie.client[cle] = n.value; redessiner(); });
   }
-  type.addEventListener('change', () => {
-    saisie.client.type = type.value === 'particulier' ? 'perso' : type.value;
-    redessiner();
-  });
 
   champCh.addEventListener('input', () => proposer(champCh.value));
   // ÉCHAP FERME LA LISTE, PAS L'ÉCRAN. Sans ça, la touche remonte au planning
@@ -536,8 +537,6 @@ function prendreClient(cl) {
     const n = $(id);
     if (n) n.value = v;
   }
-  const t = $('#dvf-cl-type');
-  if (t) t.value = saisie.client.type === 'perso' ? 'particulier' : 'professionnel';
   const ch = $('#dvf-cherche');
   if (ch) ch.value = saisie.client.nom;
   redessiner();
@@ -558,15 +557,10 @@ function carteProjet() {
     rang('Date souhaitée client', due), rang('Validité du devis', val),
   ));
 
-  // L'ÉTAT DU DÉLAI N'EST PAS UN CHAMP : c'est ce que l'approvisionnement choisi
-  // ENTRAÎNE, et c'est une phrase. Posé dans une demi-colonne comme s'il se
-  // remplissait, il montait à 117 px de haut — quatre lignes — à côté d'un menu
-  // de 50 (mesuré à 1280 px, le plus petit poste). Il prend donc toute la
-  // largeur de sa carte, où il tient sur une ligne, et il ne prétend plus être
-  // une commande.
-  const etat = el('div', 'dvf-etat');
-  etat.id = 'dvf-etat';
-  corps.append(etat);
+  // ⚠ L'ÉTAT DU DÉLAI EST RETIRÉ (02/09, Charlie : « on s'en fout »). Une bande
+  // colorée redisait, sous le menu, ce que le menu venait de dire — « Commande
+  // groupée » → « Dépend de la prochaine commande groupée ». Le texte
+  // commercial du délai, lui, reste : il est SUR LE DEVIS, où il sert.
 
   projet.addEventListener('input', () => { saisie.projet = projet.value; redessiner(); });
   due.addEventListener('change', () => { saisie.dueDate = due.value; redessiner(); });
@@ -581,7 +575,7 @@ function carteProjet() {
 // LES COLONNES DU TABLEAU, ÉCRITES UNE FOIS. L'en-tête les pose, chaque ligne
 // les remplit dans le même ordre : deux listes, ce serait un intitulé qui coiffe
 // la mauvaise case le jour où l'on en insère une.
-const COLONNES = ['Désignation', 'Référence', 'Qté', 'PU HT', 'Total', ''];
+const COLONNES = ['Désignation', 'Qté', 'PU HT', 'Total', ''];
 
 function carteArticles() {
   const [c, corps] = carte('local_grocery_store', 'Articles', 'articles');
@@ -629,10 +623,6 @@ function carteArticles() {
   barre.append(bLigne, bTransport);
   corps.append(barre);
 
-  const aide = el('p', 'dvf-aide');
-  aide.id = 'dvf-aide-cat';
-  corps.append(aide);
-
   bLigne.addEventListener('click', () => ajouterLigne({}));
   bTransport.addEventListener('click', ajouterTransport);
   return c;
@@ -648,7 +638,6 @@ function nomProduit(p) {
 
 function remplirCatalogue() {
   const listeProduits = document.getElementById(ID_PRODUITS);
-  const aide = $('#dvf-aide-cat');
   if (!listeProduits) return;
   parNom.clear();
   const frag = document.createDocumentFragment();
@@ -676,27 +665,6 @@ function remplirCatalogue() {
   // que les rangées posées à l'instant.
   for (const n of ROOT.querySelectorAll(
     `input[list="${ID_PRODUITS}"], input[data-menu-liste="${ID_PRODUITS}"]`)) menuRafraichir(n);
-  if (!aide) return;
-  const tarifes = catalogue.filter((p) => p.prixVenteTtc != null).length;
-  // L'ÉCRAN DIT CE QU'IL SAIT. Un catalogue sans prix n'est pas une panne :
-  // c'est un import qui n'a pas encore été fait, et le devis se compose quand
-  // même — mais il faut le savoir avant de chercher un tarif qui n'existe pas.
-  // CE QUI RESTE ICI EST UN COMPTE, PAS UNE PHRASE. La regle de conversion
-  // TTC → HT est passee dans la bulle du « i » : elle ne change jamais, donc
-  // elle n'a rien a faire sous les yeux a chaque devis. Ces deux nombres, eux,
-  // changent — et un catalogue sans prix n'est pas une panne, c'est un import
-  // qui n'a pas encore ete fait.
-  // DEUX COMPTES, PARCE QU'IL Y A DEUX SORTES DE PRIX. Un objet se vend à un
-  // prix de rayon, qui s'importe — « tarifé » veut dire qu'il l'a été. Un
-  // textile n'en a pas et n'en aura jamais : il se CHIFFRE, quantité par
-  // quantité. Les compter ensemble ferait lire « 130 produits, 0 tarifé » et
-  // donnerait à croire qu'il manque 130 prix.
-  const textiles = catalogue.filter((p) => p.famille === FAMILLE_TEXTILE).length;
-  const objets = catalogue.length - textiles;
-  aide.textContent = catalogue.length
-    ? `${objets} objet${objets > 1 ? 's' : ''} au catalogue, ${tarifes} tarifé${tarifes > 1 ? 's' : ''}`
-      + (textiles ? ` · ${textiles} textiles, chiffrés à la quantité` : '')
-    : '';
 }
 
 // ===========================================================================
@@ -881,12 +849,21 @@ function ajouterTransport() {
     note: 'Acheminement à Saint-Martin.',
     quantite: qte,
     unitaireHt: prix,
+    // ⚠ UNE LIGNE SIMPLE (02/09, Charlie : « ça crée une bulle comme un
+    // article, ça prend trop de place »). Un acheminement n'a ni couleur, ni
+    // marquage, ni tailles : il sortait pourtant avec les trois rangées d'un
+    // t-shirt, soit quatre fois la place de ce qu'il dit. Sa NOTE reste — elle
+    // s'imprime sur le devis — elle ne se saisit simplement plus.
+    simple: true,
   });
 }
 
 function ajouterLigne(modele) {
   saisie.lignes.push({
     designation: '', reference: '', couleur: '', tailles: '', marquage: '', note: '',
+    // `simple` : la ligne n'a pas de détail de production (le transport). Elle
+    // tient sur sa rangée de tableau, et rien dessous.
+    simple: false,
     // `parTaille` : les six cases. `tailles` reste le TEXTE du devis, et il en
     // est dérivé — une seule source, sinon le papier dit une répartition et
     // l'écran une autre.
@@ -994,7 +971,7 @@ function rangeeArticle(ligne) {
   sup.type = 'button';
   sup.setAttribute('aria-label', 'Retirer cet article');
   sup.append(ic('delete'));
-  rangee.append(design, refe, qte, pu, total, sup);
+  rangee.append(design, qte, pu, total, sup);
   // ⚠ APRÈS L'INSERTION, JAMAIS AVANT. `menuPoser` REMPLACE le champ par sa peau
   // dans la page (`hote.replaceWith(peau)`) : habillé hors de la page, le champ
   // se retrouve dans une peau détachée, et l'append suivant le sortirait de sa
@@ -1003,13 +980,20 @@ function rangeeArticle(ligne) {
 
   // --- LE DÉTAIL DE L'ARTICLE, SOUS SA LIGNE ------------------------------
   // CE QUE LA TABLE PORTE, C'EST LA LIGNE COMMERCIALE : ce qu'on vend, combien,
-  // à quel prix. Le reste dit comment on le PRODUIT — la couleur, le marquage,
-  // la répartition — et ça ne se lit pas en colonne d'un article à l'autre.
+  // à quel prix. Le reste dit comment on le PRODUIT — la référence, la couleur,
+  // le marquage, la répartition — et ça ne se lit pas en colonne d'un article à
+  // l'autre.
   //
   // ⚠ ET C'EST UNE MESURE, pas un goût. Les huit colonnes tenaient 772 px de
   // large au minimum ; la colonne de saisie en fait 574 au plus petit poste de
   // l'atelier (1280 px, mesuré dans la coquille). La table aurait défilé de
   // côté à demeure — y compris pour lire une référence.
+  //
+  // TROIS RANGÉES, PAS DEUX (02/09, Charlie : « ces 2 lignes là peuvent tenir
+  // sur 3 lignes pour aérer »). La RÉFÉRENCE descend ici : à six colonnes elle
+  // sortait à 50 px de large — deux caractères de « NS300 » — et son intitulé
+  // chevauchait celui de « Qté ». La note prend la rangée suivante, en entier :
+  // c'est une phrase, elle ne tient pas dans un tiers de colonne.
   const detail = el('div', 'dvf-r3');
 
   // --- LES TAILLES --------------------------------------------------------
@@ -1065,12 +1049,14 @@ function rangeeArticle(ligne) {
   reprendre.type = 'button';
   reprendre.hidden = true;
   const caseNote = champ('Note du devis', note);
-  // Le bouton vit DANS la boîte de la note, à sa droite : c'est la seule case
-  // du détail qui a de la place à revendre, et il tombe sur le rail des champs
-  // plutôt que sur une rangée à lui.
+  // Le bouton vit DANS la boîte de la note, à sa droite : c'est la case qui a
+  // de la place à revendre, et il tombe sur le rail des champs plutôt que sur
+  // une rangée à lui.
   caseNote.lastChild.append(reprendre);
-  detail.append(champ('Couleur', coul), champ('Marquage', marq), caseNote);
-  bloc.append(detail, cases);
+  detail.append(champ('Référence', refe), champ('Couleur', coul), champ('Marquage', marq));
+  // ⚠ UNE LIGNE SIMPLE S'ARRÊTE À SA RANGÉE. Un transport n'a ni référence, ni
+  // couleur, ni marquage, ni tailles, et sa note est écrite d'avance.
+  if (!ligne.simple) bloc.append(detail, caseNote, cases);
 
   // LA QUANTITÉ SE COMPTE QUAND LES TAILLES SONT REMPLIES, et elle se tape
   // sinon. Une tasse n'a pas de taille : sa case reste une saisie. Un t-shirt
@@ -1252,14 +1238,6 @@ function redessiner() {
 
 function peindre() {
   const compte = calculerDevis(saisie);
-
-  // L'état du délai : la seule couleur de l'écran, et elle dit un ÉTAT.
-  const appro = APPROS.find((a) => a.id === saisie.appro) || APPROS[0];
-  const etat = $('#dvf-etat');
-  if (etat) {
-    etat.className = `dvf-etat dvf-etat--${appro.etat}`;
-    etat.textContent = appro.court;
-  }
 
   const totaux = $('#dvf-totaux');
   if (totaux) {
