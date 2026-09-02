@@ -935,6 +935,10 @@ function remplirCatalogue() {
   parNom.clear();
   const frag = document.createDocumentFragment();
   for (const p of catalogue) {
+    // UN PRODUIT ÉTEINT NE SE PROPOSE PAS — c'est la règle du menu du comptoir
+    // (`catalogue.js`) et de la vente directe (`pont.js`) ; trois écrans, une
+    // seule base, et donc la même liste.
+    if (p.actif === false) continue;
     const nom = nomProduit(p);
     if (!nom || parNom.has(nom)) continue;
     parNom.set(nom, p);

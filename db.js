@@ -414,6 +414,17 @@ async function init() {
   // une base DÉJÀ remplie — la production en a quatre-vingt-deux lignes.
   await semerCatalogueTextile();
 
+  // LE FICHIER DE CAISSE, RANGÉ : les résidus de l'import du 02/09 retirés, le
+  // fichier rejoué avec la correspondance des produits. Après les deux semences
+  // et l'unicité — il compare aux clés des semences, et écrit derrière l'index.
+  try {
+    await rangerCatalogueSumup();
+  } catch (err) {
+    // Le catalogue non rangé n'est pas une raison de fermer l'atelier : on le
+    // dit, la garde reste levée, le prochain démarrage réessaie.
+    console.error('⚠  Catalogue : le fichier de caisse n’a pas pu être rangé —', err.message);
+  }
+
   // Les deux tasses que la grille sous-tarifait de 1 € et de 6 €.
   await corrigerTarifsTasseMagasin();
 
@@ -1851,7 +1862,7 @@ async function setTarifsTasseParametres(p) {
 // (test/catalogue-produits-base.test.js). Le moteur de chiffrage, conforme au
 // fichier V9 du patron, ne lit pas cette table.
 
-const { cleProduit: cleCatalogue, analyserImport } = require('./catalogue-csv');
+const { cleProduit: cleCatalogue, reduire: reduireCatalogue, analyserImport } = require('./catalogue-csv');
 
 const CATALOGUE_MAX_TEXTE = 120;
 
@@ -2064,6 +2075,110 @@ async function semerCatalogueTextile() {
     );
   }
   await poserMeta('catalogue_textile_seed_v1', '1');
+}
+
+// LE FICHIER DE CAISSE, RANGÉ (02/09/2026)
+// ===========================================================================
+// Le 02/09, le fichier SumUp du patron (export du 26/08) a été importé en
+// production SANS table de correspondance : 113 produits créés, dont une
+// quarantaine étaient DÉJÀ au catalogue sous un autre rayon (« Accessoires /
+// Couteau Multi » à côté de « Art de la table / Couteau Multi / Bois »), et les
+// t-shirts finis de la boutique posés sous « 0 UNISEXE » à côté des références
+// du moteur textile. Le devis flash montrait le même t-shirt dans deux onglets,
+// à deux prix — 33,65 € HT en « Boutique », 12,20 € HT en « Textile ».
+//
+// Les règles d'import savent maintenant faire retomber chaque ligne du fichier
+// sur le produit du comptoir qu'elle désigne (`produits`, dans
+// catalogue-import-regles.json). Cette migration les applique à la base telle
+// qu'elle est :
+//
+//   1. elle RETIRE ce que l'import du 02/09 avait créé — reconnu, et seulement
+//      lui : une ligne hors des deux semences dont le rayon et la désignation
+//      sont ceux du fichier de caisse (ou du rayon « Textile — Femme » que les
+//      règles d'alors posaient). Un produit ajouté à la main depuis Réglages
+//      ne porte pas ces noms-là : il reste ;
+//   2. elle REJOUE l'import du fichier livré avec le dépôt, par les MÊMES
+//      fonctions que l'écran de Réglages — l'aperçu, puis l'écriture signée.
+//
+// Sur une base NEUVE il n'y a rien à retirer : elle reçoit simplement le fichier
+// de caisse, et une base locale ressort identique à la production. Tenu par
+// test/catalogue-sumup-reel.test.js, sur le fichier réel.
+//
+// Down : DELETE FROM catalogue_produits WHERE cle NOT IN (clés des deux semences) ;
+//        DELETE FROM app_meta WHERE key = 'catalogue_sumup_2026_08_26_v1'.
+async function rangerCatalogueSumup() {
+  const { rows: meta } = await pool.query("SELECT value FROM app_meta WHERE key = 'catalogue_sumup_2026_08_26_v1'");
+  if (meta[0] && meta[0].value === '1') return;
+
+  let csv;
+  try {
+    csv = fs.readFileSync(path.join(__dirname, 'catalogue-sumup-2026-08-26.csv'), 'utf8');
+  } catch (_) {
+    return;   // pas de fichier : la garde n'est pas posée, on réessaiera au prochain démarrage
+  }
+  // SANS LES RÈGLES, L'IMPORT REFERAIT EXACTEMENT LE DÉSORDRE DU 02/09. On ne
+  // range donc rien tant qu'elles ne sont pas lisibles ET qu'elles ne portent
+  // pas la correspondance des produits.
+  const regles = reglesImportCatalogue();
+  if (!regles || !Array.isArray(regles.produits) || !regles.produits.length) {
+    console.error('⚠  Catalogue : catalogue-import-regles.json illisible ou sans règles `produits` — le fichier de caisse n’a pas été rangé.');
+    return;
+  }
+  // Les rayons et désignations TELS QUE LE FICHIER LES ÉCRIT — lus sans aucune
+  // règle, refus compris : c'est sous ces noms-là que l'import d'alors a créé.
+  const brut = analyserImport(csv, [], null);
+  if (brut.erreur) {
+    console.error(`⚠  Catalogue : fichier de caisse illisible — ${brut.erreur}`);
+    return;
+  }
+  const FEMME = /^(01|[2-6]) femme$/;
+  const nomsDeCaisse = new Set();
+  for (const l of brut.lignes) {
+    const f = reduireCatalogue(l.famille);
+    const d = reduireCatalogue(l.designation);
+    if (!f || !d) continue;
+    nomsDeCaisse.add(`${f}\u0001${d}`);
+    if (FEMME.test(f)) nomsDeCaisse.add(`textile femme\u0001${d}`);
+  }
+  // Les clés des deux semences : ce qui n'en est pas ET porte un nom du fichier
+  // de caisse est un résidu de l'import du 02/09.
+  const semences = new Set();
+  for (const f of ['catalogue-produits-seed.json', 'catalogue-textile-seed.json']) {
+    try {
+      for (const p of JSON.parse(fs.readFileSync(path.join(__dirname, f), 'utf8'))) {
+        const n = nettoyerProduit(p, 0);
+        if (n) semences.add(n.cle);
+      }
+    } catch (_) { /* une semence absente ne désigne rien */ }
+  }
+  const { rows } = await pool.query('SELECT id, cle, famille, designation FROM catalogue_produits');
+  const residus = rows.filter((r) => !semences.has(r.cle)
+    && nomsDeCaisse.has(`${reduireCatalogue(r.famille)}\u0001${reduireCatalogue(r.designation)}`));
+
+  if (residus.length) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const r of residus) await client.query('DELETE FROM catalogue_produits WHERE id = $1', [r.id]);
+      await client.query('COMMIT');
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch (_) { /* la connexion est déjà perdue */ }
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Le même chemin que l'écran de Réglages : l'aperçu, puis l'écriture signée.
+  // Un échec ici laisse la garde LEVÉE : le prochain démarrage réessaie, et les
+  // résidus déjà retirés ne reviennent pas — le fichier les recrée rangés.
+  const apercu = await apercuImportCatalogue(csv);
+  if (apercu.erreur) throw new Error(`fichier de caisse : ${apercu.erreur}`);
+  const fait = await appliquerImportCatalogue(csv, apercu.signature);
+  if (fait.erreur) throw new Error(fait.erreur);
+  await poserMeta('catalogue_sumup_2026_08_26_v1', '1');
+  console.log(`ℹ  Catalogue : fichier de caisse du 26/08 rangé — ${residus.length} résidu(s) de l’import du 02/09 retiré(s), `
+    + `${fait.resume.creees} produit(s) créé(s), ${fait.resume.majs} mis à jour, ${fait.resume.inchangees} déjà juste(s).`);
 }
 
 // L'UNICITÉ DE LA CLÉ, POSÉE EN BASE. C'est elle — pas le code — qui empêche
@@ -3790,7 +3905,7 @@ module.exports = {
   corrigerTarifsTasseMagasin,
   // Exportées pour être rejouées SEULES : pg-mem ne relit pas `schema.sql` deux
   // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
-  semerCatalogueProduits, semerCatalogueTextile, poserUniciteCatalogue,
+  semerCatalogueProduits, semerCatalogueTextile, poserUniciteCatalogue, rangerCatalogueSumup,
   apercuImportCatalogue, appliquerImportCatalogue, 
   getTarifsTasseArticles, setTarifsTasseArticles,
   getTarifsTasseParametres, setTarifsTasseParametres,

@@ -781,7 +781,7 @@ remet pas les temps machine à zéro.
 #### Les règles d'import — `catalogue-import-regles.json`
 
 Ce que l'export ne dit pas, et qu'on ne devine pas. Des **données**, pas du
-code : un rayon qui change ne doit pas demander un déploiement. Trois sortes,
+code : un rayon qui change ne doit pas demander un déploiement. Quatre sortes,
 appliquées dans cet ordre, et **toutes lues sur le rayon d'origine** — celui que
 le patron a sous les yeux dans son tableur :
 
@@ -795,7 +795,33 @@ le patron a sous les yeux dans son tableur :
 2. **`variantes`** — le nom d'une variante, retrouvé par son **prix**, seul
    repère que l'export laisse. Une variante déjà écrite dans le fichier gagne
    toujours sur la règle.
-3. **`familles`** — le rayon SumUp → le rayon du comptoir.
+3. **`produits`** — une ligne du fichier → **le produit du comptoir qu'elle
+   désigne**. C'est la règle qui manquait le 02/09/2026 : le fichier de caisse
+   a été importé en prod sans elle, et « Accessoires / Couteau Multi » est entré
+   à côté de « Art de la table / Couteau Multi / Bois » — cent treize produits
+   créés, une quarantaine de doublons, le même t-shirt dans deux onglets du devis
+   flash à deux prix. `de` vise un rayon + un produit (+ un prix pour ne viser
+   qu'une ligne), `vers` pose le rayon, la désignation, et s'il est écrit le nom
+   de variante. **Un prix donné au produit vaut pour toutes ses variantes** en
+   base (Couteau Multi : Bois et Liège) — ce que SumUp fait déjà de son côté en
+   répétant le prix par variante —, mais **seulement** pour une ligne passée par
+   une règle `produits` : quelqu'un a regardé le catalogue avant de l'écrire.
+   `vers` peut être une **liste** (« Identificateur Valise » vaut pour les trois
+   identificateurs du comptoir).
+4. **`familles`** — le rayon SumUp → le rayon du comptoir, pour ce qu'aucune
+   règle `produits` n'a déjà rangé. Les t-shirts **finis** de la boutique
+   (« 0 UNISEXE / H001… », 35 €) entrent sous « Vêtements — Unisexe / Femme /
+   Enfant » : ce ne sont pas les références **nues** du rayon « Textile », que le
+   devis chiffre au moteur. Les deux existent et ne disent pas la même chose.
+
+**Le fichier de caisse du patron est livré avec le dépôt**
+(`catalogue-sumup-2026-08-26.csv`, l'export SumUp du 26/08) et **rangé au
+démarrage** par `rangerCatalogueSumup` (db.js) : les résidus de l'import du
+02/09 retirés — reconnus par leur rayon et leur désignation de caisse, hors des
+deux semences, donc jamais un produit ajouté à la main —, puis le fichier rejoué
+par les mêmes fonctions que l'écran de Réglages. Une base neuve ressort
+identique à la production ; `test/catalogue-sumup-reel.test.js` le tient sur le
+fichier réel : aucun rayon de caisse, aucun doublon, chaque prix sur son produit.
 
 **Nommer une variante coupe le produit en deux, et c'est le piège.** Tant
 qu'aucune ligne n'est nommée, la ligne « d'ouverture » de SumUp — celle qui
@@ -914,7 +940,8 @@ Deux exceptions assumées :
 │                     grille du patron, et son coût de revient. Pur, sans base
 ├── catalogue-csv.js  lecture du CSV de prix + rapport d'import (pur, sans base)
 ├── catalogue-produits-seed.json  la SEMENCE du catalogue du comptoir (82 lignes vendables)
-├── catalogue-import-regles.json  rayons écartés, variantes nommées, correspondance des rayons
+├── catalogue-import-regles.json  rayons écartés, variantes nommées, correspondance des PRODUITS et des rayons
+├── catalogue-sumup-2026-08-26.csv  le fichier de caisse du patron (export SumUp), rangé au démarrage
 ├── catalogue-textile-seed.json   les 48 références du moteur, semées dans la MÊME table
 │                                 que les objets — identité seule, jamais l'argent
 ├── public/

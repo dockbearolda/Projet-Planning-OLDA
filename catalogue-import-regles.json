@@ -10,17 +10,24 @@
     "Ce fichier est appliqué à CHAQUE import, et l'aperçu DIT ce qu'il a fait, ligne",
     "par ligne : une règle qui agit en silence est une règle qu'on ne relit jamais.",
     "",
-    "ÉTAT AU 01/09/2026 : `familles` est VIDE — la table de correspondance des rayons",
-    "est attendue de Charlie. Tant qu'elle est vide, chaque rayon SumUp entre sous son",
-    "propre nom, et les quinze objets qui existent déjà au catalogue sous un autre",
-    "rayon feraient un doublon. L'import le DIT dans son aperçu avant d'écrire."
+    "CE QUI S'EST PASSÉ LE 02/09/2026, ET QUE CE FICHIER EMPÊCHE DÉSORMAIS. Le fichier",
+    "de caisse a été importé en prod SANS table de correspondance : 113 produits créés,",
+    "dont une quarantaine étaient DÉJÀ au catalogue sous un autre rayon (« Accessoires /",
+    "Couteau Multi » à côté de « Art de la table / Couteau Multi / Bois »), et les",
+    "t-shirts finis de la boutique (« 0 UNISEXE / H001… », 35 €) posés à côté des",
+    "références du moteur textile. Le devis flash montrait le même t-shirt dans deux",
+    "onglets, à deux prix. Les quatre règles ci-dessous — écartés, familles, PRODUITS,",
+    "variantes — font maintenant retomber chaque ligne du fichier sur le produit du",
+    "comptoir qu'elle désigne, ou la rangent sous un rayon qui a un nom. Le résultat",
+    "est tenu par test/catalogue-sumup-reel.test.js, sur le fichier réel."
   ],
 
   "_ecartes": [
     "DES RAYONS QUI NE SONT PAS DES PRODUITS. Le comptoir les traite ailleurs — les",
     "mettre au menu ferait DEUX endroits pour un même prix, et c'est le second qu'on",
     "oublie de corriger. Les lignes concernées sont comptées à part (`ecartees`),",
-    "jamais confondues avec un refus : ce n'est pas une erreur, c'est une décision."
+    "jamais confondues avec un refus : ce n'est pas une erreur, c'est une décision.",
+    "Une règle porte un RAYON, un PRODUIT, ou UNE SEULE LIGNE par son prix (`prix`)."
   ],
   "ecartes": [
     {
@@ -53,6 +60,22 @@
       "pourquoi": "Il n'y a PAS de porte-clés à 9 € (Charlie, 01/09) : cette ligne du fichier ne correspond à rien qu'on vende. « Friendly Books » à 9 €, c'est le MAGNET. Écartée et non refusée — ce n'est pas une erreur de lecture, c'est une décision, et les trois autres lignes du porte-clés entrent normalement."
     },
     {
+      "famille": "Verre",
+      "designation": "Verre à Ti Punch",
+      "prix": 14,
+      "pourquoi": "« Verre Ti punch 12 » (Charlie, 01/09) : le verre vaut 12 €, et c'est cette ligne-là qui entre. Ce qu'est la ligne à 14 € du fichier, personne ne le sait — écartée pour que les deux ne se contredisent plus et que le verre à 12 € cesse d'être refusé avec elle."
+    },
+    {
+      "famille": "Papeterie",
+      "designation": "Grand Bloc Note A5",
+      "pourquoi": "Sans prix au fichier, et le comptoir a déjà un « Grand Bloc Note Similicuir A5 » et un « Bloc Note Liège A5 » : on ne sait pas lequel des deux c'est. Créer un troisième bloc-notes A5 sans prix ne tarifierait rien et ferait une ligne de plus à trier au menu."
+    },
+    {
+      "famille": "Papeterie",
+      "designation": "Petit Bloc Note A6",
+      "pourquoi": "Sans prix au fichier, et le comptoir a déjà un « Bloc Note Liège A6 » : même raison que le Grand Bloc Note A5 — rien à tarifer, une ligne de plus à trier."
+    },
+    {
       "famille": "perso textile",
       "pourquoi": "Même décision : les paliers « Avec / Sans textiles OLDA » et « Reprise Logo » sont du travail graphique sur textile — la grille de réglage que le textile n'a pas encore, et que la tasse a déjà."
     }
@@ -60,22 +83,96 @@
 
   "_familles": [
     "LE RAYON SUMUP → LE RAYON DU COMPTOIR. `de` se compare sans casse ni accent.",
-    "Une famille absente d'ici entre sous son propre nom.",
+    "Une famille absente d'ici entre sous son propre nom. Une règle `produits` qui pose",
+    "elle-même un rayon passe AVANT celle-ci.",
     "",
-    "SEULE ENTRÉE CONFIRMÉE À CE JOUR : la fusion des six rayons « FEMME ». L'export",
-    "a mis l'indice de variante dans la colonne du rayon — « 2 FEMME » à « 6 FEMME »",
-    "ne portent que F001 et F002, à 39 €, pendant que « 01 FEMME » les porte SANS",
-    "prix. Les fondre règle les deux : un seul rayon, et F001/F002 reçoivent 39 €",
+    "LES VÊTEMENTS FINIS DE LA BOUTIQUE. « 0 UNISEXE », « 01 FEMME », « 02 ENFANT » sont",
+    "les t-shirts imprimés que le magasin vend tout faits (codes H001, F003, E001…), à",
+    "leur prix de rayon. Ce ne sont PAS les références du moteur textile (rayon",
+    "« Textile », NS300…) : celles-là sont des vêtements NUS que le devis CHIFFRE —",
+    "quantité, marquage, genre. Les deux existent, et ils ne disent pas la même chose :",
+    "un rayon « Vêtements — … » pour le fini, le rayon « Textile » pour ce qui se marque.",
+    "L'export a mis l'indice de variante dans la colonne du rayon — « 2 FEMME » à",
+    "« 6 FEMME » ne portent que F001 et F002, à 39 €, pendant que « 01 FEMME » les porte",
+    "SANS prix. Les fondre règle les deux : un seul rayon, et F001/F002 reçoivent 39 €",
     "(une case vide ne contredit rien, c'est la règle de fusion de l'import).",
-    "Le NOM « Textile — Femme » est ma proposition : une ligne à changer."
+    "",
+    "« Jeux » est « Jeux & loisirs » au comptoir, « Planches » range sa planche avec",
+    "« Art de la table », et « Art de la Table » n'est que la casse du même rayon.",
+    "« Accessoires » et « Offres Spéciales » sont des rayons de CAISSE, pas de comptoir :",
+    "ce qui s'y trouve va soit sur son produit existant (règle `produits`), soit dans",
+    "« Du quotidien » pour ce qui n'existait pas encore."
   ],
   "familles": [
-    { "de": "01 FEMME", "vers": "Textile — Femme" },
-    { "de": "2 FEMME", "vers": "Textile — Femme" },
-    { "de": "3 FEMME", "vers": "Textile — Femme" },
-    { "de": "4 FEMME", "vers": "Textile — Femme" },
-    { "de": "5 FEMME", "vers": "Textile — Femme" },
-    { "de": "6 FEMME", "vers": "Textile — Femme" }
+    { "de": "0 UNISEXE", "vers": "Vêtements — Unisexe" },
+    { "de": "01 FEMME", "vers": "Vêtements — Femme" },
+    { "de": "2 FEMME", "vers": "Vêtements — Femme" },
+    { "de": "3 FEMME", "vers": "Vêtements — Femme" },
+    { "de": "4 FEMME", "vers": "Vêtements — Femme" },
+    { "de": "5 FEMME", "vers": "Vêtements — Femme" },
+    { "de": "6 FEMME", "vers": "Vêtements — Femme" },
+    { "de": "02 ENFANT", "vers": "Vêtements — Enfant" },
+    { "de": "Jeux", "vers": "Jeux & loisirs" },
+    { "de": "Art de la Table", "vers": "Art de la table" },
+    { "de": "Planches", "vers": "Art de la table" },
+    { "de": "Accessoires", "vers": "Du quotidien" },
+    { "de": "Offres Spéciales", "vers": "Du quotidien" }
+  ],
+
+  "_produits": [
+    "UNE LIGNE DU FICHIER → LE PRODUIT DU COMPTOIR QU'ELLE DÉSIGNE. C'est la règle qui",
+    "manquait le 02/09 : « Accessoires / Couteau Multi » est le « Couteau Multi » de",
+    "« Art de la table », pas un deuxième couteau.",
+    "",
+    "`de` se lit sur le rayon D'ORIGINE (sans casse ni accent), avec un `prix` en plus",
+    "pour ne viser qu'une ligne. `vers` pose le rayon, la désignation et, s'il est écrit,",
+    "le nom de variante (« » = le produit sans variante). Une clé absente de `vers` ne",
+    "change rien à la ligne.",
+    "",
+    "UN PRIX DONNÉ AU PRODUIT VAUT POUR TOUTES SES VARIANTES. Quand `vers` ne nomme pas",
+    "de variante et que le comptoir en a plusieurs (Couteau Multi : Bois et Liège, tous",
+    "deux à 14 €), la ligne se pose sur chacune — c'est exactement ce que SumUp fait de",
+    "son côté en répétant le même prix par variante. Ça ne vaut QUE pour une ligne",
+    "passée par une règle `produits` : quelqu'un a regardé le catalogue avant de l'écrire.",
+    "",
+    "`vers` peut être une LISTE : « Identificateur Valise » à 9 € vaut pour les trois",
+    "identificateurs du comptoir (Cuir PU en quatre couleurs, Liège, Métal), tous à 9 €."
+  ],
+  "produits": [
+    { "de": { "famille": "Accessoires", "designation": "Couteau Multi" },
+      "vers": { "famille": "Art de la table", "designation": "Couteau Multi" } },
+    { "de": { "famille": "Accessoires", "designation": "Flasque Bois" },
+      "vers": { "famille": "Art de la table", "designation": "Flasque Bois" } },
+    { "de": { "famille": "Accessoires", "designation": "Limonadier Bois" },
+      "vers": { "famille": "Art de la table", "designation": "Limonadier Bois" } },
+    { "de": { "famille": "Accessoires", "designation": "Grand Miroir Liège" },
+      "vers": { "famille": "Du quotidien", "designation": "Miroir Liège", "variante": "XL" } },
+    { "de": { "famille": "Accessoires", "designation": "Petit Miroir Liège" },
+      "vers": { "famille": "Du quotidien", "designation": "Miroir Liège", "variante": "Petit" } },
+    { "de": { "famille": "Accessoires", "designation": "Pince à Billet" },
+      "vers": { "famille": "Du quotidien", "designation": "Pince à billet" } },
+    { "de": { "famille": "Accessoires", "designation": "Porte Sac" },
+      "vers": { "famille": "Du quotidien", "designation": "Porte sac" } },
+    { "de": { "famille": "Accessoires", "designation": "Identificateur Valise" },
+      "vers": [
+        { "famille": "Voyage", "designation": "Identificateur Valise Cuir PU" },
+        { "famille": "Voyage", "designation": "Identificateur Valise Liège" },
+        { "famille": "Voyage", "designation": "Identificateur Valise Métal" }
+      ] },
+    { "de": { "famille": "Art de la Table", "designation": "Dessous Verre", "prix": 4.5 },
+      "vers": { "famille": "Art de la table", "designation": "Dessous de verre Liège", "variante": "" } },
+    { "de": { "famille": "Art de la Table", "designation": "Dessous Verre" },
+      "vers": { "famille": "Art de la table", "designation": "Dessous de verre Liège" } },
+    { "de": { "famille": "Art de la Table", "designation": "Plateau en Liège" },
+      "vers": { "famille": "Art de la table", "designation": "Plateau Liège" } },
+    { "de": { "famille": "Gourdes", "designation": "Gourde 800 ml" },
+      "vers": { "famille": "Gourdes", "designation": "Gourde 800 ml Métal" } },
+    { "de": { "famille": "Offres Spéciales", "designation": "Décapsuleur Bois" },
+      "vers": { "famille": "Art de la table", "designation": "Décapsuleur Bois" } },
+    { "de": { "famille": "Planches", "designation": "Petite planche à découper Aulne" },
+      "vers": { "famille": "Art de la table", "designation": "Planche à découper Aulne", "variante": "Petite" } },
+    { "de": { "famille": "Goodies", "designation": "Porte-clés" },
+      "vers": { "famille": "Porte-clés" } }
   ],
 
   "_variantes": [
@@ -106,6 +203,12 @@
     "27 ÷ 3 = 9, Porte-clés Plexiglass 15 ÷ 3 = 5. Contrôle : le Pack Sticker à 12 €",
     "donne 4 €, et le Sticker EST à 4 €.",
     "",
+    "DESSOUS VERRE : « dessous de verre 1,2,6 » (Charlie, 01/09) pour 4,50 / 15 / 19.",
+    "La ligne à 4,50 € EST le « Dessous de verre Liège » que le comptoir avait déjà",
+    "(règle `produits`, par son prix) ; les deux autres deviennent ses variantes",
+    "« 2 pièces » et « 6 pièces ». La dégressivité n'est PAS régulière (2 pièces à 15 €",
+    "font 7,50 la pièce, contre 4,50 à l'unité) : signalé, et le prix du patron fait foi.",
+    "",
     "Le magnet et le porte-clés acrylique et bois se raréfient — « on en produit",
     "plus beaucoup » (Charlie, 01/09). Ce n'est pas une raison de les retirer du",
     "catalogue ; c'est une raison de ne pas en promettre cinquante au comptoir."
@@ -133,7 +236,6 @@
     { "famille": "Sous-traitance", "designation": "Livres The Friendly Books", "prix": 59, "variante": "Grand" },
     { "famille": "Sous-traitance", "designation": "Livres The Friendly Books", "prix": 39, "variante": "Petit" },
 
-    { "famille": "Art de la Table", "designation": "Dessous Verre", "prix": 4.5, "variante": "1 pièce" },
     { "famille": "Art de la Table", "designation": "Dessous Verre", "prix": 15, "variante": "2 pièces" },
     { "famille": "Art de la Table", "designation": "Dessous Verre", "prix": 19, "variante": "6 pièces" }
   ],
@@ -149,30 +251,18 @@
     "Expresso 14, Bois 22, Fuck 18 — les quatre concordent, et la grille de",
     "chiffrage sort déjà les trois premiers (PR #188).",
     "",
-    "LES GOODIES SONT TRANCHÉS AUSSI (01/09), et c'est le gros du reste : le magnet",
-    "et le porte-clés à 7 € sont l'acrylique et le bois ; il n'y a pas de porte-clés",
-    "à 9 €. Sept produits entrent proprement là où quatre lignes se contredisaient.",
+    "IL RESTE CECI, ET CHARLIE A DIT « POUR LE RESTE ON S'EN FOUT » (01/09) :",
     "",
-    "IL RESTE CECI, ET CHARLIE A DIT « POUR LE RESTE ON S'EN FOUT » (01/09). Ces",
-    "lignes restent donc REFUSÉES à l'import, avec leur raison : rien de faux",
-    "n'entre au catalogue, et on n'y revient pas tant que personne ne le demande.",
-    "",
-    "· Verre / Verre à Ti Punch — deux lignes, 12 et 14 €. Charlie a dit « Verre Ti",
-    "  punch 12 » : c'est le prix du verre. Ce qu'est la ligne à 14 € reste inconnu,",
-    "  les deux se contredisent, les deux sont refusées.",
     "· Sous-traitance / Armelle B — 49, 69, 89, 6 et 25 €, cinq variantes sans nom",
-    "  et sans pack pour les déduire.",
-    "· Offres Spéciales — prix normal, ou prix PROMO ? Quatre de ses cinq articles",
-    "  sont déjà au catalogue sous un autre rayon.",
-    "· LA TABLE DE CORRESPONDANCE DES RAYONS reste le plus gros : sans elle, une",
-    "  quinzaine d'objets entrent EN DOUBLE (le Décapsuleur Bois à 6 € sous",
-    "  « Offres Spéciales », et sans prix sous « Art de la table »).",
+    "  et sans pack pour les déduire. Refusées, avec leur raison.",
+    "· Sous-traitance / Livres The Friendly Books — le fichier répète Grand (59) et",
+    "  Petit (39) une seconde fois : les deux répétitions restent sans nom, refusées.",
+    "  Les deux livres, eux, entrent.",
     "",
-    "DESSOUS VERRE EST TRANCHÉ (01/09) : trois lignes tarifées, 4,50 / 15 / 19, et",
-    "Charlie a dit « dessous de verre 1,2,6 ». Elles sont nommées dans l'ordre",
-    "croissant des prix — 1 pièce, 2 pièces, 6 pièces. La dégressivité n'est PAS",
-    "régulière (2 pièces à 15 € font 7,50 la pièce, contre 4,50 à l'unité) : ça a",
-    "été signalé, et le prix du patron fait foi. Une seule ligne à changer si",
-    "l'ordre n'est pas celui-là."
+    "CE QUI RESTE À RAPPROCHER À LA MAIN, parce que les noms ne suffisent pas à dire",
+    "si c'est le même objet : « Goodies / Porte-clés Acrylique et Bois » (7 €) à côté",
+    "des huit porte-clés nommés du comptoir (tous à 7 €) ; « Veilleuse Lumineuse Seule »",
+    "(35 €) à côté du « Sabot veilleuse bois » sans prix ; « Casquette Brodée » (35 €,",
+    "finie) à côté de la « Casquette Trucker » du moteur (nue, à chiffrer)."
   ]
 }

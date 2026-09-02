@@ -286,5 +286,114 @@ for (const e of brut.ecartes) {
   assert.ok(String(e.pourquoi || '').trim().length > 20,
     `« ${e.famille} » est écarté sans raison écrite — dans six mois, personne ne saura pourquoi`);
 }
+// Une règle de produit dit d'où elle part et où elle va — les deux, sinon elle
+// ne fait rien et personne ne le voit.
+const cibles = new Set();
+for (const p of brut.produits) {
+  assert.ok(p.de && p.de.famille && p.de.designation, 'une règle de produit part d’un rayon ET d’un produit');
+  const vers = Array.isArray(p.vers) ? p.vers : [p.vers];
+  assert.ok(vers.length && vers.every((v) => v && (v.famille || v.designation || v.variante !== undefined)),
+    `« ${p.de.famille} / ${p.de.designation} » : une destination qui ne change rien n’est pas une règle`);
+  const k = `${reduire(p.de.famille)}|${reduire(p.de.designation)}|${p.de.prix == null ? '' : Number(p.de.prix)}`;
+  assert.ok(!cibles.has(k), `deux règles de produit pour « ${p.de.famille} / ${p.de.designation} » : l’une écraserait l’autre`);
+  cibles.add(k);
+}
 
-console.log('✓ règles d’import : un rayon écarté n’est pas un refus, une variante se nomme, et rien ne reste fantôme');
+// --- 7. Une ligne du fichier retombe sur le PRODUIT du comptoir ---------------
+// C'est la règle qui manquait le 02/09 : « Accessoires / Couteau Multi » est le
+// « Couteau Multi » de « Art de la table », pas un deuxième couteau — et son prix
+// vaut pour ses deux variantes, Bois et Liège, exactement comme SumUp répète le
+// même prix par variante de son côté.
+{
+  const base = [
+    { id: 'c1', famille: 'Art de la table', designation: 'Couteau Multi', variante: 'Bois', prixVenteTtc: 13, actif: true },
+    { id: 'c2', famille: 'Art de la table', designation: 'Couteau Multi', variante: 'Liège', prixVenteTtc: 14, actif: true },
+    { id: 'm1', famille: 'Du quotidien', designation: 'Miroir Liège', variante: 'XL', prixVenteTtc: null, actif: true },
+    { id: 'm2', famille: 'Du quotidien', designation: 'Miroir Liège', variante: 'Petit', prixVenteTtc: 11, actif: true },
+    { id: 'i1', famille: 'Voyage', designation: 'Identificateur Valise Liège', variante: '', prixVenteTtc: null, actif: true },
+    { id: 'i2', famille: 'Voyage', designation: 'Identificateur Valise Cuir PU', variante: 'Brun', prixVenteTtc: null, actif: true },
+    { id: 'i3', famille: 'Voyage', designation: 'Identificateur Valise Cuir PU', variante: 'Noir', prixVenteTtc: 9, actif: true },
+    { id: 'd1', famille: 'Art de la table', designation: 'Dessous de verre Liège', variante: '', prixVenteTtc: 4.5, actif: true },
+  ];
+  const PRODUITS = {
+    familles: [{ de: 'Accessoires', vers: 'Du quotidien' }],
+    produits: [
+      { de: { famille: 'Accessoires', designation: 'Couteau Multi' },
+        vers: { famille: 'Art de la table', designation: 'Couteau Multi' } },
+      { de: { famille: 'Accessoires', designation: 'Grand Miroir Liège' },
+        vers: { famille: 'Du quotidien', designation: 'Miroir Liège', variante: 'XL' } },
+      { de: { famille: 'Accessoires', designation: 'Identificateur Valise' },
+        vers: [{ famille: 'Voyage', designation: 'Identificateur Valise Liège' },
+          { famille: 'Voyage', designation: 'Identificateur Valise Cuir PU' }] },
+      { de: { famille: 'Art de la Table', designation: 'Dessous Verre', prix: 4.5 },
+        vers: { famille: 'Art de la table', designation: 'Dessous de verre Liège', variante: '' } },
+      { de: { famille: 'Art de la Table', designation: 'Dessous Verre' },
+        vers: { famille: 'Art de la table', designation: 'Dessous de verre Liège' } },
+    ],
+    variantes: [
+      { famille: 'Art de la Table', designation: 'Dessous Verre', prix: 15, variante: '2 pièces' },
+      { famille: 'Art de la Table', designation: 'Dessous Verre', prix: 19, variante: '6 pièces' },
+    ],
+  };
+  const r = analyserImport([
+    'Category;Item name;Price',
+    'Accessoires;Couteau Multi;',
+    'Accessoires;Couteau Multi;14',
+    'Accessoires;Couteau Multi;14',
+    'Accessoires;Grand Miroir Liège;14',
+    'Accessoires;Identificateur Valise;9',
+    'Accessoires;Bracelet;19',
+    'Art de la Table;Dessous Verre;',
+    'Art de la Table;Dessous Verre;4.5',
+    'Art de la Table;Dessous Verre;15',
+    'Art de la Table;Dessous Verre;19',
+  ].join('\n'), base, PRODUITS);
+
+  assert.strictEqual(r.resume.refusees, 0, `rien à refuser : ${JSON.stringify(r.lignes.filter((l) => l.refus.length))}`);
+  // Le couteau : UNE ligne du fichier, DEUX variantes en base. Bois passe de 13 à
+  // 14, Liège était déjà juste — pas de troisième couteau.
+  assert.ok(!r.plan.creations.some((c) => c.designation === 'Couteau Multi'), 'pas de troisième couteau');
+  assert.deepStrictEqual(r.plan.majs.filter((m) => m.designation === 'Couteau Multi').map((m) => [m.id, m.changements]),
+    [['c1', [{ champ: 'prixVenteTtc', avant: 13, apres: 14 }]]], 'le prix se pose sur la variante qui n’avait pas le bon');
+  const lc = r.lignes.find((l) => l.numero === 3);
+  assert.strictEqual(lc.action, 'maj');
+  assert.strictEqual(lc.famille, 'Art de la table', 'la ligne dit où elle est allée');
+  assert.strictEqual(lc.rangeDepuis, 'Accessoires', '… et d’où elle vient');
+  // Le miroir : la règle nomme la variante, la ligne va sur CELLE-LÀ seulement.
+  assert.deepStrictEqual(r.plan.majs.filter((m) => m.designation === 'Miroir Liège').map((m) => [m.id, m.variante]),
+    [['m1', 'XL']], 'le grand miroir ne tarife pas le petit');
+  const lm = r.lignes.find((l) => l.numero === 5);
+  assert.strictEqual(lm.renommeDepuis, 'Grand Miroir Liège', 'la ligne dit sous quel nom le fichier l’écrivait');
+  // L'identificateur : une ligne, DEUX produits, TROIS lignes en base — les deux
+  // qui n'avaient pas de prix le reçoivent, la troisième était juste.
+  assert.deepStrictEqual(r.plan.majs.filter((m) => /Identificateur/.test(m.designation)).map((m) => m.id).sort(),
+    ['i1', 'i2'], 'une liste de destinations pose le prix sur chacune');
+  assert.ok(!r.plan.creations.some((c) => /Identificateur/.test(c.designation)));
+  // Le bracelet : pas de règle de produit, la règle de rayon suffit.
+  const bracelet = r.plan.creations.find((c) => c.designation === 'Bracelet');
+  assert.strictEqual(bracelet.famille, 'Du quotidien');
+  // Le dessous de verre : la ligne à 4,50 € EST le produit sans variante du
+  // comptoir (règle par son prix) ; 15 et 19 deviennent ses variantes. La ligne
+  // d'ouverture est absorbée, et la ligne à 4,50 € n'est PAS refusée comme
+  // « variante inconnue » sous prétexte que ses sœurs ont un nom : une règle
+  // l'a placée.
+  assert.strictEqual(r.lignes.find((l) => l.numero === 8).action, 'ecartee', 'la ligne d’ouverture est absorbée');
+  assert.strictEqual(r.lignes.find((l) => l.numero === 9).action, 'inchangee', '4,50 € : c’est le produit existant, déjà juste');
+  assert.deepStrictEqual(r.plan.creations.filter((c) => c.designation === 'Dessous de verre Liège')
+    .map((c) => [c.variante, c.prixVenteTtc]), [['2 pièces', 15], ['6 pièces', 19]]);
+  assert.ok(!r.plan.creations.some((c) => c.designation === 'Dessous Verre'), 'le nom de caisse ne survit pas');
+
+  // UNE LIGNE SANS VARIANTE QUI N'EST PASSÉE PAR AUCUNE RÈGLE ne se répand PAS
+  // sur les variantes du comptoir : personne n'a regardé le catalogue pour elle.
+  const sansRegle = analyserImport('Category;Item name;Price\nArt de la table;Couteau Multi;20', base, {});
+  assert.strictEqual(sansRegle.resume.creees, 1, 'sans règle, une ligne sans variante est un produit à part');
+  assert.strictEqual(sansRegle.resume.majs, 0, '… et ne retarife pas Bois et Liège en silence');
+
+  // UNE DESTINATION QUI N'EXISTE PAS ENCORE se crée sous SON nom — la règle a
+  // décidé du nom, pas le fichier.
+  const neuf = analyserImport('Category;Item name;Price\nAccessoires;Couteau Multi;14', [], PRODUITS);
+  assert.deepStrictEqual(neuf.plan.creations.map((c) => [c.famille, c.designation, c.variante, c.prixVenteTtc]),
+    [['Art de la table', 'Couteau Multi', '', 14]]);
+}
+
+console.log('✓ règles d’import : un rayon écarté n’est pas un refus, une variante se nomme, une ligne retombe sur son produit, et rien ne reste fantôme');

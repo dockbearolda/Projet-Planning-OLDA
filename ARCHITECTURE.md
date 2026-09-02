@@ -189,7 +189,7 @@ Statuts : **Actif** (utilisé par un écran ou un outil), **Mort** (aucun écran
 | Archivage et corbeille | Supprimer = archiver ; restauration depuis Réglages | Actif | `server.js:3129`, `server.js:3151`, `server.js:1747`, `public/reglages.js:618` |
 | Copie de commande, envoi Fiverr | Duplique une ligne, éventuellement dans une autre famille | Actif | `server.js:2491` |
 | Composants partagés | Calendrier, modale, en-tête d'écran, bulle d'aide, menu avec recherche | Actif | `public/calendrier.js`, `public/modale.js`, `public/ecran-tete.js`, `public/aide-bulle.js`, `public/menu-recherche.js` |
-| Import de prix CSV | Aperçu signé, puis écriture en une transaction | Actif | `catalogue-csv.js`, `catalogue-import-regles.json`, `server.js:1091-1103` |
+| Import de prix CSV | Aperçu signé, puis écriture en une transaction ; le fichier de caisse du patron est livré et rangé au démarrage | Actif | `catalogue-csv.js`, `catalogue-import-regles.json`, `catalogue-sumup-2026-08-26.csv`, `db.js` (`rangerCatalogueSumup`), `server.js:1091-1103` |
 | Ancien « Nouveau Projet » interne (`POST /api/projets`) | L'ancien parcours du CRM, remplacé le 31/07 par les écrans du patron | **Mort** côté écran (10 fichiers de test l'exercent encore) | `server.js:3727-4682`, `catalog.json` |
 | Routes de référence sans appelant | `/api/stages`, `/api/commande/catalog`, `/api/delais`, `/api/pipeline` | **Mort** | `server.js:954`, `server.js:3807`, `server.js:2058`, `server.js:3805` |
 | Projets (regroupement + prochaine action) | Table, quatre routes, migration des lots, interrupteur `projets` | **Mort** côté écran (aucun écran ne les appelle ; l'interrupteur s'affiche mais rien ne le lit) | `schema.sql` (`projects`), `server.js:1932-2049`, `db.js:3086` |

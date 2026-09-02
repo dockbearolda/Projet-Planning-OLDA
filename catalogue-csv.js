@@ -202,7 +202,7 @@ function booleen(brut) {
 // « Art de la Table » et « Art de la table » sont le même rayon ; le patron ne
 // tape pas deux fois la même majuscule, et ce n'est pas à lui de le faire.
 function cleProduit(famille, designation, variante) {
-  return [reduire(famille), reduire(designation), reduire(variante)].join('');
+  return [reduire(famille), reduire(designation), reduire(variante)].join('\u0001');
 }
 
 // --- LES RÈGLES D'IMPORT ----------------------------------------------------
@@ -265,7 +265,54 @@ function preparerRegles(brut) {
     variantes.set(`${reduire(v.famille)}\u0001${reduire(v.designation)}\u0001${Number(v.prix)}`,
       noms);
   }
-  return { ecartes, familles, variantes, actives: ecartes.size + familles.size + variantes.size };
+  // UNE LIGNE DU FICHIER → LE PRODUIT DU COMPTOIR QU'ELLE DÉSIGNE. C'est la règle
+  // qui manquait le 02/09/2026 : « Accessoires / Couteau Multi » est le « Couteau
+  // Multi » de « Art de la table », pas un deuxième couteau — et l'import en a
+  // créé cent treize comme ça en production, dont une quarantaine de doublons.
+  // `de` se lit sur le rayon d'origine, avec un prix en plus pour ne viser
+  // qu'une ligne (le dessous de verre à 4,50 € EST le produit sans variante ; ses
+  // sœurs à 15 et 19 € en deviennent les variantes). `vers` peut être une LISTE :
+  // la ligne vaut alors pour chacun des produits nommés.
+  const produits = new Map();
+  for (const p of Array.isArray(r.produits) ? r.produits : []) {
+    if (!p || !p.de || !p.de.famille || !p.de.designation || !p.vers) continue;
+    const vers = (Array.isArray(p.vers) ? p.vers : [p.vers])
+      .filter((v) => v && typeof v === 'object')
+      .map((v) => ({
+        famille: v.famille ? String(v.famille) : '',
+        designation: v.designation ? String(v.designation) : '',
+        variante: v.variante === undefined || v.variante === null ? undefined : String(v.variante),
+      }));
+    if (!vers.length) continue;
+    const bouts = [reduire(p.de.famille), reduire(p.de.designation)];
+    if (p.de.prix != null) bouts.push(String(Number(p.de.prix)));
+    produits.set(bouts.join('\u0001'), vers);
+  }
+  return {
+    ecartes, familles, variantes, produits,
+    actives: ecartes.size + familles.size + variantes.size + produits.size,
+  };
+}
+
+// Pose une destination de règle `produits` sur une ligne, et NOTE ce qui a
+// changé : le rapport doit pouvoir dire d'où la ligne vient et sous quel nom
+// le fichier l'écrivait.
+function placer(l, vers) {
+  if (vers.famille && vers.famille !== l.famille) {
+    l.rangeDepuis = l.famille;
+    l.famille = vers.famille;
+  }
+  if (vers.famille) l.familleFixee = true;
+  if (vers.designation && vers.designation !== l.designation) {
+    l.renommeDepuis = l.designation;
+    l.designation = vers.designation;
+  }
+  if (vers.variante !== undefined) {
+    l.variante = vers.variante;
+    // La règle a décidé de la variante — y compris « aucune ». La ligne n'est
+    // donc pas une « variante inconnue » quand ses sœurs portent un nom.
+    l.placee = true;
+  }
 }
 
 // --- L'analyse --------------------------------------------------------------
@@ -312,6 +359,8 @@ function lireLigne(cases, par) {
 }
 
 const CHAMPS_IMPORTES = ['reference', 'prixAchat', 'prixVenteTtc', 'tempsMoMin', 'tempsMachineMin', 'actif'];
+// Ce qu'une entrée du plan retient de la ligne, en plus de ces champs.
+const CHAMPS_IDENTITE = ['famille', 'designation', 'variante'];
 
 // `existants` : les lignes déjà en base, forme
 //   { id, famille, designation, variante, reference, prixAchat, prixVenteTtc,
@@ -396,10 +445,24 @@ function analyserImport(texte, existants, reglesBrutes) {
       }
     }
 
-    // 3. LE RAYON DU COMPTOIR. En dernier : les deux règles au-dessus se
-    //    lisent sur le rayon d'origine.
+    // 3. LE PRODUIT DU COMPTOIR que la ligne désigne. La ligne d'abord (rayon +
+    //    produit + prix), puis le produit : la règle la plus précise l'emporte.
+    //    Une liste de destinations se garde entière : la ligne vaudra pour
+    //    chacune au moment de comparer à la base.
+    const regleProduit = (l.prixVenteTtc != null
+        && regles.produits.get(`${cleProduit}\u0001${l.prixVenteTtc}`))
+      || regles.produits.get(cleProduit);
+    if (regleProduit) {
+      placer(l, regleProduit[0]);
+      if (regleProduit.length > 1) l.cibles = regleProduit;
+      l.parRegle = true;
+    }
+
+    // 4. LE RAYON DU COMPTOIR. En dernier : les règles au-dessus se lisent sur
+    //    le rayon d'origine — et une règle de produit qui a posé le rayon
+    //    elle-même passe avant.
     const versFamille = regles.familles.get(cleFamille);
-    if (versFamille && versFamille !== l.famille) {
+    if (!l.familleFixee && versFamille && versFamille !== l.famille) {
       l.rangeDepuis = l.famille;
       l.famille = versFamille;
     }
@@ -435,7 +498,7 @@ function analyserImport(texte, existants, reglesBrutes) {
       l.absorbee = 'ligne d’ouverture du produit (aucune valeur) : fondue dans ses variantes';
       continue;
     }
-    if (!l.variante && nommes.has(l.produit) && l.prixVenteTtc != null) {
+    if (!l.variante && !l.placee && nommes.has(l.produit) && l.prixVenteTtc != null) {
       l.refus.push(`variante inconnue pour ${l.prixVenteTtc} € — les autres lignes de `
         + `« ${l.designation} » ont été nommées, pas celle-ci. Ajoute sa règle dans `
         + 'catalogue-import-regles.json, ou une colonne « Variante » au fichier.');
@@ -455,7 +518,7 @@ function analyserImport(texte, existants, reglesBrutes) {
   const fusions = new Map();
   for (const [cle, groupe] of paquets) {
     const fusion = { cle, numeros: groupe.map((l) => l.numero) };
-    for (const champ of ['famille', 'designation', 'variante']) fusion[champ] = groupe[0][champ];
+    for (const champ of ['famille', 'designation', 'variante', 'cibles', 'parRegle']) fusion[champ] = groupe[0][champ];
     let conflit = null;
     for (const champ of CHAMPS_IMPORTES) {
       let valeur = null;
@@ -485,35 +548,64 @@ function analyserImport(texte, existants, reglesBrutes) {
 
   // 3e passage : comparer à la base.
   const enBase = new Map();
+  // Les lignes de la base par PRODUIT (rayon + désignation), toutes variantes
+  // confondues — pour qu'un prix donné au produit se pose sur chacune.
+  const parProduitBase = new Map();
   for (const p of Array.isArray(existants) ? existants : []) {
     enBase.set(cleProduit(p.famille, p.designation, p.variante), p);
+    const k = `${reduire(p.famille)}\u0001${reduire(p.designation)}`;
+    if (!parProduitBase.has(k)) parProduitBase.set(k, []);
+    parProduitBase.get(k).push(p);
   }
 
   const creations = [];
   const majs = [];
   const inchangees = [];
   for (const fusion of fusions.values()) {
-    const deja = enBase.get(fusion.cle);
-    if (!deja) {
-      creations.push(fusion);
-      for (const l of lignes) if (l.cle === fusion.cle && !l.refus.length) l.action = 'creation';
-      continue;
+    // CE QUE LA LIGNE DÉSIGNE : un produit, ou la LISTE qu'une règle a posée.
+    // Une destination sans rayon garde celui de la ligne, sans désignation garde
+    // la sienne, sans variante écrite garde la sienne aussi.
+    const cibles = (fusion.cibles || [{}]).map((v) => ({
+      famille: v.famille || fusion.famille,
+      designation: v.designation || fusion.designation,
+      variante: v.variante !== undefined ? v.variante : fusion.variante,
+    }));
+    let action = 'inchangee';
+    for (const c of cibles) {
+      const exacte = enBase.get(cleProduit(c.famille, c.designation, c.variante));
+      let dejas = exacte ? [exacte] : [];
+      // UN PRIX DONNÉ AU PRODUIT VAUT POUR TOUTES SES VARIANTES. « Couteau Multi
+      // 14 € » sans variante, quand le comptoir a Bois et Liège : la ligne se pose
+      // sur les deux — c'est ce que SumUp fait de son côté en répétant le même
+      // prix par variante. Réservé aux lignes passées par une règle `produits` :
+      // quelqu'un a regardé le catalogue avant de l'écrire. Sans règle, une ligne
+      // sans variante est un produit à part, comme avant.
+      if (!dejas.length && fusion.parRegle && !c.variante) {
+        dejas = parProduitBase.get(`${reduire(c.famille)}\u0001${reduire(c.designation)}`) || [];
+      }
+      if (!dejas.length) {
+        creations.push({ ...fusion, ...c });
+        action = 'creation';
+        continue;
+      }
+      for (const deja of dejas) {
+        const changements = [];
+        for (const champ of CHAMPS_IMPORTES) {
+          const neuf = fusion[champ];
+          if (neuf == null || neuf === '') continue;      // le fichier ne dit rien : on ne touche pas
+          const ancien = deja[champ] == null ? null : deja[champ];
+          if (ancien === neuf) continue;
+          changements.push({ champ, avant: ancien, apres: neuf });
+        }
+        if (!changements.length) {
+          inchangees.push({ ...fusion, ...c });
+          continue;
+        }
+        majs.push({ ...fusion, ...c, variante: deja.variante || '', id: deja.id, changements });
+        if (action !== 'creation') action = 'maj';
+      }
     }
-    const changements = [];
-    for (const champ of CHAMPS_IMPORTES) {
-      const neuf = fusion[champ];
-      if (neuf == null || neuf === '') continue;      // le fichier ne dit rien : on ne touche pas
-      const ancien = deja[champ] == null ? null : deja[champ];
-      if (ancien === neuf) continue;
-      changements.push({ champ, avant: ancien, apres: neuf });
-    }
-    if (!changements.length) {
-      inchangees.push(fusion);
-      for (const l of lignes) if (l.cle === fusion.cle && !l.refus.length) l.action = 'inchangee';
-      continue;
-    }
-    majs.push({ ...fusion, id: deja.id, changements });
-    for (const l of lignes) if (l.cle === fusion.cle && !l.refus.length) l.action = 'maj';
+    for (const l of lignes) if (l.cle === fusion.cle && !l.refus.length) l.action = action;
   }
 
   const refusees = lignes.filter((l) => l.refus.length);
@@ -553,6 +645,9 @@ function analyserImport(texte, existants, reglesBrutes) {
       // rayon ou lui pose un nom de variante.
       ecarte: l.ecarte || l.absorbee || null,
       rangeDepuis: l.rangeDepuis || null,
+      // Le nom que le fichier donnait au produit, quand une règle l'a renommé
+      // (« Gourde 800 ml » → « Gourde 800 ml Métal »).
+      renommeDepuis: l.renommeDepuis || null,
       varianteNommee: !!l.varianteNommee,
       // Combien de lignes du fichier ce produit a-t-il avalées (leur prix étant
       // le même, ou muet). C'est ce chiffre qui dit qu'une variante a disparu.
@@ -565,7 +660,8 @@ function analyserImport(texte, existants, reglesBrutes) {
 }
 
 function extraire(f) {
-  const out = { famille: f.famille, designation: f.designation, variante: f.variante };
+  const out = {};
+  for (const champ of CHAMPS_IDENTITE) out[champ] = f[champ];
   for (const champ of CHAMPS_IMPORTES) out[champ] = f[champ] == null ? null : f[champ];
   return out;
 }

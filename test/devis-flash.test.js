@@ -788,5 +788,11 @@ assert.ok(/id="viewDevisFlash" href="#devis-flash"/.test(INDEX)
 assert.ok(/dfModule\.refreshDevisFlash\(\)/.test(APP),
   'revenir sur l’onglet relit les réglages, il ne reconstruit pas le devis');
 
+// UN PRODUIT ÉTEINT NE SE PROPOSE PAS — le menu du comptoir et la vente directe
+// le taisent déjà (`r.actif===false` dans catalogue.js, `p.actif !== false` dans
+// pont.js) ; le devis flash lit la même base et doit montrer la même liste.
+assert.ok(/if \(p\.actif === false\) continue;/.test(ECRAN),
+  'le devis flash ne propose pas un produit éteint au catalogue');
+
 console.log('✓ devis : l’addition tombe juste sur trois arrondis, le papier tient son A4, '
   + 'l’écran ne réinvente aucun composant, et les six tailles comptent la quantité');

@@ -77,20 +77,28 @@ delete process.env.APP_PASSWORD;
   // LES OBJETS DU PATRON, ET LE TEXTILE QUI LES A REJOINTS LE 01/09. Les deux
   // vivent dans la même table depuis que les trois écrans doivent lire la même
   // base — voir `test/catalogue-textile-base.test.js`, qui tient le textile.
+  // LA SEMENCE ENTIÈRE EST LÀ. Depuis le 02/09 le fichier de caisse du patron
+  // arrive à sa suite (`rangerCatalogueSumup`, éprouvé sur le fichier réel par
+  // test/catalogue-sumup-reel.test.js) : on ne compte donc plus 82 objets, on
+  // vérifie que les 82 de la semence y sont, chacun sous SA clé.
+  const { cleProduit: cleCsv } = require('../catalogue-csv');
+  const cleDe = (p) => cleCsv(p.famille, p.designation, p.variante || '');
+  const clesEnBase = new Set(r.body.map(cleDe));
+  for (const p of SEMENCE) {
+    assert.ok(clesEnBase.has(cleDe(p)), `« ${p.famille} / ${p.designation} » de la semence est en base`);
+  }
   const objets = r.body.filter((p) => p.famille !== 'Textile');
-  assert.strictEqual(objets.length, 82, 'les 82 lignes vendables de l’ancien fichier');
-  assert.strictEqual(objets.length, SEMENCE.length, '… c’est-à-dire exactement la semence');
+  assert.ok(objets.length >= SEMENCE.length, 'la semence, et ce que le fichier de caisse y a ajouté');
 
-  const familles = [...new Set(objets.map((p) => p.famille))];
-  assert.deepStrictEqual(familles, [
+  // LES FAMILLES DU PATRON, DANS SON ORDRE — le menu du comptoir s'y range —,
+  // puis le textile, puis les rayons que le fichier de caisse a apportés : un
+  // t-shirt ne s'intercale pas au milieu des rayons de la boutique, et un rayon
+  // de caisse non plus.
+  const familles = [...new Set(r.body.map((p) => p.famille))];
+  assert.deepStrictEqual(familles.slice(0, 9), [
     'Art de la table', 'Du quotidien', 'Voyage', 'Gourdes', 'Jeux & loisirs',
-    'Papeterie', 'Porte-clés', 'Tasse céramique 350 ml',
-  ], 'les familles du patron, dans SON ordre — le menu du comptoir s’y range');
-  // … et le textile arrive APRÈS elles : un t-shirt ne s'intercale pas au
-  // milieu des rayons de la boutique.
-  assert.deepStrictEqual([...new Set(r.body.map((p) => p.famille))],
-    [...familles, 'Textile'],
-    'le textile est le dernier rayon — la semence part à la suite des positions');
+    'Papeterie', 'Porte-clés', 'Tasse céramique 350 ml', 'Textile',
+  ], 'les familles du patron d’abord, le textile ensuite, le fichier de caisse à la suite des positions');
 
   const couteau = r.body.filter((p) => p.designation === 'Couteau Multi');
   assert.deepStrictEqual(couteau.map((p) => p.variante), ['Bois', 'Liège'],
