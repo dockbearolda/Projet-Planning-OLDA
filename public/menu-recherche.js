@@ -803,6 +803,33 @@ function menuPeindre(etat){
   menuPeindreVise(etat,true);
 }
 
+/* ON DEROULE LA LISTE, PAS LA PAGE (02/09/2026).
+
+   ⚠ DEFAUT MESURE AU RENDU : le champ produit du devis ne s'ouvrait PLUS DU
+   TOUT. Le panneau s'ouvrait puis se refermait UNE MILLISECONDE plus tard, a
+   chaque clic — donc aucune liste, aucun produit choisi, aucun prix. Charlie :
+   « toujours aucun putain de prix pour les produits ».
+
+   La cause : `scrollIntoView` ne deroule pas que la boite qu'on vise, il
+   remonte TOUTE la chaine des ancetres qui defilent. Le panneau est en
+   `position: fixed`, mais la colonne de saisie du devis (`.work`) defile — et
+   le navigateur la faisait bouger d'un cheveu pour « montrer » une ligne deja
+   visible. Ce defilement arrivait a l'ecouteur de `window` qui referme les
+   menus sur un defilement EXTERIEUR au panneau (voir `menuDefilementExterieur`)
+   — le menu se refermait donc lui-meme, en s'ouvrant.
+
+   C'est le meme piege que celui ferme le 27/08 pour la liste du panneau : il
+   avait ete traite du cote de l'ECOUTEUR (ignorer ce qui vient du panneau).
+   Il se traite ici du cote de la CAUSE, et pour de bon : l'arithmetique ne
+   touche qu'un seul element, celui de la liste. Aucun ancetre ne bouge, donc
+   aucun evenement de defilement ne sort du panneau. */
+function menuDeroulerVers(liste,actif){
+  const boite=liste.getBoundingClientRect();
+  const ligne=actif.getBoundingClientRect();
+  if(ligne.top<boite.top)liste.scrollTop-=boite.top-ligne.top;
+  else if(ligne.bottom>boite.bottom)liste.scrollTop+=ligne.bottom-boite.bottom;
+}
+
 function menuPeindreVise(etat,deroule){
   etat.liste.querySelectorAll('.est-vise').forEach(li=>li.classList.remove('est-vise'));
   const actif=etat.liste.querySelector(`[data-rang="${etat.vise}"]`);
@@ -810,7 +837,7 @@ function menuPeindreVise(etat,deroule){
   if(!actif){champ.removeAttribute('aria-activedescendant');return}
   actif.classList.add('est-vise');
   champ.setAttribute('aria-activedescendant',actif.id);
-  if(deroule!==false)actif.scrollIntoView({block:'nearest'});
+  if(deroule!==false)menuDeroulerVers(etat.liste,actif);
 }
 
 function menuViser(etat,pas){

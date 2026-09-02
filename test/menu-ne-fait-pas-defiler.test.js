@@ -187,6 +187,34 @@ assert.ok(/passive:\s*true/.test(ecouteHash[0]),
 assert.ok(!/export function menuFermerTous/.test(PONT),
   '… et il ne demande plus aux écrans de l’appeler : la fonction reste, son export part');
 
+// --- 3 bis. LE MENU NE SE REFERME PAS EN S'OUVRANT (02/09/2026) -----------
+// Charlie : « toujours aucun putain de prix pour les produits ». La cause
+// n'était pas le prix — c'est que le champ produit du devis ne s'ouvrait PLUS
+// DU TOUT. Mesuré au rendu : le panneau passait à `display: block`, puis à
+// `display: none` UNE MILLISECONDE plus tard, à chaque clic. Sans liste, pas
+// de produit choisi ; sans produit choisi, pas de prix.
+//
+// `scrollIntoView` ne déroule pas que la boîte visée : il remonte TOUTE la
+// chaîne des ancêtres qui défilent. La colonne de saisie du devis en fait
+// partie — elle bougeait d'un cheveu pour « montrer » une ligne déjà visible,
+// et ce défilement arrivait à l'écouteur qui referme les menus sur un
+// défilement extérieur. Le menu se refermait lui-même.
+//
+// Le correctif est du côté de la CAUSE : on ne déroule QUE la liste, à
+// l'arithmétique. Aucun ancêtre ne bouge, donc aucun événement ne sort.
+// On lit le CODE, pas les commentaires : ils racontent justement cette
+// histoire, et le mot y figure forcément.
+const CODE_MENU = PONT.replace(/\/\*[\s\S]*?\*\//g, '')
+  .split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n');
+assert.ok(!/scrollIntoView/.test(CODE_MENU),
+  'le menu ne déroule plus par scrollIntoView : il ferait défiler ses ancêtres, et ce défilement le refermerait');
+assert.ok(/function menuDeroulerVers\(liste,actif\)/.test(PONT),
+  '… il déroule sa liste lui-même');
+assert.ok(/liste\.scrollTop\s*-=|liste\.scrollTop\s*\+=/.test(PONT),
+  '… en écrivant dans le scrollTop de la SEULE liste');
+assert.ok(/menuDeroulerVers\(etat\.liste,actif\)/.test(PONT),
+  '… et c’est bien elle que la ligne visée fait défiler');
+
 // --- 4. Le bloc CSS vit dans un littéral de gabarit ------------------------
 // UN ACCENT GRAVE Y REFERME LA CHAÎNE. C'est arrivé en écrivant ce correctif :
 // un commentaire qui citait `fixed` entre accents graves a cassé tout pont.js,
