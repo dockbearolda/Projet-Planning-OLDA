@@ -105,13 +105,33 @@ delete process.env.APP_PASSWORD;
     'l’intitulé du groupe dit lequel des deux tons est le dehors');
 
   // =========================================================================
-  // 2. UN PRIX ABSENT RESTE ABSENT — jamais zéro
+  // 2. LA SEMENCE PORTE LES PRIX DU MAGASIN — et un prix absent reste absent
   // =========================================================================
-  assert.ok(r.body.every((p) => p.prixVenteTtc === null),
-    'aucun produit n’est tarifé aujourd’hui : les semer à 0 ferait annoncer « 0 € » en rayon');
+  // Charlie, 02/09 : « des heures et des heures de blabla pour ajouter des prix
+  // à des produits ». La semence n'en portait AUCUN : toute base neuve — et
+  // c'est le cas de la base locale à chaque démarrage — ouvrait un catalogue de
+  // soixante-cinq objets sans un seul montant. Ils viennent maintenant du
+  // fichier de caisse du patron, produit par produit.
+  const rayon = r.body.filter((p) => !['Textile', 'Tasse céramique 350 ml'].includes(p.famille));
+  const tarifes = rayon.filter((p) => p.prixVenteTtc != null);
+  assert.ok(tarifes.length >= 45,
+    `la semence tarife le rayon (${tarifes.length}/${rayon.length}) : une base neuve n’ouvre pas sur un catalogue muet`);
+  assert.ok(tarifes.every((p) => p.prixVenteTtc > 0),
+    'un produit tarifé l’est à un vrai montant — semer 0 ferait annoncer « 0 € » en rayon');
+  // ⚠ CE QUI N'A PAS DE PRIX N'EN PREND PAS UN INVENTÉ. Vingt objets ne
+  // figurent pas au fichier de caisse : ils restent à blanc, l'écran le DIT
+  // (« À chiffrer ») et la vendeuse pose le montant.
+  assert.ok(rayon.some((p) => p.prixVenteTtc === null),
+    'ce qui n’a pas de prix garde un blanc, il n’en reçoit pas un devine');
+  // LE TEXTILE ET LA TASSE NE SE TARIFENT PAS : ils se CHIFFRENT — moteur V9
+  // pour l'un, grille du comptoir pour l'autre. Un prix de rayon posé ici
+  // court-circuiterait le calcul.
+  assert.ok(r.body.filter((p) => ['Textile', 'Tasse céramique 350 ml'].includes(p.famille))
+    .every((p) => p.prixVenteTtc === null),
+    'le textile et la tasse n’ont pas de prix de rayon : ils se chiffrent');
   assert.ok(r.body.every((p) => p.prixAchat === null && p.tempsMoMin === null
     && p.tempsMachineMin === null),
-    'et ni prix d’achat, ni temps : un blanc n’est pas un zéro');
+    'ni prix d’achat, ni temps : un blanc n’est pas un zéro');
   assert.ok(r.body.every((p) => p.actif === true), 'tout est en rayon au départ');
 
   // Les colonnes sont CELLES de la grille tarifaire tasse : c'est la même

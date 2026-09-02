@@ -231,13 +231,19 @@ const enBase = (liste) => liste.map((p, i) => ({
   // rejoints le 01/09 dans la même table — c'est l'import qu'on éprouve ici,
   // pas le nombre de rayons : on compte donc ce que l'import VISE.
   assert.strictEqual(depart.filter((p) => p.famille !== 'Textile').length, 82);
-  assert.strictEqual(depart.find((p) => p.designation === 'Bouchon Bois').prixVenteTtc, null);
+  // ⚠ ON ÉPROUVE L'IMPORT SUR DES OBJETS QUI N'ONT PAS ENCORE DE PRIX. La
+  // semence en porte depuis le 02/09 (le fichier de caisse du patron) : viser
+  // « Bouchon Bois », désormais à 6 €, ferait compter une ligne INCHANGÉE là où
+  // le test veut une mise à jour. « Coffret à Vin » et « Shaker inox » ne
+  // figurent pas au fichier de caisse — ils restent à blanc, et c'est ce qui en
+  // fait de bons sujets.
+  assert.strictEqual(depart.find((p) => p.designation === 'Coffret à Vin').prixVenteTtc, null);
 
   const CSV = [
     'Category;Item name;Price',
-    'Art de la table;Bouchon Bois;6,00',
+    'Art de la table;Coffret à Vin;6,00',
     'Papeterie;Sticker;4,00',
-    'Art de la table;Plateau Liège;n’importe quoi',
+    'Art de la table;Shaker inox;n’importe quoi',
   ].join('\n');
 
   // L'APERÇU N'ÉCRIT RIEN.
@@ -248,7 +254,7 @@ const enBase = (liste) => liste.map((p, i) => ({
     { lues: 3, creees: 1, majs: 1, inchangees: 0, refusees: 1, ecartees: 0 });
   const inchange = (await call('GET', '/api/catalogue-produits')).body;
   assert.strictEqual(inchange.length, depart.length, 'un aperçu ne crée rien');
-  assert.strictEqual(inchange.find((p) => p.designation === 'Bouchon Bois').prixVenteTtc, null,
+  assert.strictEqual(inchange.find((p) => p.designation === 'Coffret à Vin').prixVenteTtc, null,
     '… et n’écrit aucun prix');
 
   // SANS SIGNATURE, RIEN. Un appel direct écrirait un import que personne n'a
@@ -272,9 +278,9 @@ const enBase = (liste) => liste.map((p, i) => ({
   assert.strictEqual(fait.body.ecrit, true);
   const apres = (await call('GET', '/api/catalogue-produits')).body;
   assert.strictEqual(apres.length, depart.length + 1, 'un produit créé, un mis à jour, un refusé');
-  assert.strictEqual(apres.find((p) => p.designation === 'Bouchon Bois').prixVenteTtc, 6);
+  assert.strictEqual(apres.find((p) => p.designation === 'Coffret à Vin').prixVenteTtc, 6);
   assert.strictEqual(apres.find((p) => p.designation === 'Sticker').prixVenteTtc, 4);
-  assert.ok(!apres.some((p) => p.designation === 'Plateau Liège' && p.prixVenteTtc != null),
+  assert.ok(!apres.some((p) => p.designation === 'Shaker inox' && p.prixVenteTtc != null),
     'la ligne refusée n’a rien écrit du tout');
   // Un produit créé entre à la SUITE des rayons du patron, pas au milieu.
   assert.ok(apres[apres.length - 1].designation === 'Sticker',
