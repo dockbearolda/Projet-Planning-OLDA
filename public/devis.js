@@ -196,8 +196,20 @@ export function calculerDevis(saisie) {
   const pourcent = ACOMPTES.includes(Number(s.acompte)) ? Number(s.acompte) : 0;
   const acompte = cents(ttc * (pourcent / 100));
 
+  // TANT QUE PERSONNE N'A POSÉ DE PRIX, IL N'Y A PAS DE TOTAL (02/09/2026,
+  // Charlie : « par défaut je ne veux pas de prix, ça doit être vierge »). Un
+  // devis neuf sortait « TOTAL À PAYER 0,00 € » en géant sur la feuille, avec
+  // trois lignes à zéro au-dessus — un montant que personne n'a décidé.
+  //
+  // C'est exactement la règle des lignes (`sansPrix`, juste au-dessus), tenue
+  // une marche plus haut : un zéro affiché est un prix, et celui-là, c'est la
+  // maison qui le tiendrait. Un article OFFERT reste un zéro VOULU — une seule
+  // ligne chiffrée suffit à faire revenir les totaux, fût-ce à zéro.
+  const aucunPrix = lignes.every((l) => l.sansPrix);
+
   return {
     lignes,
+    aucunPrix,
     sousTotalHt,
     ecart,
     totalHt,
@@ -269,7 +281,11 @@ export function modeleDevis(saisie, entreprise) {
     })).filter((l) => l.designation || l.totalHt),
     bat: TEXTE_BAT,
     delai: appro.texte,
-    totaux: {
+    // RIEN DE CHIFFRÉ, PAS DE BLOC DE TOTAUX. Voir `calculerDevis` : le devis
+    // neuf n'affiche plus une addition que personne n'a faite. Les cadres
+    // « délai » et « BAT » ne bougent pas pour autant — la colonne de droite
+    // reste réservée, le premier prix posé la remplit sans rien décaler.
+    totaux: compte.aucunPrix ? null : {
       sousTotalHt: euro(compte.sousTotalHt),
       // L'ARRONDI NE S'IMPRIME QUE S'IL EXISTE. À zéro, c'est une ligne qui
       // n'apprend rien et qui pousse le total d'un rang vers le bas.
@@ -284,7 +300,9 @@ export function modeleDevis(saisie, entreprise) {
     // LE CADRE DE RÈGLEMENT NE SORT QUE COMPLET. Un devis qui réclame un
     // acompte sans dire où le virer fait rappeler le client — c'est pire qu'un
     // cadre absent. Et sans acompte demandé, il n'y a rien à réclamer.
-    reglement: compte.acompte.pourcent > 0 ? {
+    // ET PAS D'ACOMPTE SUR UN DEVIS SANS PRIX : réclamer 0,00 € tout de suite,
+    // c'est la même promesse écrite plus gros.
+    reglement: !compte.aucunPrix && compte.acompte.pourcent > 0 ? {
       pourcent: compte.acompte.pourcent,
       montant: euro(compte.acompte.montant),
       solde: euro(compte.acompte.solde),
@@ -524,20 +542,23 @@ export function dessinerDevis(t, doc) {
     return c;
   };
   cadres.append(cadre('DÉLAI ESTIMATIF', t.delai), cadre('BON À TIRER (BAT)', t.bat));
-  const totaux = el('div');
-  const ligneTotal = (k, v) => {
-    const l = el('div', 'dv__tot-l');
-    l.append(el('span', 'dv__tot-k', k), el('span', 'dv__tot-v', v));
-    return l;
-  };
-  totaux.append(ligneTotal('Sous-total HT', t.totaux.sousTotalHt));
-  if (t.totaux.ecart) totaux.append(ligneTotal('Arrondi commercial', t.totaux.ecart));
-  totaux.append(ligneTotal('Total HT', t.totaux.totalHt));
-  totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
-  const grand = el('div', 'dv__grand');
-  grand.append(el('div', 'pap-cap', 'TOTAL À PAYER'), el('div', 'dv__grand-v', t.totaux.ttc));
-  totaux.append(grand);
-  bas.append(cadres, totaux);
+  bas.append(cadres);
+  if (t.totaux) {
+    const totaux = el('div');
+    const ligneTotal = (k, v) => {
+      const l = el('div', 'dv__tot-l');
+      l.append(el('span', 'dv__tot-k', k), el('span', 'dv__tot-v', v));
+      return l;
+    };
+    totaux.append(ligneTotal('Sous-total HT', t.totaux.sousTotalHt));
+    if (t.totaux.ecart) totaux.append(ligneTotal('Arrondi commercial', t.totaux.ecart));
+    totaux.append(ligneTotal('Total HT', t.totaux.totalHt));
+    totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
+    const grand = el('div', 'dv__grand');
+    grand.append(el('div', 'pap-cap', 'TOTAL À PAYER'), el('div', 'dv__grand-v', t.totaux.ttc));
+    totaux.append(grand);
+    bas.append(totaux);
+  }
   corps.append(bas);
 
   // --- Reglement ---

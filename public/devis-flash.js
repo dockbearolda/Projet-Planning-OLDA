@@ -1984,7 +1984,11 @@ function peindre() {
   const compte = calculerDevis(saisie);
 
   const totaux = $('#dvf-totaux');
-  if (totaux) {
+  // LES DEUX MOITIÉS DE L'ÉCRAN DISENT LA MÊME CHOSE. Rien de chiffré, pas de
+  // totaux — ni ici, ni sur la feuille (voir `calculerDevis`). Le volet garde
+  // ses trois réglages : c'est l'addition qui disparaît, pas la fiscalité.
+  if (totaux && compte.aucunPrix) totaux.replaceChildren();
+  else if (totaux) {
     const lignes = [['Sous-total HT', compte.sousTotalHt]];
     if (compte.ecart) lignes.push(['Arrondi commercial', compte.ecart]);
     lignes.push(['Total HT', compte.totalHt]);
@@ -2021,7 +2025,10 @@ function peindre() {
     // sous les yeux.
     const manquants = compte.lignes.filter((l) => l.sansPrix).length;
     const reste = manquants ? ` · ${manquants} à chiffrer` : '';
-    compteur.textContent = `${n} article${n > 1 ? 's' : ''} · ${euro(compte.ttc)}${reste} · ${etatDevis}`;
+    // ET LE COMPTEUR NE PORTE UN MONTANT QUE S'IL EN EXISTE UN : « 0 article ·
+    // 0,00 € · brouillon local » annonçait un devis à zéro euro dès l'ouverture.
+    const montant = compte.aucunPrix ? '' : ` · ${euro(compte.ttc)}`;
+    compteur.textContent = `${n} article${n > 1 ? 's' : ''}${montant}${reste} · ${etatDevis}`;
   }
   const bSave = $('#dvf-enregistrer');
   if (bSave) {
