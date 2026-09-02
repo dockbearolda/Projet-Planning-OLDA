@@ -458,22 +458,32 @@
    au-dessous, le travail. */
 .ecran-tete {
   display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: var(--pas-2) var(--pas-3);
-  padding: var(--pas-3) var(--ecran-pad-x);
+  /* UNE RANGEE, JAMAIS DEUX (01/09/2026, Charlie : « il faut reduire cette
+     barre aussi qui est beaucoup trop grosse »). Elle se pliait : mesure au
+     rendu sur le devis flash a 1 280, 937 px de contenu pour 918 — dix-neuf
+     px de trop, et l'en-tete passait de 83 a 122. Un en-tete qui double de
+     hauteur selon le nom de l'ecran est exactement le defaut que le plancher
+     ci-dessous existe pour empecher. Ce qui cede, c'est le compteur, par
+     l'ellipse ; les commandes gardent leur boite. */
+  flex-wrap: nowrap; gap: var(--pas-3);
+  padding: var(--pas-2) var(--ecran-pad-x);
   /* TOUS LES EN-TETES A LA MEME HAUTEUR, et elle ne s'ecrit pas : c'est la
-     boite de l'application (`--ctrl-h`) plus son rembourrage, donc 82 px. Sans
-     ce plancher, chaque en-tete prenait la hauteur de ce qu'il portait —
-     mesure au rendu le 30/08 : 61,9 px quand il n'y a qu'un titre, 72,4 avec
-     les onglets du Point du jour, 83 avec un bouton de pleine boite. Trois
+     boite de l'application (`--ctrl-h`) plus son rembourrage. Sans ce
+     plancher, chaque en-tete prenait la hauteur de ce qu'il portait — mesure
+     au rendu le 30/08 : 61,9 px quand il n'y a qu'un titre, 72,4 avec les
+     onglets du Point du jour, 83 avec un bouton de pleine boite. Trois
      hauteurs pour la meme rangee, et le titre qui descend de 10 px quand on
-     change d'ecran. */
+     change d'ecran.
+     LE REMBOURRAGE EST PASSE DE `--pas-3` A `--pas-2` LE 01/09 : 83 px de
+     rangee deviennent 71. Douze px sur huit ecrans, sans rien retirer — la
+     recette ne change pas, seul le pas choisi change, et il reste un JETON. */
   /* LE FILET COMPTE DANS LA BOITE, comme la charte le dit deja du trait
      reserve de la boite serree : en `border-box`, un plancher de 82 px
      laisse 81 px au contenu, et une commande de pleine boite (50) pousse
      l'en-tete a 83. Quatre ecrans a 83, quatre a 82 — un pixel, mais le
      titre descend d'un demi-pixel avec, et c'est exactement le genre
      d'ecart qu'on ne voit qu'en comparant deux ecrans. */
-  min-height: calc(var(--ctrl-h) + 2 * var(--pas-3) + 1px);
+  min-height: calc(var(--ctrl-h) + 2 * var(--pas-2) + 1px);
   border-bottom: 1px solid var(--border-soft);
   flex-shrink: 0;
 }
@@ -481,7 +491,13 @@
    rognerait par la gauche sur une rangee trop etroite — meme piege que la
    barre du comptoir et que la rangee du Point du jour. */
 .ecran-tete__gauche { display: flex; align-items: center; gap: var(--pas-3); min-width: 0; }
-.ecran-tete__droite { display: flex; align-items: center; gap: var(--pas-2); margin-left: auto; }
+/* LES COMMANDES NE SE COMPRIMENT PAS : sur une rangee verrouillee, c'est le
+   groupe de GAUCHE qui rend la place — un nom d'ecran s'abrege, un bouton
+   dont le mot se coupe ne se clique plus. */
+.ecran-tete__droite {
+  display: flex; align-items: center; gap: var(--pas-2);
+  margin-left: auto; flex-shrink: 0;
+}
 
 /* PAS D'ICONE DANS CET EN-TETE, ET C'EST UN CHOIX. Les Reglages et les Tailles
    logos en posaient une (24 px, nue, sans boite) ; les six autres ecrans non.
@@ -490,7 +506,11 @@
    qui est actif. C'est l'argument que le Point du jour avait deja retenu le
    26/08 pour supprimer sa ligne de titre. A egalite, celui qui montre moins
    gagne : il ne reste que le nom de l'ecran. */
-.ecran-tete__titres { display: flex; flex-direction: column; min-width: 0; }
+/* LE NOM DE L'ECRAN NE S'ABREGE PAS. Sur la rangee verrouillee du 01/09, les
+   deux morceaux du groupe de gauche se partageaient le manque de place :
+   « Devis » sortait en « De… » pendant que le compteur restait entier. C'est
+   le compteur qui cede — vu au rendu, corrige, et mesure ici meme. */
+.ecran-tete__titres { display: flex; flex-direction: column; min-width: 0; flex-shrink: 0; }
 .ecran-tete__titre {
   margin: 0;
   font-size: var(--taille-titre); font-weight: var(--graisse-forte);
@@ -510,7 +530,13 @@
   line-height: var(--ligne-serre); color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
-.ecran-tete__compte { white-space: nowrap; }
+/* LE COMPTEUR EST CE QUI CEDE. Il tient sur une ligne, et quand la rangee
+   manque de place il s'abrege plutot que de la plier en deux : « 2 articles »
+   se lit encore, la hauteur de l'en-tete ne bouge pas. */
+.ecran-tete__compte {
+  white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
 
 /* ------------------------------------------------ L'ACTION POSEE DANS UNE LIGNE
    « Renommer », « Retirer », « revenir au tri par urgence » : une commande qui

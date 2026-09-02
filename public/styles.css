@@ -197,15 +197,21 @@ textarea { line-height: var(--ligne-texte); }
   z-index: 20;
   display: flex;
   align-items: center;
-  /* LA BARRE NE SE MESURE PLUS ELLE-MÊME — ET C'EST TOUT L'ENJEU. Elle se
-     mesurait, et son pli dépendait donc de sa PROPRE largeur, donc du rail :
-     rentrer le rail lui donnait 180 px de plus et faisait changer sa
-     disposition sous les yeux. Or cette barre EST l'ossature de l'outil : elle
-     doit se présenter pareil sur les sept écrans et dans les deux états du
-     rail. C'est la FENÊTRE qui décide désormais (voir « le pli de la barre »),
-     et la fenêtre ne bouge pas quand on range le rail. */
-  flex-wrap: wrap;
-  gap: 8px 14px;
+  /* UNE RANGÉE, ET UNE SEULE (01/09). La barre se pliait en deux — recherche
+     en haut, onglets dessous — et coûtait 126 px de hauteur à tous les écrans.
+     Verrouillée sur une ligne, elle en coûte 66.
+     RIEN ICI NE DÉPEND DU RAIL, et c'est la leçon qu'on garde du 26/08 : la
+     barre se mesurait alors elle-même (`@container`), donc son pli dépendait
+     de sa propre largeur, donc du rail — le rentrer réorganisait l'ossature
+     sous les yeux. Elle n'a plus de pli à décider : sa forme est la même à
+     toutes les largeurs et dans les deux états du rail. Seuls les LIBELLÉS des
+     onglets vont et viennent, et ça, ça se mesure (`ajusterLesOnglets`). */
+  flex-wrap: nowrap;
+  gap: 10px;
+  /* LA LARGEUR OÙ « Rechercher » SE LIT ENCORE — un jeton, parce que la
+     recherche s'en sert deux fois (base élastique et plancher) et que deux
+     nombres recopiés divergent. */
+  --rech-plancher: 180px;
   /* 32 px à gauche = la largeur de la gouttière (16) + le retrait de la zone de
      travail (16) : la recherche démarre pile à l'aplomb de la carte du dessous.
      Les deux flancs sont des JETONS parce que la rangée d'onglets les REPREND
@@ -213,8 +219,12 @@ textarea { line-height: var(--ligne-texte); }
      divergé, et la rangée serait retombée à côté de l'axe. */
   --topbar-flanc-g: 32px;
   --topbar-flanc-d: 16px;
-  padding: 8px var(--topbar-flanc-d) 8px var(--topbar-flanc-g);
-  min-height: 64px;
+  --topbar-flanc-y: 8px;
+  padding: var(--topbar-flanc-y) var(--topbar-flanc-d) var(--topbar-flanc-y) var(--topbar-flanc-g);
+  /* SA RECETTE, PAS UN NOMBRE : la boîte de l'application plus ses deux
+     flancs. Le 64 px qu'il y avait là était sous la hauteur réelle depuis que
+     la barre est passée à `--ctrl-h` — il ne tenait donc plus rien. */
+  min-height: calc(var(--ctrl-h) + 2 * var(--topbar-flanc-y));
   background: var(--surface);
 }
 
@@ -3519,106 +3529,111 @@ a,
    Responsive
    ========================================================================= */
 
-/* LE PLI DE LA BARRE — ET POURQUOI IL NE REGARDE PLUS LE RAIL.
-   Sept onglets LIBELLÉS (Nouveau Projet · Planning · Dashboard · Fiverr ·
-   À commander · Base clients · Réglages) font 929 px à eux seuls. Avec le
-   bouton du rail (44), une recherche encore lisible (~220), les actions (200),
-   les écarts et les flancs, une rangée unique demande ~1490 px de BARRE.
+/* LA BARRE DU HAUT TIENT SUR UNE SEULE RANGÉE (01/09/2026, demande de Charlie :
+   « il faut que tu fusionne ça pour gagner de la place d'affichage en hauteur »).
+   Elle en portait DEUX depuis le 26/08 — recherche + actions en haut, onglets
+   sur leur propre ligne dessous : 126 px de barre, mesurés à 1 280. Fondues en
+   une, elles en font 66. Les 60 px vont à la zone de travail, sur les sept
+   écrans à la fois — c'est le seul pixel qu'on puisse rendre partout d'un coup.
 
-   ÇA SE DÉCIDAIT SUR LA LARGEUR DE LA BARRE (`@container barre`), donc sur
-   celle du rail — et c'était le défaut. Mesuré en 1440 : rail sorti, la barre
-   faisait 1260 et se pliait en deux rangées ; rail rentré, 1440, elle se
-   dépliait. Ranger le rail changeait donc la DISPOSITION de l'ossature : les
-   onglets sautaient de la seconde rangée à la première, la recherche passait
-   de 940 à 391 px, et les quatre actions tombaient sous la recherche, contre
-   le bord GAUCHE. Le seuil de 1360 était en prime sous-évalué : à 1440 la
-   rangée unique ne tenait pas, elle se dépliait pour se casser aussitôt.
+   CE QU'ON PERD, ET C'EST ASSUMÉ : la rangée d'onglets n'a plus toute la
+   largeur de la barre pour elle. À 1 280 avec le rail sorti (320), il reste
+   912 px pour le bouton du rail (50), la recherche, les dix onglets et les
+   quatre actions (224). Les libellés ne tiennent donc plus à cette largeur —
+   ils cèdent, comme avant, par la MESURE (`ajusterLesOnglets` dans app.js), et
+   chaque icône reprend son mot en infobulle. Ils reviennent dès que la fenêtre,
+   ou le rail replié, rend la place.
 
-   LA FENÊTRE DÉCIDE, ET ELLE NE BOUGE PAS QUAND ON RANGE LE RAIL. En dessous
-   de 1720 px de fenêtre la barre est pliée, au-dessus elle tient sa rangée —
-   dans les DEUX états du rail, sur les SEPT écrans. 1720 = les ~1490 px qu'il
-   faut à la rangée + le rail à sa largeur par défaut (180) + une marge.
-
-   LE PLI EST DONC L'ÉTAT DE BASE, et la rangée unique l'exception : une
-   nouvelle largeur, un nouvel écran, un rail élargi à la main retombent sur la
-   disposition qui tient toujours, jamais sur celle qui déborde.
+   L'ORDRE : bouton du rail (posé par le HTML), recherche, onglets, actions.
+   La recherche est le SEUL élément élastique de la rangée — c'est elle qui
+   absorbe la largeur en trop et qui rend la place quand elle manque. Les
+   onglets et les actions gardent leur taille : un onglet qui rétrécit est un
+   onglet qu'on rate, et les quatre actions sont des cercles.
 
    Sélecteurs préfixés par `.topbar` À DESSEIN : les règles de base des onglets
-   vivent plus bas dans le fichier — à égalité de spécificité, c'est la dernière
-   lue qui gagne, et le pli n'aurait servi à rien. */
-.topbar .grid-search { order: 1; flex: 1 1 240px; max-width: none; }
-.topbar .topbar-right { order: 3; }
+   vivent plus bas dans le fichier — à égalité de spécificité, c'est la
+   dernière lue qui gagne. */
+.topbar .grid-search {
+  order: 1;
+  /* Le plancher et la base sont le MÊME jeton : la recherche ne descend jamais
+     sous la largeur où son intitulé se lit, et elle part de là pour grandir.
+     Mesuré à 1 280 : 196 px ; au-delà elle grandit jusqu'à sa borne haute. */
+  flex: 1 1 var(--rech-plancher);
+  min-width: var(--rech-plancher);
+  /* Bornée, comme avant : au-delà elle ne gagne plus rien à s'étirer, et la
+     rangée d'onglets se retrouverait poussée contre les actions. */
+  max-width: 520px;
+}
 .topbar .nav-switch {
-  order: 4;
-  flex: 1 0 100%;
-  width: 100%;
+  order: 2;
+  /* NI ÉLASTIQUE NI PLEINE LARGEUR : la rangée vaut exactement ses onglets.
+     `flex: 0 1 auto` lui laisse quand même la possibilité d'être rognée quand
+     la recherche à son plancher ne suffit plus — c'est la seule façon pour
+     elle de MESURER son propre débordement, donc de savoir retirer ses
+     libellés. */
+  flex: 0 1 auto;
+  width: auto;
   min-width: 0;
-  margin-left: 0;
-  /* LES ONGLETS SE CENTRENT SUR L'AXE DE LA BARRE. Pliés sur leur propre
-     rangée, ils partaient du bord gauche : 917 px de contenu dans 1012 px de
-     rangée, donc 95 px de vide, tout à droite.
-     `safe` n'est pas décoratif : la rangée peut défiler (`overflow-x`), et un
-     `center` sec rend le DÉBUT du contenu inatteignable dès qu'il déborde —
-     le mot-clé retombe alors sur `start`. Même famille de piège que
-     `justify-content: flex-end`.
-     Le rembourrage de droite qui rendait l'écart des flancs de la barre n'a
-     plus lieu d'être : la rangée reprend les 12 px des DEUX côtés (voir la
-     marge négative plus bas), sa boîte est donc symétrique et l'axe tombe
-     juste. Il coûtait 16 px sur une rangée qui n'en a pas à perdre. */
+  /* ONGLETS ET ACTIONS TIENNENT LE BORD DROIT. Sans cette marge, les 332 px
+     que la recherche ne prend pas une fois à sa borne (mesuré à 1 920)
+     restaient DERRIÈRE les actions : le poste flottait à 332 px du bord de
+     l'écran. La marge automatique ne passe qu'APRÈS la répartition élastique —
+     la recherche grandit d'abord jusqu'à sa borne, le reste va ici. C'est
+     aussi pour ça que le premier onglet doit rendre la sienne, plus bas. */
+  margin: 0 0 0 auto;
+  /* `safe` n'est pas décoratif : la rangée peut défiler, et un `center` sec
+     rend le DÉBUT du contenu inatteignable dès qu'il déborde — le mot-clé
+     retombe alors sur `start`. Même famille de piège que `flex-end`. */
   justify-content: safe center;
-  /* UNE SEULE LIGNE, VERROUILLÉE (26/08, demande de Charlie). La rangée s'est
-     pliée un temps : c'était le seul moyen de ne pas poser « Réglages » 175 px
-     hors de l'écran quand les onglets se sont multipliés. Mais deux rangées
-     d'onglets, c'est deux endroits où chercher — et 40 px de barre en plus sur
-     tous les écrans.
-     La place se prend donc SUR LES FLANCS, jamais sur les libellés : écart
-     resserré, rembourrage resserré, et les 12 px de marge de la barre rendus à
-     la rangée (elle est seule sur sa ligne, personne d'autre n'en a besoin).
-     Mesuré : 1 145 px nécessaires pour 1 072 disponibles à 1 440 — les trois
-     leviers en rendent 86, il en reste 13 de marge.
-     Le défilement reste le dernier recours, pour la fenêtre si étroite qu'un
-     seul onglet serait plus large qu'elle. */
   flex-wrap: nowrap;
   gap: 2px;
-  /* LA RANGÉE REPREND LES DEUX FLANCS DE LA BARRE. Elle est seule sur sa
-     ligne : personne d'autre n'a besoin de cette marge. Ça rend 48 px — et
-     comme les flancs sont ASYMÉTRIQUES (32 à gauche, 16 à droite), les
-     reprendre tels quels remet aussi la boîte de la rangée à l'aplomb de la
-     barre : le centrage tombe alors sur l'axe RÉEL, sans compensation. */
-  margin-left: calc(-1 * var(--topbar-flanc-g));
-  margin-right: calc(-1 * var(--topbar-flanc-d));
+  /* Dernier recours, pour la fenêtre si étroite qu'un seul onglet serait plus
+     large qu'elle. Avant lui : les libellés s'en vont, puis la recherche
+     descend à son plancher. */
   overflow-x: auto;
 }
+/* LES ONGLETS NE SE COMPRIMENT PAS. Sans ça, la rangée rétrécit en emmenant
+   ses onglets avec elle : les libellés se coupent en silence, `scrollWidth`
+   redevient égal à `clientWidth`, et la mesure conclut « ça tient » sur une
+   rangée illisible. Ils débordent, donc, et c'est ce débordement qui déclenche
+   le retrait des libellés. */
+.topbar .nav-switch-btn { flex: 0 0 auto; }
+.topbar .topbar-right { order: 3; }
 /* Les flancs des onglets, sur la rangée qui leur est propre. C'est le premier
    levier quand la place manque, et le seul qui ne coûte rien à la lecture :
    « Fiverr » et « À commander » ne se devinent pas à l'icône. */
 .topbar .nav-switch-btn { padding-inline: 7px; }
 /* LA RANGÉE SERRÉE — posée par la mesure, jamais par une largeur devinée (voir
    `ajusterLesOnglets` dans app.js). Les mots s'en vont, les icônes restent, et
-   chacune reprend son mot en infobulle. Les flancs se rouvrent : une icône
-   seule dans 7 px de chaque côté ferait une cible de 34 px. */
+   chacune reprend son mot en infobulle.
+   8 PX DE FLANC DEPUIS LE 01/09, contre 11. Les 11 rouvraient les flancs pour
+   ne pas descendre la cible sous 44 px — une justification TACTILE, et
+   l'atelier n'a plus une seule tablette (voir CLAUDE.md). À la souris, une
+   cible de 36 px se vise sans y penser, et les 60 px que ça rend sont ce qui
+   permet à la rangée unique de tenir à 1 280 : mesuré, dix onglets passent de
+   472 à 412 px. */
 .nav-switch.est-serree .nav-switch-label { display: none; }
-.topbar .nav-switch.est-serree .nav-switch-btn { padding-inline: 11px; }
-.topbar .nav-switch.est-serree .nav-switch-btn--projet-fin { padding-right: 14px; }
-.topbar .nav-switch.est-serree .nav-switch-btn--reglages { padding-left: 14px; }
+.topbar .nav-switch.est-serree .nav-switch-btn { padding-inline: 8px; }
+.topbar .nav-switch.est-serree .nav-switch-btn--projet-fin { padding-right: 11px; }
+.topbar .nav-switch.est-serree .nav-switch-btn--reglages { padding-left: 11px; }
 .topbar .nav-switch-btn--projet-fin { padding-right: 11px; margin-right: 4px; }
 .topbar .nav-switch-btn--reglages { padding-left: 11px; margin-left: 4px; }
-/* ET IL FAUT RENDRE LA MARGE AUTOMATIQUE, sans quoi tout ce qui précède ne
-   sert à rien. Sur la rangée pleine, les onglets tiennent la droite par
-   `.nav-switch > :first-child { margin-left: auto }` — et une marge AUTO mange
-   toute la place libre AVANT que `justify-content` n'ait son mot à dire.
-   Mesuré : 67,4 px de marge résolue sur « Nouveau Projet », et les sept
-   onglets 33,7 px à droite de l'axe malgré le centrage demandé. Pliés sur leur
-   propre rangée, ils n'ont plus de droite à tenir : ils la rendent, et le
-   centrage prend. */
+/* LA DROITE SE TIENT PAR LA RANGÉE, JAMAIS PAR SON PREMIER ONGLET. Elle s'est
+   tenue un temps par un `margin-left: auto` posé sur l'onglet lui-même : une
+   marge AUTO mange toute la place libre restante, et le centrage à l'intérieur
+   de la rangée ne prenait plus (mesuré : 67,4 px de marge résolue, les onglets
+   33,7 px à droite de l'axe malgré le centrage demandé). C'est la RANGÉE qui
+   porte cette marge désormais (voir plus haut) ; ce zéro reste le garde-fou
+   qui empêche la marge de redescendre sur un onglet. */
 .topbar .nav-switch > :first-child { margin-left: 0; }
 
-/* PLUS D'EXCEPTION « RANGÉE UNIQUE » (26/08). Au-dessus de 1 720 px, les
-   onglets remontaient sur la ligne de la recherche — et s'y repliaient en deux
-   rangées, puisqu'ils la partageaient. La barre changeait donc de forme au
-   milieu de la plage de largeurs, et se pliait justement là où il y a le plus
-   de place. La recherche reste EN HAUT, les onglets ont leur ligne : une seule
-   disposition, à toutes les largeurs. */
+/* UNE SEULE DISPOSITION, À TOUTES LES LARGEURS — la leçon du 26/08 reste, même
+   si la rangée a changé de forme le 01/09. Il y avait eu une exception
+   « rangée unique » au-dessus de 1 720 px : la barre changeait donc de forme
+   au milieu de la plage de largeurs, et se pliait justement là où il y a le
+   plus de place. Aucune requête média ne décide plus de la disposition de la
+   barre : ce qui cède quand la place manque, ce sont les LIBELLÉS, et c'est la
+   mesure qui le dit. */
 
 /* Un cran plus serré avant de renoncer : sur une fenêtre étroite les sept
    onglets se touchent presque, mais ils TIENNENT — et tenir vaut mieux que
@@ -3644,26 +3659,19 @@ a,
   .grid { min-width: 1180px; }
 }
 
-/* Portrait étroit : rail réduit, grille scrollable */
+/* Fenêtre étroite : on rogne les flancs, rien d'autre.
+   IL Y AVAIT ICI UN ONGLET EN DEUX ÉTAGES — l'icône au-dessus de son mot —
+   posé pour le doigt : « au doigt il n'y a pas de survol pour révéler une
+   infobulle ». L'atelier n'a plus de tablette (voir CLAUDE.md), et cet onglet
+   à deux étages faisait 60 px de haut dans une barre qui en fait 66 : sur la
+   rangée unique du 01/09, il la déformait au lieu de la sauver. À la souris,
+   les libellés qui s'en vont reprennent leur mot en infobulle — c'est déjà la
+   réponse, et elle se mesure.
+   Partait avec : un `#viewProjet` qui ne désigne plus rien (l'onglet
+   « Nouveau Projet » a été remplacé par « Vente » et « Devis » le 29/08). */
 @media (max-width: 900px) {
   .shell { --rail-w: var(--sidebar-w, 320px); grid-template-columns: var(--rail-w) 16px 1fr; }
-  .topbar { gap: 10px; padding: 8px 12px; min-height: 56px; }
-  .grid-search { max-width: none; }
-  /* Barre du haut serrée : l'onglet met son icône AU-DESSUS de son nom, il ne
-     perd pas son nom. Sept pictogrammes muets (Fiverr, À commander, Base
-     clients, Réglages…) ne se devinent pas — et au doigt il n'y a pas de survol
-     pour révéler une infobulle. */
-  .nav-switch { gap: 2px; }
-  .nav-switch-btn {
-    flex-direction: column;
-    gap: 2px;
-    min-height: var(--ctrl-h);
-    padding: var(--champ-y-serre) var(--pas-2);
-  }
-  .nav-switch-label { font-size: var(--taille-texte); line-height: var(--ligne-serre); max-width: 76px; }
-  /* Sélecteur d'ID assumé : la règle de base de `--projet` vit plus bas dans le
-     fichier et gagnerait à spécificité égale. */
-  #viewProjet { padding-right: 8px; margin-right: 4px; }
+  .topbar { --topbar-flanc-g: 12px; --topbar-flanc-d: 12px; }
   .topbar .btn-primary { padding: 10px; }
 }
 
@@ -3707,7 +3715,6 @@ a,
   }
   .nav-switch-btn { flex: 0 0 auto; padding: var(--champ-y-serre) var(--pas-2); }
   .nav-switch-label { display: inline; }
-  #viewProjet { padding-right: 12px; margin-right: 6px; }
   /* rail empilé au-dessus de la zone de travail : pas de poignée horizontale */
   .sidebar-resizer { display: none; }
   .sidebar {

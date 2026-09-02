@@ -51,7 +51,7 @@ const RACINE = path.join(__dirname, '..');
 const PLAFONDS = {
   'public/comptoir/demande-devis.css': 98,
   'public/comptoir/vente-directe.css': 41,
-  'public/styles.css': 24,
+  'public/styles.css': 22,
   'public/dashboard.css': 4,
   'public/clients.css': 2,
   'public/montravail.css': 4,
@@ -59,13 +59,16 @@ const PLAFONDS = {
   'public/projet.css': 3,
 };
 
-// REDESCENDU LE 01/09 : 180 → 177. Le nettoyage de ce jour-là a emporté trois
+// REDESCENDU DEUX FOIS LE 01/09 : 180 → 177, puis 177 → 175 quand la barre du
+// haut est passée sur une rangée unique (une hauteur en dur de moins dans la
+// barre, une autre de moins dans l'onglet à deux étages qui est parti avec).
+// Le nettoyage du matin a emporté trois
 // écarts avec le code mort qui les portait (le barème de la vente directe, les
 // règles de priorité du devis, `.modal`). Un cliquet qu'on ne resserre pas se
 // desserre : il laisserait réintroduire ce qu'on vient de retirer.
 // LE TOTAL EST UN CLIQUET, LUI AUSSI. Sans lui, découper un fichier en deux
 // permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
-const TOTAL_MAX = 177;
+const TOTAL_MAX = 175;
 
 const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public'], {
   cwd: RACINE, encoding: 'utf8',

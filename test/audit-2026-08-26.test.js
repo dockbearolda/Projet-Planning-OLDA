@@ -170,17 +170,26 @@ for (const [nom, src, sel] of [['styles.css', CRM, '.grid-search'], ['clients.cs
   assert.ok(regle, 'la rangée d’onglets a bien sa règle de barre');
   assert.match(regle[1], /flex-wrap:\s*nowrap/,
     'la rangée est VERROUILLÉE sur une ligne : rien ne repasse en dessous');
-  // Elle reprend les deux flancs de la barre, par les JETONS et pas par des
-  // nombres recopiés : les flancs sont ASYMÉTRIQUES (32 à gauche, 16 à droite)
-  // et, écrits deux fois, ils divergeraient — la rangée retomberait à côté de
-  // l'axe qu'elle prétend viser.
-  assert.match(regle[1], /margin-left:\s*calc\(-1 \* var\(--topbar-flanc-g\)\)/);
-  assert.match(regle[1], /margin-right:\s*calc\(-1 \* var\(--topbar-flanc-d\)\)/);
+  // ELLE NE REPREND PLUS LES FLANCS DE LA BARRE (01/09). Elle les reprenait
+  // par une marge négative, et c'était juste tant qu'elle était SEULE sur sa
+  // ligne. Depuis que la barre tient sur une rangée unique, elle les partage
+  // avec la recherche et les actions : la marge négative la ferait passer
+  // dessous. Les flancs, eux, restent des JETONS — ils sont ASYMÉTRIQUES (32 à
+  // gauche, 16 à droite) et, écrits deux fois, ils divergeraient.
+  assert.ok(!/-1 \* var\(--topbar-flanc/.test(regle[1]),
+    'la rangée ne déborde plus sur les flancs de la barre');
+  // ET ELLE TIENT LE BORD DROIT. Sans marge automatique, les 332 px que la
+  // recherche ne prend pas une fois à sa borne (mesuré à 1 920) restaient
+  // derrière les actions : le poste flottait à 332 px du bord de l'écran.
+  assert.match(regle[1], /margin:\s*0 0 0 auto/,
+    '… et onglets comme actions tiennent le bord droit, quelle que soit la largeur');
   const barre = sansCom(CRM).match(/(?:^|\n)\.topbar\s*\{([^}]*padding[^}]*)\}/);
   assert.ok(barre, 'la barre déclare son rembourrage');
   assert.match(barre[1], /--topbar-flanc-g:/, 'et ses flancs sont des jetons');
   assert.match(barre[1], /padding:[^;]*var\(--topbar-flanc-d\)[^;]*var\(--topbar-flanc-g\)/,
     'le rembourrage LIT les jetons — sinon les deux nombres se séparent');
+  assert.match(barre[1], /min-height:\s*calc\(var\(--ctrl-h\)/,
+    'et sa hauteur est sa recette — la boîte de l’application plus ses deux flancs');
 }
 // LE REPLI DES LIBELLÉS SE MESURE, IL NE SE DEVINE PAS. Une requête média ne
 // peut pas voir combien d'onglets sont affichés : allumer les comptes en ajoute
