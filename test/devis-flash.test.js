@@ -536,7 +536,10 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
 {
   // LE VOLET EST CELUI DE LA CHARTE — `.volet-plus`, un <details> — pas un
   // repli écrit pour l'écran.
-  assert.ok(/el\('details', 'reg-card dvf-cat volet-plus'\)/.test(ECRAN),
+  // `volet-carte` s'y ajoute le 02/09 : depuis que l'écran de VENTE replie ses
+  // cartes de la même façon, la hauteur de la poignée est partagée par deux
+  // écrans et ne peut plus être écrite dans la feuille de celui-ci.
+  assert.ok(/el\('details', 'reg-card dvf-cat volet-plus volet-carte'\)/.test(ECRAN),
     'une catégorie est la carte des Réglages ET le volet du comptoir, sur le même nœud');
   assert.ok(/el\('summary', 'reg-card__head'\)/.test(ECRAN),
     'la poignée du volet est l’en-tête de la carte : pas une rangée de plus');
@@ -547,9 +550,24 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
   assert.ok(/\.dvf-cat \{ display: block; \}/.test(FEUILLE)
     && /\.dvf-cat__corps \{[^}]*gap: var\(--pas-3\)/.test(FEUILLE),
     'le corps du volet reprend l’écart de la carte, une seule fois');
+  // LA POIGNÉE PREND SA HAUTEUR DANS LA CHARTE, PAS ICI. Une hauteur que deux
+  // écrans partagent et qui s'écrit dans la feuille de l'un des deux redevient
+  // deux hauteurs le jour où l'une bouge.
+  assert.ok(!/\.dvf-cat > summary/.test(FEUILLE),
+    'devis-flash.css n’écrit plus la hauteur de la poignée : `.volet-carte` la porte');
+  assert.ok(/\.volet-carte > summary \{ min-height: var\(--ctrl-h\); padding-block: 0; \}/.test(CHARTE_CSS),
+    '… et elle est un JETON dans charte.css, jamais un nombre');
   // L'ÉTAT DES VOLETS SUIT LE BROUILLON, par appareil.
   assert.ok(/JSON\.stringify\(\{ saisie, dossierId, replis \}\)/.test(ECRAN),
     'le pli de chaque catégorie part avec le brouillon');
+  // … MAIS UN DEVIS NEUF REPART REPLIÉ (02/09). Charlie : « ils sont fermés par
+  // défaut et doivent être fermés à chaque nouveau devis. » Le pli suivait le
+  // brouillon jusque-là : celui qui avait déplié la fiscalité la retrouvait
+  // dépliée sur le devis d'après.
+  const zero = ECRAN.match(/function repartirDeZero\(\)[\s\S]*?\n\}/)[0];
+  assert.ok(/replis = \{\};/.test(zero)
+    && /querySelectorAll\('details\.dvf-cat'\)[\s\S]*?open = false/.test(zero),
+    'un devis neuf referme ses volets — l’état ET les nœuds déjà rendus');
   // … ET ELLES SONT FERMÉES AU DÉPART (02/09). Quatre catégories dépliées,
   // c'est trois écrans à franchir avant d'arriver aux articles.
   assert.ok(/c\.open = replis\[cle\] === true;/.test(ECRAN),

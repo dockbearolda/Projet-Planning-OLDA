@@ -86,7 +86,12 @@ h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);l
    une commande. Sans subgrid, on garde le collage en bas — le moins mauvais
    des deux. */
 @supports (grid-template-rows:subgrid){
-  .grid,.grid-3{grid-template-rows:auto auto auto;align-items:stretch}
+  /* `:has(>.field)` : SEULE une rangée de CHAMPS a trois lignes à partager.
+     La règle valait pour toute `.grid`, et celle qui porte les deux cartes
+     « Articles de la commande » et « Résumé TTC » y gagnait deux lignes vides
+     — plus leurs deux gouttières, soit 40 px de blanc sous les cartes (mesuré
+     au rendu le 02/09, quand le repli les a rendues visibles). */
+  .grid:has(>.field),.grid-3:has(>.field){grid-template-rows:auto auto auto;align-items:stretch}
   .grid>.field,.grid-3>.field{display:grid;grid-template-rows:subgrid;grid-row:span 3;margin-bottom:0}
   .grid>.field>label,.grid-3>.field>label{grid-row:1;align-self:end}
   .grid>.field>.error,.grid>.field>.help,
@@ -170,15 +175,48 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
    dessous). Aucun champ visible ne vit hors d'une bulle sur cet écran — les
    sept qui traînent sont des champs CACHÉS, porteurs de valeurs pour le ticket
    et le planning. */
-.bloc{border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin:var(--pas-3) 0 0;background:var(--surface)}
-/* Les trois cartes qui portent des groupes ne sont plus des cartes : leurs
-   enfants en sont. Sans ça on retrouverait un arrondi dans un arrondi. */
-.card:has(> .bloc){background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;margin:0 0 var(--pas-3)}
+.bloc{margin:var(--pas-3) 0 0}
+/* LE GROUPE A RENDU SON CADRE A LA CARTE-VOLET (02/09) : il ne reste que
+   l'ecart, et un FILET entre deux groupes qui se suivent. Ecrit sur le
+   deuxieme, jamais sur chacun : un trait par groupe en pose un de trop sous le
+   dernier. */
+.volet-carte .bloc+.bloc{border-top:1px solid var(--card-border);padding-top:var(--pas-3)}
+/* ===========================================================================
+   CHAQUE CARTE EST UN VOLET (02/09/2026)
+   ---------------------------------------------------------------------------
+   Charlie : « je veux que mon onglet vente soit pareil que flash devis avec
+   les menus depliables repliables. » Le composant vient de la CHARTE
+   (`.volet-plus` pour la fleche et l'ouverture glissee, `.volet-carte` pour la
+   poignee a `--ctrl-h`) : c'est celui du devis flash, au pixel, pas un repli
+   ecrit ici qui lui ressemblerait.
+
+   LA CARTE REDEVIENT UNE CARTE, ET LES GROUPES S'APLATISSENT. Depuis le 25/08,
+   une carte qui ne portait QUE des groupes de champs (`.bloc`) s'effaçait et
+   c'etaient ses enfants qui faisaient les cartes — sans quoi on avait un
+   arrondi dans un arrondi. Un volet renverse ce partage : ce qu'on replie, ce
+   qu'on lit ferme, c'est la CARTE et son titre ; un titre nu pose sur le fond
+   gris ne se lit pas comme une carte, et l'ecran d'a cote en montre une.
+   C'est donc la carte qui reprend le cadre, et les groupes qui le rendent : ils
+   ne sont plus qu'un ecart et un filet de separation. TROIS NIVEAUX, comme
+   avant — fond gris, carte, champ — l'un d'eux a simplement change de main.
+   =========================================================================== */
+/* Le corps du volet : le titre a rendu sa marge basse (`.volet-carte` dans
+   charte.css), c'est le corps qui prend l'air sous la poignee. */
+.vd-corps{padding-top:var(--pas-2)}
+.vd-corps>:first-child{margin-top:0}
+.vd-corps>:last-child{margin-bottom:0}
+/* UNE CARTE FERMEE NE S'ETIRE PAS SUR SA VOISINE OUVERTE. « Articles de la
+   commande » et « Resume TTC » partagent une rangee de grille, qui etire ses
+   cellules a la meme hauteur : l'une ouverte, l'autre fermee heritait de 400 px
+   de carte vide. Elles se posent donc en haut de leur rangee — et elles rendent
+   la marge basse de la carte, qui dans une grille double la gouttiere. */
+.grid>.volet-carte{align-self:start;margin-bottom:0}
 .bloc>:first-child{margin-top:0}
 .bloc>:last-child{margin-bottom:0}
-/* Un encadré posé DANS une bulle repasse en blanc, et une bulle posée dans un
-   encadré aussi : deux fonds gris l'un sur l'autre ne se distinguent pas. */
-.bloc .notice,.bloc .product-card,.notice .bloc{background:var(--surface)}
+/* La règle « un encadré dans une bulle repasse en blanc » est partie avec le
+   fond de la bulle (02/09) : le groupe n'a plus de fond à opposer à celui d'un
+   encadré, et aucun `.notice` ni `.product-card` de cet écran n'en a jamais
+   été l'enfant. */
 .product-card{border:1px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-top:var(--pas-2);background:var(--zone-bg)}
 .product-top{display:flex;justify-content:space-between;gap:12px}
 .product-title{font-weight:var(--graisse-forte)}
@@ -189,7 +227,14 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
 .badge.green{background:var(--primary-soft);color:var(--primary)}
 .badge.orange{background:var(--warning-bg);color:var(--warning)}
 .internal{border:2px solid var(--primary);background:var(--surface)}
-.internal-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+/* LE TITRE SUIT SA FLECHE, LE BADGE FINIT LA LIGNE. `space-between` ecartait
+   les TROIS elements de la poignee — la fleche du volet, le titre, le badge —
+   et posait « Note interne OLDA » au milieu de la carte quand les trois autres
+   volets collent leur titre a la fleche. Par une marge automatique sur le
+   badge, jamais par `flex-end` : une rangee en `flex-end` qui deborde se fait
+   rogner PAR LA GAUCHE. */
+.internal-head{display:flex;align-items:center;gap:var(--pas-1)}
+.internal-head .lock{margin-left:auto}
 .lock{background:var(--primary);color:var(--on-primary);border-radius:999px;padding:5px 9px;font-weight:var(--graisse-forte)}
 .hidden{display:none!important}
 .payment-option{display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:var(--graisse-texte)}
@@ -255,12 +300,9 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
 }
 
 
-/* Masque les anciens boutons de navigation pour ne garder qu'une action claire */
-#goToClientBtn,
-#continueToPaymentBtn,
-#backToArticlesBtn{
-  display:none!important;
-}
+/* Les trois anciens boutons de navigation ne sont plus masqués : ils sont
+   PARTIS (02/09), avec leurs fonctions et leurs écouteurs. Masquer un bouton
+   laisse sa carte. */
 
 
 /* V10 — Vente directe reprise propre */
@@ -527,12 +569,14 @@ body{font-family:var(--font)!important}
    `inherit` et non un nom en dur : dans le ticket, qui a sa propre échelle,
    les champs doivent rester avec lui. */
 input,select,textarea,button{font-family:inherit!important}
-/* `:not(:has(> .bloc))` : une carte qui ne contient QUE des groupes de champs
-   n'est plus une carte depuis le 25/08 — ce sont ses enfants qui le sont (voir
-   « TROIS NIVEAUX, JAMAIS PLUS » plus bas). Sans cette exception, ces deux
-   `!important` la lui rendaient de force, et on retrouvait l'arrondi dans
-   l'arrondi. */
-.card:not(:has(> .bloc)){border-radius:var(--arrondi-carte)!important}
+/* L'EXCEPTION `:not(:has(> .bloc))` EST PARTIE AVEC LES VOLETS (02/09). Elle
+   protegeait les cartes qui ne portaient QUE des groupes de champs : elles
+   s'effacaient au profit de leurs enfants, et ces deux `!important` leur
+   rendaient le cadre de force. Depuis que chaque carte est un volet, le corps
+   du volet s'interpose, plus aucune carte n'a de `.bloc` pour enfant direct, et
+   le carve-out ne designait plus rien — un selecteur qui ne retire rien, qu'on
+   relit dix fois en se demandant ce qu'il protege. */
+.card{border-radius:var(--arrondi-carte)!important}
 /* `:not(.btn-retour)` : le bouton « revenir d'un cran » de la charte est ROND,
    et un `!important` sur un sélecteur nu bat n'importe quelle classe — c'est
    ainsi qu'il se retrouvait avec l'arrondi d'un champ au lieu du sien. */
@@ -590,7 +634,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.
    pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
    la boîte. */
 button{line-height:var(--ligne-serre)!important}
-.card:not(:has(> .bloc)){border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
+.card{border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
 input,select,textarea{border:1.5px solid var(--border)!important;line-height:var(--ligne-serre)!important}input,select{padding:0 var(--champ-x)!important}textarea{padding:var(--champ-x)!important}
 input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
 h2{letter-spacing:-.01em}

@@ -228,7 +228,7 @@ function relireBrouillon() {
 //
 // Rend `[bloc, corps]` : on empile dans le corps, jamais dans le bloc.
 function carte(icone, titre, cle) {
-  const c = el('details', 'reg-card dvf-cat volet-plus');
+  const c = el('details', 'reg-card dvf-cat volet-plus volet-carte');
   // FERMÉES AU DÉPART (02/09, Charlie : « par défaut ces bulles doivent être
   // fermé »). Quatre catégories dépliées, c'est trois écrans à franchir avant
   // d'arriver aux articles — et sur un devis sur trois, le client est déjà en
@@ -2174,6 +2174,14 @@ function repartirDeZero() {
     && !window.confirm('Ce devis n’est pas au planning. Le remplacer par un devis vierge ?')) return;
   saisie = saisieNeuve();
   dossierId = null;
+  // UN DEVIS NEUF S'OUVRE REPLIÉ (02/09). Charlie : « ils sont fermés par
+  // défaut et doivent être fermés à chaque nouveau devis. » Le pli suivait le
+  // brouillon — celui qui avait déplié la fiscalité la retrouvait dépliée sur
+  // le devis d'après, et l'écran ne repartait donc jamais du même endroit. Le
+  // squelette est posé UNE fois : on referme les volets rendus, on ne les
+  // reconstruit pas.
+  replis = {};
+  for (const v of (ROOT ? ROOT.querySelectorAll('details.dvf-cat') : [])) v.open = false;
   for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-ville', ''],
     ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cl-wa', ''],
     ['#dvf-cherche', ''],

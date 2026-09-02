@@ -297,4 +297,57 @@ console.log('✓ fiche atelier : la boîte de l’app, et deux colonnes au même
     'une action ne prend jamais la pilule — sinon rien ne la distingue d’une étiquette');
 }
 
-console.log('✓ écrans : un seul en-tête, une seule verticale, une seule action de ligne');
+// ---------------------------------------------------------------------------
+// 9. LES DEUX ÉCRANS QUI SE REPLIENT PORTENT LE MÊME VOLET (02/09/2026)
+// ---------------------------------------------------------------------------
+// Charlie : « je veux que mon onglet vente soit pareil que flash devis avec les
+// menus dépliables repliables, ils sont fermés par défaut et doivent être
+// fermés à chaque nouveau devis. »
+//
+// C'est exactement la situation que ce fichier existe pour tenir : deux écrans
+// du même poste, à un clic l'un de l'autre, qui replient chacun leurs cartes.
+// Écrites deux fois, les deux poignées redeviennent deux hauteurs le jour où
+// l'une bouge — et un écart pareil ne se voit qu'en COMPARANT les deux écrans.
+{
+  const CHARTE = fs.readFileSync(path.join(RACINE, 'public/charte.css'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  const VENTE = fs.readFileSync(path.join(RACINE, 'public/comptoir/vente-directe.html'), 'utf8');
+  const VENTE_CSS = fs.readFileSync(path.join(RACINE, 'public/comptoir/vente-directe.css'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  const DEVIS = fs.readFileSync(path.join(RACINE, 'public/devis-flash.js'), 'utf8');
+
+  // UNE SEULE ÉCRITURE, DANS LA CHARTE, ET C'EST UN JETON.
+  assert.ok(/\.volet-carte > summary \{ min-height: var\(--ctrl-h\); padding-block: 0; \}/.test(CHARTE),
+    'la poignée d’une carte qui se replie prend la boîte de l’application, et elle est écrite dans la charte');
+  assert.ok(!/min-height:\s*[0-9]/.test(VENTE_CSS.match(/\.vd-corps[\s\S]{0,400}/)?.[0] || ''),
+    '… l’écran de vente n’en réécrit aucune en dur autour de son volet');
+
+  // ET LES DEUX ÉCRANS LA PORTENT, SUR LE MÊME NŒUD QUE LEUR CARTE.
+  assert.ok(/'reg-card dvf-cat volet-plus volet-carte'/.test(DEVIS),
+    'le devis flash pose le volet de la charte sur sa carte');
+  const volets = VENTE.match(/<details class="card[^"]*volet-plus volet-carte"/g) || [];
+  assert.ok(volets.length >= 5,
+    `les cartes de l’écran de vente sont des volets (${volets.length} trouvé(s), 5 attendus au moins)`);
+  assert.ok(!/<details[^>]*volet-carte[^>]*\sopen[\s>]/.test(VENTE),
+    'aucun volet n’est écrit `open` : « ils sont fermés par défaut »');
+  // … ET FERMÉS À CHAQUE NOUVELLE VENTE. Une nouvelle vente recharge la page,
+  // mais un rechargement n'est pas toujours une page neuve : le navigateur peut
+  // restaurer l'état de la précédente.
+  assert.ok(/querySelectorAll\("details\.volet-carte"\)[\s\S]{0,80}open=false/.test(VENTE),
+    '… et l’écran les referme au chargement plutôt que de parier sur le navigateur');
+
+  // UN CHAMP REPLIÉ QU'ON APPELLE OUVRE SON VOLET. Sans ça, `focus()` sur le
+  // premier champ obligatoire qui manque échoue SANS RIEN DIRE : le champ passe
+  // en rouge dans une carte fermée, et le défaut ne se voit pas.
+  assert.ok(/HTMLElement\.prototype\.focus\s*=/.test(VENTE)
+    && /closest\("details"\)/.test(VENTE),
+    'un champ qu’on appelle ouvre son volet, par une seule règle et non douze appels');
+
+  // LA CARTE REPREND LE CADRE QUE LE GROUPE LUI AVAIT PRIS. Un titre nu posé
+  // sur le fond gris ne se lit pas comme une carte, et l'écran d'à côté en
+  // montre une : le carve-out `:has(> .bloc)` n'a plus lieu d'être.
+  assert.ok(!/:has\(> \.bloc\)/.test(VENTE_CSS),
+    'plus aucune carte ne s’efface derrière ses groupes : c’est le volet qu’on lit fermé');
+}
+
+console.log('✓ écrans : un seul en-tête, une seule verticale, une seule action de ligne, un seul volet');

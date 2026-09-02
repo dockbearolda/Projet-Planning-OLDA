@@ -446,7 +446,7 @@ assert.match(VENTE, /<body class="ecran-comptoir">/,
   'la vente porte la couche de jetons de l’écran de référence');
 assert.match(DEVIS, /<body class="ecran-comptoir">/,
   '… la demande aussi, évidemment');
-for (const [nom, src] of [['demande-devis', DEVIS], ['vente-directe', VENTE]]) {
+for (const [nom, src] of [['demande-devis', DEVIS]]) {
   const m = sansCom(src).match(/(^|[\n;}])\.(bloc|article-bloc)[^{}\n]*\{([^}]*)\}/);
   assert.ok(m, `${nom} : le groupe de champs a bien une règle`);
   assert.match(m[3], /background:var\(--surface\)/,
@@ -460,10 +460,37 @@ for (const [nom, src] of [['demande-devis', DEVIS], ['vente-directe', VENTE]]) {
 // retrouve un arrondi dans un arrondi.
 assert.match(DEVIS, /#step2>\.card\{background:transparent;border:0/,
   'la demande aplatit la carte qui contient ses groupes');
-assert.match(VENTE, /\.card:has\(> \.bloc\)\{background:transparent;border:0/,
-  'la vente aussi');
-assert.ok(!/(^|[\n;}])\.card\{[^}]*!important/.test(sansCom(VENTE)),
-  '… et aucun `.card` en !important ne vient la lui rendre de force');
+
+// ---------------------------------------------------------------------------
+// LA VENTE REPLIE SES CARTES DEPUIS LE 02/09, ET LE CADRE A CHANGÉ DE MAIN
+// ---------------------------------------------------------------------------
+// Charlie : « je veux que mon onglet vente soit pareil que flash devis avec les
+// menus dépliables repliables. » Ce qu'on replie, on le lit FERMÉ : c'est donc
+// la carte qui porte le cadre et son titre, et le groupe qui le rend. Le compte
+// de niveaux ne bouge pas — fond gris, carte, champ — l'un d'eux a changé de
+// main. La demande de devis, elle, ne se replie pas et garde ses bulles : c'est
+// le repli qui déplace le cadre, pas un goût.
+{
+  const nu = sansCom(VENTE);
+  const m = nu.match(/(^|[\n;}])\.bloc\{([^}]*)\}/);
+  assert.ok(m, 'vente-directe : le groupe de champs a bien une règle');
+  assert.match(m[2], /margin:var\(--pas-3\) 0 0/,
+    'vente-directe : le groupe ne garde que son écart');
+  for (const rendu of ['background:', 'border:1px', 'padding:var(--pas-4)']) {
+    assert.ok(!m[2].includes(rendu),
+      `vente-directe : le groupe a rendu « ${rendu} » à la carte-volet — sinon quatre niveaux`);
+  }
+  assert.match(nu, /\.volet-carte \.bloc\+\.bloc\{border-top:1px solid var\(--card-border\)/,
+    'vente-directe : deux groupes qui se suivent sont séparés par UN filet');
+  // ET LA CARTE PORTE LE CADRE SANS EXCEPTION. Le carve-out `:has(> .bloc)`
+  // protégeait les cartes qui s'effaçaient derrière leurs groupes ; le corps du
+  // volet s'interpose désormais, plus aucune n'a de `.bloc` pour enfant direct,
+  // et le sélecteur ne désignait plus rien.
+  assert.ok(!/:has\(> \.bloc\)/.test(nu),
+    'vente-directe : plus aucune carte ne s’efface derrière ses groupes');
+  assert.match(nu, /\.card\{border:1px solid var\(--card-border\)!important/,
+    '… c’est la carte-volet qui porte le cadre, celle qu’on lit fermée');
+}
 
 // ---------------------------------------------------------------------------
 // L'EXCEPTION DE COULEUR EST CLOSE (Charlie, 26/08/2026)

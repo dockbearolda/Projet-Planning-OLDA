@@ -66,6 +66,47 @@ try {
 })();
 </script>
 
+<!-- ======================================================================
+     UN CHAMP QU'ON APPELLE OUVRE SON VOLET
+     ----------------------------------------------------------------------
+     Depuis que chaque carte est un volet (02/09), un champ peut etre replie
+     au moment ou le script l'appelle : le premier champ obligatoire qui
+     manque (`requireFields`), la description qu'on vient de rouvrir pour
+     modifier un article, la recherche de client quand le bouton « suivant »
+     refuse d'avancer. Un `<details>` ferme ne rend pas son contenu :
+     `focus()` n'y trouve rien, echoue SANS RIEN DIRE, et le champ rouge reste
+     invisible — le defaut se signale, et personne ne le voit.
+
+     UNE SEULE REGLE, POSEE SUR `focus()`, PLUTOT QUE DOUZE APPELS A NE PAS
+     OUBLIER. Cet ecran appelle `focus()` a douze endroits, `pont.js` a
+     d'autres, et une nouvelle version du fichier en apportera. Un appel
+     oublie, c'est un champ qu'on ne voit pas : la garde vit donc a l'endroit
+     par lequel ils passent tous.
+
+     Elle ne fait qu'OUVRIR : rien n'est memorise, un volet ouvert par un
+     defaut se referme au rechargement comme les autres.
+     ====================================================================== -->
+<script>
+(function(){
+  var natif=HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus=function(){
+    for(var d=this.closest?this.closest("details"):null;d;
+        d=d.parentElement?d.parentElement.closest("details"):null) d.open=true;
+    return natif.apply(this,arguments);
+  };
+
+  // ET L'ECRAN S'OUVRE REPLIE, MEME AU RETOUR. « Ils sont fermes par defaut et
+  // doivent etre fermes a chaque nouvelle vente. » Une nouvelle vente recharge
+  // la page, et aucun volet n'est ecrit `open` dans le document — mais un
+  // rechargement n'est pas toujours une page neuve : le navigateur restaure
+  // l'etat de la page precedente (retour arriere, cache de session), et un
+  // volet laisse ouvert reviendrait ouvert. On le DIT plutot que de le parier.
+  document.addEventListener("DOMContentLoaded",function(){
+    document.querySelectorAll("details.volet-carte").forEach(function(v){v.open=false;});
+  });
+})();
+</script>
+
 <div class="container">
   <div class="stepper">
     <div class="step active">1. Articles</div>
@@ -74,8 +115,20 @@ try {
     <div class="step">4. Ticket</div>
   </div>
 
-  <div class="card">
-    <h2>1. Ajouter un article</h2>
+  <!-- CHAQUE CARTE EST UN VOLET, ET ELLE S'OUVRE FERMEE (02/09/2026).
+       Charlie : « je veux que mon onglet vente soit pareil que flash devis
+       avec les menus depliables repliables, ils sont fermes par defaut et
+       doivent etre fermes a chaque nouveau devis. »
+       C'est le volet de la CHARTE (`.volet-plus` + `.volet-carte`), celui que
+       le devis flash porte deja : deux ecrans du meme poste, a un clic l'un de
+       l'autre, donnent le meme composant — pas deux qui se ressemblent.
+       « Ferme a chaque nouvelle vente » ne demande aucun code : une nouvelle
+       vente RECHARGE la page (voir le bouton de l'etape 4), et aucun volet
+       n'est ecrit `open` ici. Rien n'est memorise, donc rien n'est a remettre
+       a zero. -->
+  <details class="card volet-plus volet-carte">
+    <summary><h2>1. Ajouter un article</h2></summary>
+    <div class="vd-corps">
     <div class="bloc"><div class="grid">
       <div class="field">
         <label for="productName">Article *</label>
@@ -196,16 +249,20 @@ try {
       <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
       <button id="saveProductBtn" class="primary">Ajouter l'article</button>
     </div>
-  </div>
+    </div>
+  </details>
 
   <div class="grid">
-    <div class="card">
-      <h2>Articles de la commande</h2>
+    <details class="card volet-plus volet-carte">
+      <summary><h2>Articles de la commande</h2></summary>
+      <div class="vd-corps">
       <div id="productList"><p class="help">Aucun article ajouté.</p></div>
-    </div>
+      </div>
+    </details>
 
-    <div class="card">
-      <h2>Résumé TTC</h2>
+    <details class="card volet-plus volet-carte">
+      <summary><h2>Résumé TTC</h2></summary>
+      <div class="vd-corps">
       <div id="summaryLines">
         <p class="help">Les articles ajoutés apparaîtront ici avec leur tarif TTC.</p>
       </div>
@@ -219,13 +276,14 @@ try {
       <span id="summaryHT" class="hidden">0,00 €</span>
       <span id="summaryTax" class="hidden">0,00 €</span>
       <span id="summarySurcharge" class="hidden">0,00 €</span>
-    </div>
+      </div>
+    </details>
   </div>
 
   <!-- REPLIÉE (27/08) : remplie 5 fois sur 33 ventes réelles. Elle reste à un
        clic, et le volet DIT qu'elle existe — ce qu'un champ supprimé ne dit
        plus. -->
-  <details class="card internal volet-plus">
+  <details class="card internal volet-plus volet-carte">
     <summary class="internal-head">
       <span id="internalNoteTitle" class="volet-titre">Note interne OLDA</span>
       <span class="lock">🔒 Interne uniquement</span>
@@ -236,12 +294,18 @@ try {
     <textarea id="internalNote" aria-labelledby="internalNoteTitle" placeholder="Cette note peut être ajoutée maintenant, après le paiement ou après le départ du client. Elle n'est jamais visible par le client."></textarea>
   </details>
 
-  <div class="card">
-    <button id="goToClientBtn" class="primary full">Passer au paiement →</button>
-  </div>
+  <!-- « PASSER AU PAIEMENT » A ETE RETIRE (02/09). Le bouton etait masque
+       depuis que la barre du bas porte l'action de l'etape (27/08), mais sa
+       CARTE, elle, restait : un rectangle blanc vide de 50 px entre la note
+       interne et l'etape suivante. Invisible tant que l'ecran etait un long
+       ruban ; c'est l'un des cinq blocs qu'on voit maintenant que les cartes
+       sont repliees. Ses deux jumeaux — « Continuer vers le paiement » et le
+       retour aux articles — partent avec lui, ainsi que les trois fonctions
+       qu'ils appelaient : la barre du bas fait tout cela depuis le 27/08. -->
 
-  <div class="card hidden" id="clientSection">
-    <h2>2. Associer le client</h2>
+  <details class="card hidden volet-plus volet-carte" id="clientSection">
+    <summary><h2>2. Associer le client</h2></summary>
+    <div class="vd-corps">
 
     <div class="bloc"><div class="field client-search-wrap">
       <label for="clientSearch">Rechercher un client existant</label>
@@ -403,14 +467,12 @@ try {
     <input id="counterSale" type="hidden" value="false">
         <input id="orderNumber" type="hidden">
 
-    <div class="actions" style="margin-top:18px">
-      <button id="backToArticlesBtn" class="btn-retour" title="Revenir aux articles" aria-label="Revenir aux articles"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m11 6-6 6 6 6"></path></svg></button>
-      <button id="continueToPaymentBtn" class="primary">Continuer vers le paiement →</button>
     </div>
-  </div>
+  </details>
 
-  <div class="card hidden" id="paymentSection">
-    <h2>3. Paiement</h2>
+  <details class="card hidden volet-plus volet-carte" id="paymentSection">
+    <summary><h2>3. Paiement</h2></summary>
+    <div class="vd-corps">
     <div id="amountDue" class="summary-row summary-total"><span>À encaisser</span><span>0,00 €</span></div>
 
     <div class="bloc"><label class="payment-option"><input type="radio" name="payment" value="Carte bancaire" checked> Carte bancaire</label>
@@ -439,7 +501,8 @@ try {
     </div>
 
     <button id="payButton" class="primary full">Encaisser le paiement</button>
-  </div>
+    </div>
+  </details>
 
   <div id="paymentSuccess" class="card success hidden">
     <p><b>La note interne OLDA reste modifiable à tout moment.</b></p>
@@ -972,9 +1035,15 @@ function editProduct(index){
   updateDeadlineInfo();
   document.getElementById("saveProductBtn").textContent="Enregistrer les modifications";
   document.getElementById("cancelEditBtn").classList.remove("hidden");
+  // LE FOCUS AVANT LA MESURE. Modifier un article se clique depuis la LISTE,
+  // donc depuis un autre volet : celui de la saisie peut etre replie, et un
+  // champ replie n'a ni position ni hauteur — on scrollait vers un rectangle
+  // vide pendant que le formulaire restait ferme, rempli, sous le titre.
+  // `focus()` ouvre le volet (voir la garde en tete de fichier) ; la mesure
+  // vient apres, quand le champ existe a l'ecran.
   const desc=document.getElementById("productDescription");
-  window.scrollTo({top:desc.getBoundingClientRect().top+window.scrollY-150,behavior:"smooth"});
   desc.focus();
+  window.scrollTo({top:desc.getBoundingClientRect().top+window.scrollY-150,behavior:"smooth"});
 }
 function deleteProduct(index){
   if(confirm("Supprimer cet article ?")){
@@ -1102,34 +1171,11 @@ function validatePayment(){
   return true;
 }
 
-function goToClient(){
-  if(products.length===0){
-    alert("Ajoute au moins un article avant de passer au paiement.");
-    return;
-  }
-  document.getElementById("clientSection").classList.remove("hidden");
-  document.getElementById("paymentSection").classList.add("hidden");
-  updateStepper(1);
-  document.getElementById("clientSection").scrollIntoView({behavior:"smooth"});
-}
-
-function continueToPayment(){
-  if(!selectedClient){
-    alert("Sélectionne un client ou crée une nouvelle fiche avant de continuer.");
-    document.getElementById("clientSearch").focus();
-    return;
-  }
-  document.getElementById("paymentSection").classList.remove("hidden");
-  updateStepper(2);
-  document.getElementById("paymentSection").scrollIntoView({behavior:"smooth"});
-}
-
-function backToArticles(){
-  document.getElementById("clientSection").classList.add("hidden");
-  document.getElementById("paymentSection").classList.add("hidden");
-  updateStepper(0);
-  window.scrollTo({top:0,behavior:"smooth"});
-}
+/* LES TROIS NAVIGATIONS D'AVANT LA BARRE DU BAS SONT PARTIES (02/09).
+   `goToClient`, `continueToPayment` et `backToArticles` démasquaient les étapes
+   à la main ; depuis le 27/08 c'est `displayStep` qui le fait, et leurs trois
+   boutons étaient masqués par la feuille — une navigation morte qu'on relisait
+   en se demandant laquelle des deux faisait foi. */
 function processPayment(){
   if(!validatePayment()) return false;
 
@@ -1240,9 +1286,6 @@ document.getElementById("cancelEditBtn").addEventListener("click",resetProductFo
 document.getElementById("orderDate").addEventListener("change",updateDeadlineInfo);
 document.querySelectorAll('input[name="payment"]').forEach(r=>r.addEventListener("change",updatePaymentZones));
 document.getElementById("cashGiven").addEventListener("input",updateCashChange);
-document.getElementById("goToClientBtn").addEventListener("click",goToClient);
-document.getElementById("continueToPaymentBtn").addEventListener("click",continueToPayment);
-document.getElementById("backToArticlesBtn").addEventListener("click",backToArticles);
 
 document.getElementById("clientSearch").addEventListener("input",renderClientResults);
 // ON APPELLE LA VERSION DU MOMENT, PAS CELLE DE L'INSCRIPTION (25/08/2026).

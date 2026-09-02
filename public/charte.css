@@ -1559,6 +1559,41 @@ body.a-connecter { overflow: hidden; }
 
 
 /* ===========================================================================
+   UNE CARTE QUI SE REPLIE (02/09/2026)
+   ---------------------------------------------------------------------------
+   Charlie : « je veux que mon onglet vente soit pareil que flash devis avec
+   les menus depliables repliables ». Le devis flash repliait ses categories
+   depuis le 01/09 ; l'ecran de vente les empilait toutes ouvertes. Deux ecrans
+   du meme poste, a un clic l'un de l'autre : c'est le MEME composant.
+
+   `.volet-carte` se pose SUR la carte de l'ecran — `.reg-card` pour le devis,
+   `.card` pour la vente — avec `.volet-plus` qui fournit la fleche et
+   l'ouverture glissee. Ce qui est ecrit ICI, c'est le seul point que les deux
+   ecrans doivent partager au pixel : la POIGNEE prend la boite de
+   l'application. Une tete qu'on lit fait 23 px ; une tete qu'on CLIQUE prend
+   `--ctrl-h`, comme tout ce qui se clique et se remplit ailleurs.
+
+   ⚠ UNE HAUTEUR EST UN JETON, JAMAIS UN NOMBRE : `--ctrl-h`, pas 50px. Ecrite
+   deux fois en dur, elle redevient deux hauteurs le jour ou l'une bouge.
+
+   Le CORPS reste a chaque ecran : le devis empile des rangees de feuille de
+   calcul, la vente des groupes de champs. C'est la mise en place qui differe,
+   pas le composant.
+   =========================================================================== */
+/* ⚠ ET SON REMBOURRAGE VERTICAL PART AVEC (mesuré au rendu le 02/09). Le volet
+   pose `padding: var(--pas-2) 0` sur sa poignée : sur trois cartes de l'écran de
+   vente le contenu tenait sous les 30 px et c'est `min-height` qui décidait —
+   50 px, la boîte. Sur la quatrième, « Note interne OLDA » porte un badge de
+   34,6 px : 34,6 + 20 = 54,6, et cette poignée-là faisait 4,6 px de plus que ses
+   trois voisines. Une hauteur imposée et un rembourrage qui s'y ajoute, ce sont
+   DEUX hauteurs — la boîte suffit, et elle centre ce qu'elle contient. */
+.volet-carte > summary { min-height: var(--ctrl-h); padding-block: 0; }
+/* Le titre ne porte plus sa marge : c'est la poignee qui fait la boite. */
+.volet-carte > summary h2,
+.volet-carte > summary h3 { margin: 0; }
+
+
+/* ===========================================================================
    LE CHAMP DE DATE FANTÔME
    ===========================================================================
    Notre calendrier (`calendrier.js`) se greffe sur un `input[type=date]` et

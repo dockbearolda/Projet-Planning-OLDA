@@ -149,15 +149,18 @@
    lui qui porte l'écart de la carte, une seule fois.
    =========================================================================== */
 .dvf-cat { display: block; }
-/* LA POIGNÉE PREND LA BOÎTE DE L'APPLICATION. Mesuré à 1280 px : la tête d'une
-   carte des Réglages fait 23 px (elle ne se clique pas) ; ici, le rembourrage du
-   volet la portait à 45 — un nombre que personne n'a choisi, et qui ne tombe sur
-   rien. Elle se CLIQUE : c'est donc `--ctrl-h`, la boîte de tout ce qui se
-   clique et se remplit dans l'application.
+/* LA POIGNÉE PREND LA BOÎTE DE L'APPLICATION, ET LA RÈGLE EST PARTIE DANS LA
+   CHARTE (02/09). Mesuré à 1280 px : la tête d'une carte des Réglages fait
+   23 px (elle ne se clique pas) ; ici, le rembourrage du volet la portait à 45
+   — un nombre que personne n'a choisi. Elle se CLIQUE : c'est donc `--ctrl-h`.
+   Depuis que l'écran de VENTE replie ses cartes de la même façon, cette
+   hauteur ne peut plus être écrite ici : deux écrans à un clic l'un de l'autre
+   la partagent, donc elle vit dans `.volet-carte` (charte.css) et les deux la
+   portent. La classe est posée par `carte()` dans devis-flash.js.
    ⚠ L'ÉCART AVEC LES RÉGLAGES RESTE, ET IL SE DIT : une tête qu'on déplie n'est
    pas une tête qu'on lit. Ce qui est égalisé, c'est ce qui est comparable — les
-   quatre poignées de cet écran entre elles, et la boîte de l'application. */
-.dvf-cat > summary { min-height: var(--ctrl-h); }
+   quatre poignées de cet écran, celles de la vente, et la boîte de
+   l'application. */
 .dvf-cat__corps {
   display: flex;
   flex-direction: column;
