@@ -170,19 +170,19 @@ for (const [nom, src, sel] of [['styles.css', CRM, '.grid-search'], ['clients.cs
   assert.ok(regle, 'la rangée d’onglets a bien sa règle de barre');
   assert.match(regle[1], /flex-wrap:\s*nowrap/,
     'la rangée est VERROUILLÉE sur une ligne : rien ne repasse en dessous');
-  // ELLE NE REPREND PLUS LES FLANCS DE LA BARRE (01/09). Elle les reprenait
-  // par une marge négative, et c'était juste tant qu'elle était SEULE sur sa
-  // ligne. Depuis que la barre tient sur une rangée unique, elle les partage
-  // avec la recherche et les actions : la marge négative la ferait passer
-  // dessous. Les flancs, eux, restent des JETONS — ils sont ASYMÉTRIQUES (32 à
-  // gauche, 16 à droite) et, écrits deux fois, ils divergeraient.
-  assert.ok(!/-1 \* var\(--topbar-flanc/.test(regle[1]),
-    'la rangée ne déborde plus sur les flancs de la barre');
-  // ET ELLE TIENT LE BORD DROIT. Sans marge automatique, les 332 px que la
-  // recherche ne prend pas une fois à sa borne (mesuré à 1 920) restaient
-  // derrière les actions : le poste flottait à 332 px du bord de l'écran.
-  assert.match(regle[1], /margin:\s*0 0 0 auto/,
-    '… et onglets comme actions tiennent le bord droit, quelle que soit la largeur');
+  // ELLE COMMENCE SOUS LA RECHERCHE, ET ÇA NE S'ÉCRIT PAS (01/09). Le décalage
+  // est ce que le bouton du rail occupe plus l'écart de la barre : écrit en
+  // dur, il se décollerait le jour où l'un des deux bouge — et un alignement
+  // raté d'un pixel se voit précisément parce que les deux rangées sont l'une
+  // sous l'autre. Mesuré au rendu : 0 px d'écart avec le bord de la recherche.
+  assert.match(regle[1], /margin: 0 calc\(-1 \* var\(--topbar-flanc-d\)\) 0 calc\(var\(--ctrl-h\) \+ var\(--topbar-gap\)\)/,
+    'la rangée tombe sous la recherche par les jetons, jamais par un nombre');
+  // À DROITE ELLE REPREND LE FLANC : elle est seule sur sa ligne, personne
+  // d'autre n'en a besoin, et ça lui rend 16 px. Par le JETON — les flancs sont
+  // ASYMÉTRIQUES (32 à gauche, 16 à droite) et, écrits deux fois, ils
+  // divergeraient.
+  assert.match(regle[1], /flex: 1 1 100%/,
+    'et elle peut rétrécir : une base de 100 % AJOUTE ses marges par-dessus, elle sortait 44 px à droite');
   const barre = sansCom(CRM).match(/(?:^|\n)\.topbar\s*\{([^}]*padding[^}]*)\}/);
   assert.ok(barre, 'la barre déclare son rembourrage');
   assert.match(barre[1], /--topbar-flanc-g:/, 'et ses flancs sont des jetons');

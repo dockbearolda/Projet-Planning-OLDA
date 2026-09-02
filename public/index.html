@@ -209,13 +209,23 @@
           <span class="material-symbols-outlined" aria-hidden="true">draw</span>
           <span class="nav-switch-label">Tailles logos</span>
         </a>
-        <a class="nav-switch-btn nav-switch-btn--reglages" id="viewReglages" href="#reglages">
-          <span class="material-symbols-outlined" aria-hidden="true">settings</span>
-          <span class="nav-switch-label">Réglages</span>
-        </a>
       </nav>
 
       <div class="topbar-right">
+        <!-- RÉGLAGES A QUITTÉ LA RANGÉE D'ONGLETS (01/09/2026, demande de
+             Charlie). L'onglet le disait déjà de lui-même — « on n'y va pas
+             pour travailler, on y va pour régler l'outil » — et il le disait
+             avec un filet qui le détachait des huit autres. Il est donc du côté
+             des commandes de l'appareil (plein écran, thème, actualiser, qui
+             est au poste), pas du côté des écrans de travail, et il en prend la
+             forme : le rond de `--ctrl-h`, comme les quatre autres.
+             C'est un LIEN, pas un bouton : il mène à une adresse (`#reglages`),
+             donc il s'ouvre dans un nouvel onglet à la molette comme les huit
+             autres écrans. -->
+        <a class="icon-btn" id="viewReglages" href="#reglages" title="Réglages" aria-label="Réglages">
+          <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+        </a>
+        <span class="topbar-sep" aria-hidden="true"></span>
         <button class="icon-btn" id="fullscreenToggle" type="button" aria-label="Passer en plein écran" hidden>
           <span class="material-symbols-outlined" aria-hidden="true">fullscreen</span>
         </button>

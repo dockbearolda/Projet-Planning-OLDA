@@ -258,12 +258,17 @@ const TE = global.window.TextileEngine;
   assert.ok(!/\blogo\b/i.test(sansCom(lire('public/comptoir/textile-catalog.js'))),
     'le moteur conforme au fichier V9 reste hors du sujet : rien n’y parle de logo');
 
-  // --- 9. L'ÉCRAN, ENTRE LA BASE CLIENTS ET LES RÉGLAGES ---------------------
+  // --- 9. L'ÉCRAN FERME LA RANGÉE, APRÈS LA BASE CLIENTS --------------------
+  // Il était JUSTE AVANT Réglages jusqu'au 01/09, jour où Réglages a quitté la
+  // rangée d'onglets pour rejoindre les commandes de l'appareil : « Tailles
+  // logos » ferme donc la marche, et c'est toujours le dernier écran de
+  // travail de la barre.
   const nav = INDEX.slice(INDEX.indexOf('class="nav-switch"'), INDEX.indexOf('</nav>'));
   const iLogos = nav.indexOf('id="viewTaillesLogos"');
-  const iReglages = nav.indexOf('id="viewReglages"');
-  assert.ok(iLogos > 0 && iReglages > 0 && iLogos < iReglages, 'l’onglet est JUSTE AVANT Réglages');
-  assert.match(nav.slice(iLogos, iReglages), /material-symbols-outlined"[^>]*>draw</,
+  const iClients = nav.indexOf('id="viewClients"');
+  assert.ok(iLogos > 0 && iClients > 0 && iClients < iLogos, 'l’onglet vient après la Base clients');
+  assert.ok(!/id="view/.test(nav.slice(iLogos + 20)), '… et plus rien après lui : il ferme la rangée');
+  assert.match(nav.slice(iLogos), /material-symbols-outlined"[^>]*>draw</,
     '« draw » est vérifié présent dans le sous-ensemble figé de la police');
   // VUE ET HASH DOIVENT RESTER ALIGNÉS : un hash absent de la table rend
   // l'onglet MORT (il retombe sur le planning sans rien dire).

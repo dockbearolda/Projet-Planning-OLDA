@@ -520,38 +520,45 @@ console.log('✓ flèche : une seule dans l’application, et plus aucune dans l
   assert.ok(!/\.topbar \{[^}]*container-type/.test(CSSNET),
     '… la barre ne se mesure donc plus elle-même');
 
-  // LA RANGÉE UNIQUE (01/09, demande de Charlie : « fusionne ça pour gagner de
-  // la place d'affichage en hauteur »). Mesuré à 1 280 : la barre passe de
-  // 126 px à 66, et la zone de travail de 673 à 733 — sur les sept écrans.
+  // DEUX RANGÉES, ET C'EST UN CHOIX TENU (01/09, Charlie : « ces catégories
+  // sauf réglages doivent rester sous la barre de recherche »). Elles avaient
+  // été fondues en une le matin même pour rendre 60 px de hauteur ; les onglets
+  // y devenaient neuf pictogrammes muets jusqu'à des largeurs qu'aucun poste
+  // n'a. Sur leur rangée ils retrouvent leurs mots dès 1 440 — mesuré : 1 028
+  // px de libellés pour 1 028 disponibles, ça tient tout juste, et à 1 280 ce
+  // sont les libellés qui cèdent, jamais la rangée.
   const barreRegle = CSSNET.match(/(?:^|\n)\.topbar \{\n(?:.*\n)*?\}/);
-  assert.ok(barreRegle && /flex-wrap: nowrap/.test(barreRegle[0]),
-    'la barre est VERROUILLÉE sur une rangée : plus rien ne repasse en dessous');
+  assert.ok(barreRegle && /flex-wrap: wrap/.test(barreRegle[0]),
+    'la barre porte ses deux rangées, et le pli est son état de base');
   assert.ok(/min-height: calc\(var\(--ctrl-h\)/.test(barreRegle[0]),
-    '… et sa hauteur est sa RECETTE, pas un nombre : la boîte plus ses flancs');
+    '… sa hauteur est sa RECETTE, pas un nombre : la boîte plus ses flancs');
+  // DEUX RANGÉES COLLÉES SONT UNE BARRE, deux rangées espacées sont deux
+  // barres. L'écart vertical est le plus petit de l'échelle, et il est LU :
+  // écrit en dur il aurait divergé du reste.
+  assert.ok(/gap: var\(--pas-1\) var\(--topbar-gap\)/.test(barreRegle[0]),
+    '… et l’écart de ses deux rangées est un jeton');
+  assert.ok(/--topbar-gap:/.test(barreRegle[0]),
+    'l’écart horizontal est un jeton lui aussi : la rangée d’onglets le REPREND pour tomber sous la recherche');
 
   const pli = CSSNET.match(/\.topbar \.nav-switch \{\n(?:.*\n)*?\}/);
-  assert.ok(pli && /order: 2/.test(pli[0]),
-    'les onglets sont le 2e groupe de la rangée : rail, recherche, onglets, actions');
-  assert.ok(/flex: 0 1 auto/.test(pli[0]) && /width: auto/.test(pli[0]),
-    'la rangée vaut ses onglets : ni élastique, ni pleine largeur');
-  // ELLE NE REPREND PLUS LES FLANCS DE LA BARRE. C'était juste tant qu'elle
-  // était SEULE sur sa ligne ; sur la rangée unique, ces marges négatives la
-  // feraient passer sous la recherche et sous les actions.
-  assert.ok(!/-1 \* var\(--topbar-flanc/.test(pli[0]),
-    '… et elle ne déborde plus sur les flancs de la barre, qu’elle ne partageait avec personne');
-  // MESURÉ À 1 920 : la recherche s'arrête à sa borne (520) et 332 px restaient
-  // derrière les actions — le poste flottait à 332 px du bord de l'écran. La
-  // marge automatique ne passe qu'APRÈS la répartition élastique : la recherche
-  // grandit d'abord, le reste vient ici, et le bord droit se tient.
-  assert.ok(/margin: 0 0 0 auto/.test(pli[0]),
-    '… onglets et actions tiennent le bord droit à toutes les largeurs');
-  assert.ok(/justify-content: safe center/.test(pli[0]),
-    'le centrage reste `safe`');
-  // `safe` n'est pas décoratif : la rangée peut DÉFILER, et un `center` sec rend
-  // le début du contenu inatteignable dès qu'il déborde — même famille de piège
-  // que `justify-content: flex-end`.
+  assert.ok(pli && /order: 3/.test(pli[0]),
+    'les onglets viennent après la recherche et les actions : ils sont la rangée du bas');
+  assert.ok(/flex: 1 1 100%/.test(pli[0]),
+    'pleine largeur, ET capable de rétrécir : une base de 100 % AJOUTE ses marges par-dessus');
+  // ELLE COMMENCE SOUS LA RECHERCHE, ET ÇA NE S'ÉCRIT PAS. Le décalage est ce
+  // que le bouton du rail occupe (`--ctrl-h`) plus l'écart de la barre. Écrit
+  // en dur, il se décollerait le jour où l'un des deux bouge — et un alignement
+  // raté d'un pixel se voit précisément parce que les deux rangées sont l'une
+  // sous l'autre. Mesuré au rendu : 0 px d'écart, à 1 280 comme à 1 440.
+  assert.ok(/margin: 0 calc\(-1 \* var\(--topbar-flanc-d\)\) 0 calc\(var\(--ctrl-h\) \+ var\(--topbar-gap\)\)/.test(pli[0]),
+    'la rangée tombe sous la recherche par les jetons, et reprend le flanc droit qu’elle ne partage avec personne');
+  // ALIGNÉE, DONC PAS CENTRÉE : un centrage la ferait flotter au milieu d'une
+  // rangée dont le bord gauche est justement ce qu'on veut voir tomber sous
+  // celui de la recherche.
+  assert.ok(/justify-content: flex-start/.test(pli[0]),
+    'elle s’aligne, elle ne se centre pas');
   assert.ok(/overflow-x: auto/.test(pli[0]),
-    '… et elle défile en dernier recours, ce qui est exactement pourquoi');
+    '… et elle défile en tout dernier recours, après que les libellés sont partis');
   // LES ONGLETS NE SE COMPRIMENT PAS, et c'est ce qui fait tenir la mesure :
   // comprimés, ils coupent leurs libellés en silence, `scrollWidth` retombe sur
   // `clientWidth`, et `ajusterLesOnglets` conclut « ça tient » sur une rangée
@@ -567,11 +574,38 @@ console.log('✓ flèche : une seule dans l’application, et plus aucune dans l
     'la recherche absorbe la place en trop et la rend, sans descendre sous son plancher');
   assert.ok(/--rech-plancher:/.test(barreRegle[0]), 'le plancher est déclaré par la barre');
 
-  // UNE MARGE AUTO MANGE TOUTE LA PLACE LIBRE AVANT `justify-content` : sans la
-  // rendre, la recherche ne pourrait pas grandir. Mesuré : 67,4 px résolus sur
-  // le premier onglet.
+  // UNE SEULE MARGE AUTOMATIQUE DANS LA BARRE, sur les actions. Deux se
+  // partageraient la place libre et creuseraient un trou au milieu ; aucune, et
+  // les 332 px que la recherche ne prend pas une fois à sa borne (mesuré à
+  // 1 920) restent derrière elles — le poste flottait à 332 px du bord.
+  assert.ok(/\.topbar-right \{ margin-left: auto;/.test(CSSNET),
+    'les actions tiennent le bord droit');
   assert.ok(/\.topbar \.nav-switch > :first-child \{ margin-left: 0; \}/.test(CSSNET),
-    '… et le premier onglet rend sa marge automatique, sinon elle mange la place de la recherche');
+    '… et le premier onglet ne reprend pas la sienne, sinon le centrage de la rangée ne prendrait plus');
+
+  // RÉGLAGES A QUITTÉ LA RANGÉE D'ONGLETS. Son ancienne règle le disait déjà :
+  // « on n'y va pas pour travailler, on y va pour régler l'outil », et elle le
+  // détachait par un filet. Il est du côté des commandes de l'appareil, en
+  // rond comme elles, et le filet est devenu `.topbar-sep`.
+  const NAV_HTML = HTML.slice(HTML.indexOf('class="nav-switch"'), HTML.indexOf('</nav>'));
+  assert.ok(!NAV_HTML.includes('id="viewReglages"'),
+    'Réglages n’est plus un onglet d’écran');
+  const DROITE = HTML.slice(HTML.indexOf('<div class="topbar-right">'), HTML.indexOf('</header>'));
+  assert.ok(DROITE.includes('id="viewReglages"'), '… il est avec les commandes de l’appareil');
+  assert.ok(DROITE.indexOf('id="viewReglages"') < DROITE.indexOf('topbar-sep')
+    && DROITE.indexOf('topbar-sep') < DROITE.indexOf('id="fullscreenToggle"'),
+    '… et le filet le sépare d’elles : lui mène à un écran, elles agissent sur l’appareil');
+  assert.ok(/class="icon-btn" id="viewReglages"/.test(DROITE),
+    '… il en prend la forme, le rond de --ctrl-h — pas un onglet égaré parmi quatre cercles');
+  assert.ok(/<a class="icon-btn" id="viewReglages" href="#reglages"/.test(DROITE),
+    '… et il reste un LIEN : il mène à une adresse, donc il s’ouvre à la molette comme les autres écrans');
+  // `hidden` NE SUFFIT PAS SUR UN `.icon-btn` non plus : la règle de classe
+  // pose `display: inline-flex`, plus spécifique que la feuille du navigateur.
+  // Réglages se cache à qui n'y a pas droit, le plein écran naît caché.
+  assert.ok(/\.icon-btn\[hidden\] \{ display: none; \}/.test(CSSNET),
+    'un rond caché disparaît vraiment');
+  assert.ok(/\.icon-btn\.active \{/.test(CSSNET),
+    '… et celui qui mène à un écran sait dire qu’on y est');
 
   assert.ok(!/@media \(min-width: 1720px\)/.test(CSSNET),
     'la barre ne change plus de forme au milieu de la plage de largeurs');

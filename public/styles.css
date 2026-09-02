@@ -197,17 +197,21 @@ textarea { line-height: var(--ligne-texte); }
   z-index: 20;
   display: flex;
   align-items: center;
-  /* UNE RANGÉE, ET UNE SEULE (01/09). La barre se pliait en deux — recherche
-     en haut, onglets dessous — et coûtait 126 px de hauteur à tous les écrans.
-     Verrouillée sur une ligne, elle en coûte 66.
-     RIEN ICI NE DÉPEND DU RAIL, et c'est la leçon qu'on garde du 26/08 : la
-     barre se mesurait alors elle-même (`@container`), donc son pli dépendait
-     de sa propre largeur, donc du rail — le rentrer réorganisait l'ossature
-     sous les yeux. Elle n'a plus de pli à décider : sa forme est la même à
-     toutes les largeurs et dans les deux états du rail. Seuls les LIBELLÉS des
-     onglets vont et viennent, et ça, ça se mesure (`ajusterLesOnglets`). */
-  flex-wrap: nowrap;
-  gap: 10px;
+  /* DEUX RANGÉES, ET C'EST UN CHOIX TENU (01/09, Charlie : « ces catégories
+     sauf réglages doivent rester sous la barre de recherche »). Elles avaient
+     été fondues en une le matin même pour rendre 60 px de hauteur ; les
+     onglets y devenaient neuf pictogrammes muets jusqu'à des largeurs qu'aucun
+     poste n'a. Sur leur propre rangée ils retrouvent leurs mots dès 1 440.
+     LE PLI EST L'ÉTAT DE BASE, il ne se décide pas. Aucune requête média,
+     aucune mesure de la barre : elle se mesurait elle-même (`@container`)
+     jusqu'au 26/08, donc son pli dépendait de sa propre largeur, donc du rail —
+     le rentrer réorganisait l'ossature sous les yeux. Seuls les LIBELLÉS vont
+     et viennent, et eux se mesurent (`ajusterLesOnglets`).
+     L'ÉCART VERTICAL EST LE PLUS PETIT DE L'ÉCHELLE : deux rangées collées
+     sont une barre, deux rangées espacées sont deux barres. */
+  flex-wrap: wrap;
+  --topbar-gap: 10px;
+  gap: var(--pas-1) var(--topbar-gap);
   /* LA LARGEUR OÙ « Rechercher » SE LIT ENCORE — un jeton, parce que la
      recherche s'en sert deux fois (base élastique et plancher) et que deux
      nombres recopiés divergent. */
@@ -229,11 +233,25 @@ textarea { line-height: var(--ligne-texte); }
 }
 
 
-/* LES ONGLETS SONT À DROITE : c'est `.nav-switch` qui absorbe la place libre
-   (la recherche est bornée à 520 px), les actions le suivent. Deux marges
-   automatiques se partageraient l'espace et creuseraient un trou entre les
-   deux — d'où le 0 explicite ici. */
-.topbar-right { margin-left: 0; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* LES ACTIONS TIENNENT LE BORD DROIT. La recherche grandit d'abord jusqu'à sa
+   borne (520) ; ce qui reste va dans cette marge — mesuré à 1 920 : 332 px qui,
+   sans elle, restaient DERRIÈRE les actions, et le poste flottait à 332 px du
+   bord de l'écran. Une marge automatique ne passe qu'APRÈS la répartition
+   élastique, les deux ne se disputent donc rien.
+   IL N'Y EN A QU'UNE DANS LA BARRE : deux se partageraient la place libre et
+   creuseraient un trou au milieu. */
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* LE FILET SÉPARE DEUX GENRES, PAS DEUX BOUTONS. À gauche, Réglages : un ÉCRAN,
+   qui change l'adresse. À droite, ce qui agit sur l'appareil ici et maintenant
+   — plein écran, thème, actualiser, qui est au poste. Cinq ronds identiques
+   d'affilée ne diraient pas que le premier n'est pas de la même famille.
+   Même grammaire que le filet qui fermait le groupe dans la rangée d'onglets. */
+.topbar-sep {
+  width: 1px;
+  align-self: stretch;
+  margin-inline: var(--pas-1);
+  background: var(--border-soft);
+}
 
 /* bouton icône rond (bascule de thème…)
    UNE SEULE HAUTEUR DANS LA BARRE DU HAUT (28/08/2026, Charlie : « je veux voir
@@ -262,8 +280,19 @@ textarea { line-height: var(--ligne-texte); }
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
+/* `hidden` NE SUFFIT PAS ICI — même piège que sur l'onglet, et déjà payé une
+   fois : l'attribut vaut `display: none` par la feuille du navigateur, mais la
+   règle de classe juste au-dessus pose `display: inline-flex`, plus spécifique.
+   Le bouton plein écran naît caché, et Réglages se cache à qui n'y a pas
+   droit : sans ça, tous deux resteraient à l'écran, cliquables. */
+.icon-btn[hidden] { display: none; }
 .icon-btn:hover { background: var(--state-hover); color: var(--text-1); }
 .icon-btn:active { background: var(--state-press); }
+/* ON EST DESSUS. Réglages est le seul de ces ronds à mener quelque part : il
+   doit donc pouvoir dire « c'est l'écran ouvert ». L'onglet le disait par un
+   soulignement, qui n'a pas de sens sous un cercle — ici c'est le fond qui le
+   dit, et une couleur qui dit un ÉTAT est ce que la charte autorise. */
+.icon-btn.active { background: var(--state-press); color: var(--text-1); }
 .icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 .icon-btn .material-symbols-outlined { font-size: var(--ic); }
 
@@ -3529,67 +3558,56 @@ a,
    Responsive
    ========================================================================= */
 
-/* LA BARRE DU HAUT TIENT SUR UNE SEULE RANGÉE (01/09/2026, demande de Charlie :
-   « il faut que tu fusionne ça pour gagner de la place d'affichage en hauteur »).
-   Elle en portait DEUX depuis le 26/08 — recherche + actions en haut, onglets
-   sur leur propre ligne dessous : 126 px de barre, mesurés à 1 280. Fondues en
-   une, elles en font 66. Les 60 px vont à la zone de travail, sur les sept
-   écrans à la fois — c'est le seul pixel qu'on puisse rendre partout d'un coup.
+/* LES ONGLETS ONT LEUR RANGÉE, SOUS LA RECHERCHE (01/09/2026, Charlie : « ces
+   catégories sauf réglages doivent rester sous la barre de recherche »).
 
-   CE QU'ON PERD, ET C'EST ASSUMÉ : la rangée d'onglets n'a plus toute la
-   largeur de la barre pour elle. À 1 280 avec le rail sorti (320), il reste
-   912 px pour le bouton du rail (50), la recherche, les dix onglets et les
-   quatre actions (224). Les libellés ne tiennent donc plus à cette largeur —
-   ils cèdent, comme avant, par la MESURE (`ajusterLesOnglets` dans app.js), et
-   chaque icône reprend son mot en infobulle. Ils reviennent dès que la fenêtre,
-   ou le rail replié, rend la place.
+   L'ORDRE DE LA BARRE : rangée du haut, le bouton du rail (posé par le HTML),
+   la recherche, puis les actions collées à droite ; rangée du bas, les huit
+   écrans de travail. Réglages n'en est plus : c'est un réglage d'appareil, il
+   est monté avec les actions (voir index.html).
 
-   L'ORDRE : bouton du rail (posé par le HTML), recherche, onglets, actions.
-   La recherche est le SEUL élément élastique de la rangée — c'est elle qui
-   absorbe la largeur en trop et qui rend la place quand elle manque. Les
-   onglets et les actions gardent leur taille : un onglet qui rétrécit est un
-   onglet qu'on rate, et les quatre actions sont des cercles.
+   ELLE COMMENCE SOUS LA RECHERCHE, PAS SOUS LA BARRE. Le décalage n'est pas
+   écrit : c'est exactement ce que le bouton du rail occupe (`--ctrl-h`) plus
+   l'écart de la barre. Écrit en dur, il se serait décollé le jour où l'un des
+   deux bouge — et un alignement raté d'un pixel se voit précisément parce que
+   les deux rangées sont l'une sous l'autre.
 
    Sélecteurs préfixés par `.topbar` À DESSEIN : les règles de base des onglets
    vivent plus bas dans le fichier — à égalité de spécificité, c'est la
-   dernière lue qui gagne. */
+   dernière lue qui gagne, et le pli n'aurait servi à rien. */
 .topbar .grid-search {
   order: 1;
   /* Le plancher et la base sont le MÊME jeton : la recherche ne descend jamais
-     sous la largeur où son intitulé se lit, et elle part de là pour grandir.
-     Mesuré à 1 280 : 196 px ; au-delà elle grandit jusqu'à sa borne haute. */
+     sous la largeur où son intitulé se lit, et elle part de là pour grandir. */
   flex: 1 1 var(--rech-plancher);
   min-width: var(--rech-plancher);
-  /* Bornée, comme avant : au-delà elle ne gagne plus rien à s'étirer, et la
-     rangée d'onglets se retrouverait poussée contre les actions. */
+  /* Bornée : au-delà elle ne gagne plus rien à s'étirer, et le reste de la
+     place va aux actions, qui tiennent le bord droit. */
   max-width: 520px;
 }
+.topbar .topbar-right { order: 2; }
 .topbar .nav-switch {
-  order: 2;
-  /* NI ÉLASTIQUE NI PLEINE LARGEUR : la rangée vaut exactement ses onglets.
-     `flex: 0 1 auto` lui laisse quand même la possibilité d'être rognée quand
-     la recherche à son plancher ne suffit plus — c'est la seule façon pour
-     elle de MESURER son propre débordement, donc de savoir retirer ses
-     libellés. */
-  flex: 0 1 auto;
-  width: auto;
+  order: 3;
+  /* `1 1 100%` ET NON `1 0 100%` : la rangée porte des marges (le décalage sous
+     la recherche à gauche, le flanc repris à droite), et une base de 100 % les
+     ajoute PAR-DESSUS la largeur du parent — mesuré, elle sortait 44 px à
+     droite de la barre. Pouvoir rétrécir, c'est ce qui la remet dans sa boîte,
+     et c'est aussi ce qui rend son débordement mesurable. */
+  flex: 1 1 100%;
   min-width: 0;
-  /* ONGLETS ET ACTIONS TIENNENT LE BORD DROIT. Sans cette marge, les 332 px
-     que la recherche ne prend pas une fois à sa borne (mesuré à 1 920)
-     restaient DERRIÈRE les actions : le poste flottait à 332 px du bord de
-     l'écran. La marge automatique ne passe qu'APRÈS la répartition élastique —
-     la recherche grandit d'abord jusqu'à sa borne, le reste va ici. C'est
-     aussi pour ça que le premier onglet doit rendre la sienne, plus bas. */
-  margin: 0 0 0 auto;
-  /* `safe` n'est pas décoratif : la rangée peut défiler, et un `center` sec
-     rend le DÉBUT du contenu inatteignable dès qu'il déborde — le mot-clé
-     retombe alors sur `start`. Même famille de piège que `flex-end`. */
-  justify-content: safe center;
+  /* SOUS LA RECHERCHE : la boîte du bouton du rail, plus l'écart de la barre.
+     Mesuré au rendu, pas déduit — les deux rangées se relisent l'une sous
+     l'autre. À droite, la rangée reprend le flanc de la barre : elle est seule
+     sur sa ligne, personne d'autre n'en a besoin, et ça lui rend 16 px. */
+  margin: 0 calc(-1 * var(--topbar-flanc-d)) 0 calc(var(--ctrl-h) + var(--topbar-gap));
+  /* ALIGNÉE, DONC PAS CENTRÉE. Un centrage la ferait flotter au milieu d'une
+     rangée dont le bord gauche est justement ce qu'on veut voir tomber sous
+     celui de la recherche. */
+  justify-content: flex-start;
   flex-wrap: nowrap;
   gap: 2px;
   /* Dernier recours, pour la fenêtre si étroite qu'un seul onglet serait plus
-     large qu'elle. Avant lui : les libellés s'en vont, puis la recherche
-     descend à son plancher. */
+     large qu'elle. Avant lui, les libellés s'en vont. */
   overflow-x: auto;
 }
 /* LES ONGLETS NE SE COMPRIMENT PAS. Sans ça, la rangée rétrécit en emmenant
@@ -3598,7 +3616,6 @@ a,
    rangée illisible. Ils débordent, donc, et c'est ce débordement qui déclenche
    le retrait des libellés. */
 .topbar .nav-switch-btn { flex: 0 0 auto; }
-.topbar .topbar-right { order: 3; }
 /* Les flancs des onglets, sur la rangée qui leur est propre. C'est le premier
    levier quand la place manque, et le seul qui ne coûte rien à la lecture :
    « Fiverr » et « À commander » ne se devinent pas à l'icône. */
@@ -3615,9 +3632,7 @@ a,
 .nav-switch.est-serree .nav-switch-label { display: none; }
 .topbar .nav-switch.est-serree .nav-switch-btn { padding-inline: 8px; }
 .topbar .nav-switch.est-serree .nav-switch-btn--projet-fin { padding-right: 11px; }
-.topbar .nav-switch.est-serree .nav-switch-btn--reglages { padding-left: 11px; }
 .topbar .nav-switch-btn--projet-fin { padding-right: 11px; margin-right: 4px; }
-.topbar .nav-switch-btn--reglages { padding-left: 11px; margin-left: 4px; }
 /* LA DROITE SE TIENT PAR LA RANGÉE, JAMAIS PAR SON PREMIER ONGLET. Elle s'est
    tenue un temps par un `margin-left: auto` posé sur l'onglet lui-même : une
    marge AUTO mange toute la place libre restante, et le centrage à l'intérieur
@@ -3650,9 +3665,10 @@ a,
 @media (max-width: 1280px) {
   .shell { --rail-w: var(--sidebar-w, 320px); grid-template-columns: var(--rail-w) 16px 1fr; }
   .app { padding: 12px; }
-  /* Barre du haut plus serrée : la marque se réduit au logo pour laisser toute
-     la place aux onglets et à la recherche. */
-  .topbar { gap: 10px; }
+  /* Barre du haut plus serrée en LARGEUR seulement : `gap: 10px` écrasait aussi
+     l'écart des deux rangées et la barre reprenait 4 px de haut à 1 280 pile —
+     le genre d'écart qu'on ne voit qu'en mesurant deux largeurs voisines. */
+  .topbar { column-gap: var(--topbar-gap); }
   /* +240 px depuis l'ajout des colonnes « État » et « → », pour que les 3 colonnes
      de texte gardent la même largeur plancher qu'avant (~104 px) : sans ça elles
      se tassent au lieu de laisser la grille défiler horizontalement. */
@@ -3846,16 +3862,11 @@ a,
   border-bottom-right-radius: 0;
 }
 
-/* Réglages ferme la marche, détaché lui aussi : on n'y va pas pour travailler,
-   on y va pour régler l'outil. */
-.nav-switch-btn--reglages {
-  margin-left: 6px;
-  padding-left: 14px;
-  border-left: 1px solid var(--border-soft);
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  color: var(--text-2);
-}
+/* RÉGLAGES A QUITTÉ LA RANGÉE (01/09) : il fermait la marche, détaché par un
+   filet, parce qu'« on n'y va pas pour travailler, on y va pour régler
+   l'outil ». C'était la bonne lecture et elle allait jusqu'au bout : il est
+   maintenant avec les commandes de l'appareil, en rond, et c'est `.topbar-sep`
+   qui porte le filet. */
 
 /* Deux familles de vues, deux classes sur <body> :
      - `view-plein`  : l'écran n'est PAS le planning (dashboard, prise de
