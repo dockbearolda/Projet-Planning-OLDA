@@ -211,6 +211,23 @@ function buildStatic() {
     + 'ensuite. Le maritime est compris dans le prix d’achat, il reste à zéro.',
     'reg-transport'));
 
+  // --- Carte « Chiffrage du devis » --------------------------------------------
+  // LES SIX RÉGLAGES DU MOTEUR TEXTILE, ENFIN DANS LES RÉGLAGES (02/09/2026).
+  // Charlie : « les 6 réglages du chiffrage doivent être réglables directement
+  // dans une catégorie dédiée à devis flash dans réglage ».
+  //
+  // ⚠ ILS EXISTAIENT DÉJÀ EN BASE (`app_meta.textile_settings`) et le comptoir
+  // les corrigeait depuis SON écran — un formulaire de six cases posé au milieu
+  // de la prise de commande. Un barème d'atelier n'a rien à faire là : c'est un
+  // réglage, il se règle une fois, et il vaut pour les trois écrans qui
+  // chiffrent.
+  page.appendChild(carteSimple('request_quote', 'Chiffrage du devis',
+    'Les coûts et cadences de l’atelier qui font le prix d’un textile : le DTF, '
+    + 'le pressage, l’heure d’atelier, l’arrondi et le palier de coefficient. '
+    + 'Ils valent pour le devis, la vente et la demande de devis — deux postes '
+    + 'ne peuvent pas annoncer deux prix pour le même article.',
+    'reg-chiffrage'));
+
   // --- Carte « Fonctions en cours » --------------------------------------------
   page.appendChild(carteSimple('settings', 'Fonctions en cours',
     'Les chantiers livrés mais pas encore allumés. Éteints, l’application se '
@@ -409,6 +426,49 @@ function renderExpress() {
         // pas changé, en croyant le contraire.
         flash(err.message, 'is-ko');
         renderExpress();
+      }
+    }));
+    return l;
+  }));
+}
+
+// LES SIX RÉGLAGES DU CHIFFRAGE. Le nom, l'unité et l'aide sont écrits ICI et
+// nulle part ailleurs : les bornes, elles, appartiennent au serveur (`db.js`,
+// TEXTILE_BORNES) — il refuse ce qui sort, on ne le devine pas deux fois.
+const CHIFFRAGE_LIGNES = [
+  ['dtfCost', 'Coût du DTF', '€ / m', 'le mètre linéaire de film, prix d’achat'],
+  ['dtfSpeed', 'Débit du DTF', 'm / h', 'ce que la machine sort en une heure'],
+  ['pressMin', 'Pressage', 'min / impression', 'le temps d’une pièce sous la presse'],
+  ['hourlyCost', 'Coût d’atelier', '€ / h', 'ce que coûte une heure de poste'],
+  ['roundStep', 'Arrondi supérieur', '€', 'le prix de vente monte au multiple suivant'],
+  ['maxCoefQty', 'Palier de coefficient', 'pièces', 'au-delà, le coefficient ne descend plus'],
+];
+let chiffrage = {};
+
+function renderChiffrage() {
+  const hote = $('#reg-chiffrage');
+  if (!hote) return;
+  hote.replaceChildren(...CHIFFRAGE_LIGNES.map(([cle, nom, unite, aide]) => {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', nom));
+    l.append(el('span', 'reg-ligne__aide', aide));
+    l.append(champNombre(chiffrage[cle], unite, async (v) => {
+      const n = Number(String(v).replace(',', '.'));
+      if (!Number.isFinite(n) || n < 0) {
+        flash('Ce réglage attend un nombre positif.', 'is-ko');
+        renderChiffrage();
+        return;
+      }
+      try {
+        // ⚠ LE SERVEUR IGNORE UNE VALEUR HORS BORNES, il ne la refuse pas : il
+        // renvoie donc ce qu'il a RETENU, et c'est ça qu'on réaffiche. Garder la
+        // valeur tapée ferait croire à un enregistrement qui n'a pas eu lieu.
+        chiffrage = await api('PUT', '/api/settings/textile', { ...chiffrage, [cle]: n });
+        renderChiffrage();
+        flash('Enregistré — vaut pour tous les postes', 'is-ok');
+      } catch (err) {
+        flash(err.message, 'is-ko');
+        renderChiffrage();
       }
     }));
     return l;
@@ -1117,9 +1177,11 @@ export async function refreshReglages() {
     api('GET', '/api/catalogue-produits').then((d) => { if (Array.isArray(d)) catalogue = d; }).catch(() => {}),
     api('GET', '/api/tarifs-transport').then((d) => { if (d) transports = d; }).catch(() => {}),
     api('GET', '/api/settings/entreprise').then((d) => { if (d) entreprise = d; }).catch(() => {}),
+    api('GET', '/api/settings/textile').then((d) => { if (d) chiffrage = d; }).catch(() => {}),
   ]);
   renderMarges();
   renderExpress();
+  renderChiffrage();
   renderTransport();
   renderModeles();
   renderMachines();

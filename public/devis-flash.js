@@ -331,19 +331,39 @@ export async function refreshDevisFlash() {
 }
 
 async function rechargerReglages() {
-  const [cl, cat, ent, par, tr] = await Promise.all([
+  const [cl, cat, ent, par, tr, tex] = await Promise.all([
     api('GET', '/api/clients').catch(() => []),
     api('GET', '/api/catalogue-produits').catch(() => []),
     api('GET', '/api/settings/entreprise').catch(() => ({})),
     api('GET', '/api/tarifs-tasse/parametres').catch(() => null),
     api('GET', '/api/tarifs-transport').catch(() => ({})),
+    api('GET', '/api/settings/textile').catch(() => null),
   ]);
   clients = Array.isArray(cl) ? cl : [];
   catalogue = Array.isArray(cat) ? cat : [];
   entreprise = ent && typeof ent === 'object' ? ent : {};
   transports = tr && typeof tr === 'object' ? tr : {};
   if (par && Number.isFinite(Number(par.tgca))) saisie.tauxTgca = Number(par.tgca);
+  reglagesTextile = tex && typeof tex === 'object' ? tex : null;
+  // ⚠ DÉFAUT CORRIGÉ LE 02/09 : le devis chiffrait avec les réglages PAR DÉFAUT
+  // du moteur (7,56 € le mètre de DTF, 25 € l'heure…), pendant que le comptoir
+  // chiffrait avec ceux de l'atelier, gardés en base depuis toujours
+  // (`app_meta.textile_settings`). Deux écrans à un clic l'un de l'autre, deux
+  // prix pour le même t-shirt — et rien à l'écran ne le disait.
+  //
+  // Le moteur peut arriver APRÈS ces réglages (il se charge au premier textile
+  // posé) : on les garde donc, et `moteurTextile()` les repose à chaque fois.
+  poserReglagesMoteur();
   remplirCatalogue();
+}
+
+// LES RÉGLAGES DE L'ATELIER, DANS LE MOTEUR. Une seule écriture, appelée aussi
+// bien quand les réglages arrivent que quand le moteur arrive : lequel des deux
+// est là en premier ne se décide pas, il se constate.
+let reglagesTextile = null;
+function poserReglagesMoteur() {
+  if (!reglagesTextile || !window.TextileEngine) return;
+  try { window.TextileEngine.setSettings(reglagesTextile); } catch (_) { /* moteur d'une autre version */ }
 }
 
 function batir() {
@@ -800,14 +820,25 @@ const parNom = new Map();
 const CHEMIN_MOTEUR = '/comptoir/textile-catalog.js';
 let moteurEnRoute = null;
 function moteurTextile() {
+  // ⚠ LES RÉGLAGES SE REPOSENT À CHAQUE APPEL, pas seulement au chargement du
+  // moteur. Il vit sur `window` : il survit à un changement d'onglet, alors que
+  // les réglages, eux, sont relus à chaque montage de l'écran. Posés au seul
+  // `onload`, un moteur déjà chargé gardait les valeurs de la fois d'avant —
+  // et un coût de DTF corrigé aux Réglages ne prenait qu'au rechargement de la
+  // page. Les reposer coûte une affectation d'objet.
+  poserReglagesMoteur();
   if (window.TextileEngine) return Promise.resolve(window.TextileEngine);
   if (!moteurEnRoute) {
     moteurEnRoute = new Promise((tenu, rompu) => {
       const s = document.createElement('script');
       s.src = CHEMIN_MOTEUR;
-      s.onload = () => (window.TextileEngine
-        ? tenu(window.TextileEngine)
-        : rompu(new Error('Moteur textile illisible')));
+      s.onload = () => {
+        if (!window.TextileEngine) return rompu(new Error('Moteur textile illisible'));
+        // Le moteur arrive avec SES valeurs par défaut : les réglages de
+        // l'atelier se posent AVANT le premier calcul, jamais après.
+        poserReglagesMoteur();
+        return tenu(window.TextileEngine);
+      };
       s.onerror = () => rompu(new Error('Moteur textile injoignable — le prix se saisit à la main'));
       document.head.appendChild(s);
     }).catch((err) => {
