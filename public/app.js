@@ -501,6 +501,33 @@ function lireRailDeplie() {
 
 let railDeplie = lireRailDeplie();
 
+// UNE PHASE ENTIÈRE SE PLIE (02/09/2026)
+// ---------------------------------------------------------------------------
+// Charlie : « ces catégories doivent être pliable repliable ». C'est un cran
+// AU-DESSUS du repli des étapes vides : là on masque la phase entière, titre
+// compris — le rail de l'atelier tient six phases et personne n'en suit six.
+//
+// DEUX REPLIS, DEUX MÉMOIRES, ET C'EST VOULU : « + 6 étapes vides » dit quelles
+// étapes on veut voir DANS une phase qu'on suit ; celui-ci dit quelles phases
+// on suit. Les confondre reviendrait à rouvrir une phase entière pour montrer
+// une étape vide.
+const RAIL_PLIE_ZONES_KEY = 'olda.rail-zones-pliees';
+const zonesKey = () => {
+  const qui = lirePoste();
+  return qui ? `${RAIL_PLIE_ZONES_KEY}:${qui}` : RAIL_PLIE_ZONES_KEY;
+};
+function lireZonesPliees() {
+  try {
+    const brut = JSON.parse(localStorage.getItem(zonesKey()) || 'null');
+    if (Array.isArray(brut)) return new Set(brut.filter((x) => typeof x === 'string'));
+  } catch (_) { /* stockage refusé ou illisible */ }
+  return new Set();
+}
+let railZonesPliees = lireZonesPliees();
+function saveZonesPliees() {
+  try { localStorage.setItem(zonesKey(), JSON.stringify([...railZonesPliees])); } catch (_) {}
+}
+
 // LES ÉTAPES REPLIÉES RESTENT DES CIBLES. « Les étapes vides, on doit se
 // rappeler qu'elles existent : quand je glisse une ligne et que je passe sur
 // "+ 5 étapes vides", le simple fait de passer dessus doit les ouvrir pour que
@@ -581,6 +608,30 @@ function ligneDeRepli(famille, repliees) {
   return el;
 }
 
+// LA POIGNÉE D'UNE PHASE. Un bouton À PART, pas un coin du titre : le titre est
+// déjà une commande (il montre toute la phase) ET une cible de dépôt. Lui faire
+// porter un second geste, c'est exactement le défaut qui a éteint le glisser des
+// lignes le mois dernier — deux gestes sur un sélecteur, et le second gagne.
+//
+// Elle ne s'affiche QUE sur une phase qui a des étapes : plier « À trier », qui
+// n'a que son titre, ne masquerait rien.
+function poignéeDeZone(famille, plieee) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'zone-plier';
+  b.dataset.zone = famille;
+  b.setAttribute('aria-expanded', String(!plieee));
+  b.setAttribute('aria-label', plieee ? 'Déplier cette phase' : 'Replier cette phase');
+  b.textContent = plieee ? '\u25B8' : '\u25BE';
+  attachTip(b, plieee ? 'Déplier cette phase' : 'Replier cette phase');
+  b.addEventListener('click', () => {
+    if (plieee) railZonesPliees.delete(famille); else railZonesPliees.add(famille);
+    saveZonesPliees();
+    renderSidebar();
+  });
+  return b;
+}
+
 function renderSidebar() {
   $stages.replaceChildren();
   // Chaque FAMILLE est une ZONE : un grand titre (en-tête) qui coiffe ses
@@ -604,8 +655,17 @@ function renderSidebar() {
     corps.className = 'zone-corps';
     const head = buildStageEl(f);
     head.classList.add('zone-head'); // le grand titre se lit comme un en-tête de zone
-    corps.appendChild(head);
-    if (hasSub) {
+    // LA TÊTE EST UNE RANGÉE : le titre, et la poignée qui plie la phase. Deux
+    // boutons côte à côte, sur le même bandeau — jamais un bouton dans un
+    // bouton, que le navigateur ne rend pas et que le clavier ne sait pas
+    // atteindre.
+    const pliee = hasSub && railZonesPliees.has(f.slug);
+    const tete = document.createElement('div');
+    tete.className = 'zone-tete';
+    tete.appendChild(head);
+    if (hasSub) tete.appendChild(poignéeDeZone(f.slug, pliee));
+    corps.appendChild(tete);
+    if (hasSub && !pliee) {
       const toutes = SUB_STAGES[f.slug]
         .filter((sub) => !RAIL_HIDDEN_SUBS.has(sub.slug));  // promue en onglet
       const { visibles, repliees } = replierLesVides(f.slug, toutes);
@@ -5896,6 +5956,9 @@ document.addEventListener('olda:poste', () => {
   // dépliée, la boutique son chiffrage. Il se repeint TOUJOURS, même quand les
   // colonnes n'ont pas bougé — les deux réglages sont indépendants.
   railDeplie = lireRailDeplie();
+  // Le pli des phases suit la personne comme celui des étapes vides : le chef
+  // d'atelier ne suit pas les mêmes phases que la boutique.
+  railZonesPliees = lireZonesPliees();
   renderSidebar();
   const avant = [...hiddenCols].sort().join(',') + '|' + (ordreCols || []).join(',');
   hiddenCols = lireHiddenCols();

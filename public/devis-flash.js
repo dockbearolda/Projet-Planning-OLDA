@@ -375,8 +375,9 @@ function batir() {
   const deux = el('div', 'dvf-deux');
   const saisieCol = el('div', 'dvf-saisie');
   const apercu = el('div', 'dvf-apercu');
-  deux.append(saisieCol, apercu);
+  deux.append(saisieCol, poignee(deux), apercu);
   ROOT.append(deux);
+  deux.style.setProperty('--dvf-gauche', partGauche());
 
   saisieCol.append(carteClient(), carteProjet(), carteArticles(), carteArgent());
 
@@ -396,6 +397,107 @@ function batir() {
   if (typeof ResizeObserver === 'function') {
     new ResizeObserver(mettreALEchelle).observe(apercu);
   }
+}
+
+// ===========================================================================
+// LA POIGNÉE — la coupe se règle à la main (02/09/2026)
+// ===========================================================================
+// Charlie : « entre ça et ça doit y avoir une barre réglable verticalement à la
+// main ». Le partage était écrit une fois pour tous les postes ; ce qu'on
+// regarde, lui, change avec le devis — une désignation longue veut de la
+// saisie, une relecture avant impression veut du papier.
+//
+// LA PART EST RETENUE PAR LE POSTE, pas par le devis : c'est un réglage
+// d'écran, pas une donnée. Elle ne part donc PAS dans le brouillon — un devis
+// repris sur une autre machine ne doit pas y déplacer la coupe.
+const CLE_PART = 'olda.devis.part';
+// Les bornes : en deçà, la saisie ne montre plus une rangée d'article entière ;
+// au-delà, la feuille n'est plus lisible à deux. Ce sont des pourcentages,
+// parce que c'est ce que la grille attend.
+const PART_MIN = 30;
+const PART_MAX = 78;
+const PART_DEFAUT = 57;
+const borner = (n) => Math.min(PART_MAX, Math.max(PART_MIN, n));
+
+function partGauche() {
+  const brut = Number(String(localStorage.getItem(CLE_PART) || '').replace('%', ''));
+  return `${Number.isFinite(brut) && brut ? borner(brut) : PART_DEFAUT}%`;
+}
+
+function poignee(deux) {
+  const b = el('div', 'dvf-poignee');
+  b.id = 'dvf-poignee';
+  b.tabIndex = 0;
+  b.setAttribute('role', 'separator');
+  b.setAttribute('aria-orientation', 'vertical');
+  b.setAttribute('aria-label', 'Largeur de la saisie');
+
+  const poser = (pct) => {
+    const v = borner(pct);
+    deux.style.setProperty('--dvf-gauche', `${v}%`);
+    b.setAttribute('aria-valuenow', String(Math.round(v)));
+    try { localStorage.setItem(CLE_PART, String(v)); } catch (_) { /* plein ou refusé */ }
+    // La feuille se remet à l'échelle de sa nouvelle moitié. Le ResizeObserver
+    // s'en charge aussi, mais il arrive à l'image suivante : appelé ici, le
+    // papier suit la poignée au lieu de la rattraper.
+    mettreALEchelle();
+  };
+  const partDe = (x) => {
+    const r = deux.getBoundingClientRect();
+    return r.width ? ((x - r.left) / r.width) * 100 : PART_DEFAUT;
+  };
+
+  // ⚠ LE GLISSER SE SUIT SUR LA FENÊTRE, PAS SUR LA POIGNÉE. Elle fait 9 px de
+  // large : le pointeur en sort à la première image, et des écouteurs posés sur
+  // elle ne verraient que le premier mouvement. `setPointerCapture` répond à ça
+  // — mais il n'est pas garanti (un pointeur déjà relâché le refuse), et un
+  // glisser qui dépend de lui reste planté là où on l'a lâché. On prend donc
+  // les deux : la capture quand elle veut bien, la fenêtre dans tous les cas.
+  let tire = false;
+  const bouger = (e) => { if (tire) poser(partDe(e.clientX)); };
+  const lacher = () => {
+    if (!tire) return;
+    tire = false;
+    window.removeEventListener('pointermove', bouger);
+    window.removeEventListener('pointerup', lacher);
+    // `pointercancel` : un geste interrompu (une autre fenêtre qui prend la
+    // main) ne doit pas laisser l'écran en « je tire » — plus rien ne se
+    // sélectionnerait.
+    window.removeEventListener('pointercancel', lacher);
+    b.classList.remove('est-tiree');
+    ROOT.classList.remove('est-tiree');
+  };
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    tire = true;
+    try { b.setPointerCapture(e.pointerId); } catch (_) { /* la fenêtre suffit */ }
+    b.classList.add('est-tiree');
+    ROOT.classList.add('est-tiree');
+    window.addEventListener('pointermove', bouger);
+    window.addEventListener('pointerup', lacher);
+    window.addEventListener('pointercancel', lacher);
+  });
+
+  // AU CLAVIER AUSSI. Le PC est la seule cible de ce projet : ce qui s'attrape
+  // à la souris s'atteint aux flèches.
+  b.addEventListener('keydown', (e) => {
+    const pas = e.shiftKey ? 10 : 2;
+    const actuel = parseFloat(getComputedStyle(deux).getPropertyValue('--dvf-gauche')) || PART_DEFAUT;
+    if (e.key === 'ArrowLeft') poser(actuel - pas);
+    else if (e.key === 'ArrowRight') poser(actuel + pas);
+    else if (e.key === 'Home') poser(PART_MIN);
+    else if (e.key === 'End') poser(PART_MAX);
+    else return;
+    e.preventDefault();
+  });
+  // Un double-clic remet la coupe d'origine : c'est le geste attendu d'une
+  // poignée, et ça évite de la chercher au pixel quand on l'a trop tirée.
+  b.addEventListener('dblclick', () => poser(PART_DEFAUT));
+
+  b.setAttribute('aria-valuemin', String(PART_MIN));
+  b.setAttribute('aria-valuemax', String(PART_MAX));
+  b.setAttribute('aria-valuenow', String(parseFloat(partGauche())));
+  return b;
 }
 
 // LA FEUILLE DE STYLE DU PAPIER EST POSÉE DANS LA PAGE, une seule fois. C'est

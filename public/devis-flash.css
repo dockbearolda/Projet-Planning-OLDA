@@ -45,11 +45,58 @@
      `minmax(0, …)` sur les deux pistes : sans lui, la largeur intrinsèque d'un
      champ (une vingtaine de caractères) l'emporte sur la fraction, et la
      colonne de gauche déborde de sa moitié.
-     ⚠ LA SAISIE A GAGNÉ UN CRAN LE 01/09 (1.08 → 1.25) : depuis que les
-     articles sont un TABLEAU, c'est elle qui porte six colonnes, et la feuille
-     n'a jamais eu besoin de plus que d'être lisible. */
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
+     ⚠ LA COUPE SE RÈGLE À LA MAIN DEPUIS LE 02/09. Elle était écrite en
+     fractions — 1.25 / .75, un partage décidé une fois pour tous les postes.
+     Mais ce qu'on regarde change avec le devis : une désignation longue veut
+     de la saisie, une relecture avant impression veut du papier. La part de
+     gauche est donc un JETON que la poignée écrit, et que le poste retient.
+     `minmax(0, …)` sur les deux pistes : sans lui, la largeur intrinsèque d'un
+     champ l'emporte sur la part, et la colonne de gauche déborde. */
+  --dvf-gauche: 57%;
+  grid-template-columns: minmax(0, var(--dvf-gauche)) auto minmax(0, 1fr);
 }
+
+/* ===========================================================================
+   LA POIGNÉE — on déplace la coupe, on ne la subit pas (02/09/2026)
+   ---------------------------------------------------------------------------
+   Elle REMPLACE le filet qui séparait les deux moitiés : une ligne qu'on peut
+   attraper ne doit pas ressembler à une ligne qu'on ne peut pas. Au repos elle
+   EST ce filet ; au survol et au focus elle prend l'accent, et le curseur dit
+   le reste.
+
+   C'est un `separator` au clavier, pas seulement à la souris : sur ce projet le
+   PC est la seule cible, et tout ce qui s'attrape à la souris doit s'atteindre
+   au clavier. Les flèches la déplacent, Origine/Fin la posent aux extrêmes.
+   =========================================================================== */
+.dvf-poignee {
+  position: relative;
+  width: 9px;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: col-resize;
+  touch-action: none;
+}
+/* LE FILET EST DANS LA POIGNÉE, pas sur le bord de l'aperçu : deux traits à
+   9 px l'un de l'autre se liraient comme une gouttière, et c'est la poignée
+   qu'on doit voir bouger. */
+.dvf-poignee::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--border);
+  transition: background var(--dur-1) var(--ease), width var(--dur-1) var(--ease);
+}
+.dvf-poignee:hover::before,
+.dvf-poignee:focus-visible::before,
+.dvf-poignee.est-tiree::before { width: 3px; background: var(--primary); }
+.dvf-poignee:focus-visible { outline: none; }
+/* PENDANT LE GLISSER, RIEN NE SE SÉLECTIONNE ET LE CURSEUR NE CHANGE PAS. Sans
+   ça, traverser la feuille en tirant surligne le devis, et le curseur redevient
+   une flèche dès qu'on quitte les 9 px de la poignée. */
+.devis-flash.est-tiree { user-select: none; cursor: col-resize; }
 
 /* Chaque moitié défile pour elle-même. `min-width: 0` pour la même raison que
    ci-dessus, sur l'axe horizontal cette fois. */
@@ -71,7 +118,6 @@
 .dvf-apercu {
   padding: 0 var(--pas-4) var(--pas-4);
   background: var(--zone-bg);
-  border-left: 1px solid var(--border);
 }
 /* LA FEUILLE GARDE SES PROPORTIONS. Elle fait 210 mm par construction (c'est ce
    qui sortira de l'imprimante) : dans une colonne plus étroite, on la met à
@@ -212,6 +258,16 @@
 .dvf-tab__tete {
   padding: 0 var(--pas-2);
   border: 1px solid transparent;
+}
+/* UN INTITULÉ DE COLONNE NE DÉBORDE JAMAIS SUR SA VOISINE. Sans ça, « Désignation »
+   sort de sa piste dès que la colonne rétrécit — rail ouvert, coupe tirée à
+   gauche — et vient s'imprimer par-dessus « Qté » : mesuré au rendu, on lisait
+   « DésignaQtéion ». Il s'ellipse, et la colonne garde son rang. */
+.dvf-tab__tete > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dvf-tab__tete[hidden] { display: none; }
 /* LE NOMBRE QUI NE SE TAPE PAS. Il prend la boîte des cases pour tomber sur
@@ -363,7 +419,10 @@
      327 px pour la saisie, 336 pour la feuille, et tout le reste en dessous. */
   .dvf-deux { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; overflow: auto; }
   .dvf-saisie, .dvf-apercu { overflow: visible; }
-  .dvf-apercu { border-left: 0; border-top: 1px solid var(--border); padding-top: var(--pas-4); }
+  .dvf-apercu { border-top: 1px solid var(--border); padding-top: var(--pas-4); }
+  /* EMPILÉES, LES DEUX MOITIÉS N'ONT PLUS DE COUPE À RÉGLER : une poignée
+     verticale entre deux blocs superposés ne déplacerait rien. */
+  .dvf-poignee { display: none; }
   .dvf-r3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
