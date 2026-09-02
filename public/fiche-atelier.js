@@ -188,6 +188,8 @@ export function texteMarge(ttc, cout) {
 //   ctx.etapes / ctx.employes / ctx.provenances / ctx.reglements / ctx.types
 //   ctx.fermer()                   → retour au planning
 //   ctx.ouvrirClient()             → la fiche du client, dans son onglet
+//   ctx.reprendreDevis(ligne)      → l'écran du devis, rempli de CE devis, pour
+//                                    en écrire la version suivante
 export function dessinerFicheAtelier(r, ctx) {
   const fiche = r.fiche && typeof r.fiche === 'object' ? r.fiche : {};
   // LA COLONNE DE PRODUCTION EXISTE MEME SANS `fiche.prod` (29/08). Elle etait
@@ -466,6 +468,18 @@ export function dessinerFicheAtelier(r, ctx) {
   // n'y a plus de « a cote » ou cliquer. Sans elle, la seule sortie serait
   // Echap — un cul-de-sac a la souris.
   const outils = el('div', 'fa-outils');
+  // REPRENDRE LE DEVIS — la V2, la V3 (02/09/2026). Charlie : « ce devis pourra
+  // être modifié directement depuis la ligne pour créer la v2, 3, 4… dans le cas
+  // où le client souhaite une modification ».
+  //
+  // IL N'APPARAÎT QUE SUR UN DOSSIER QUI PORTE UN DEVIS. Sur les autres il
+  // n'ouvrirait rien — et un bouton qui n'ouvre rien est un bouton qu'on
+  // apprend à ne plus lire.
+  if (fiche && fiche.devis && ctx.reprendreDevis) {
+    const rang = Math.max(1, Math.round(Number(fiche.version) || 1));
+    outils.append(bouton('fa-btn', `Reprendre — version ${rang + 1}`,
+      () => ctx.reprendreDevis(r)));
+  }
   outils.append(etatSauve, bouton('fa-btn fa-btn--carre', '×', () => ctx.fermer()));
   tete.append(ident, outils);
 

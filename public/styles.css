@@ -714,6 +714,46 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   border-radius: var(--arrondi-champ);
   background: var(--zsur-fond);
 }
+/* ===========================================================================
+   LA TÊTE D'UNE PHASE : le titre, et la poignée qui la plie (02/09/2026)
+   ---------------------------------------------------------------------------
+   Charlie : « ces catégories doivent être pliable repliable ». Le titre reste
+   ce qu'il était — une commande (il montre toute la phase) ET une cible de
+   dépôt. La poignée est un bouton À PART, posé au bout du même bandeau : deux
+   gestes sur un seul sélecteur, c'est le défaut qui a éteint le glisser des
+   lignes.
+   LE BANDEAU RESTE UN SEUL BANDEAU À L'ŒIL : la marque de couleur de la phase
+   court sur les deux, et l'arrondi n'est repris qu'aux extrémités.
+   =========================================================================== */
+.zone-tete { display: flex; align-items: stretch; margin: 0 0 10px; }
+.zone-tete > .stage.zone-head {
+  margin: 0;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+.zone-plier {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  padding: 0;
+  border: 0;
+  border-start-end-radius: var(--arrondi-champ);
+  border-end-end-radius: var(--arrondi-champ);
+  background: var(--zsur-fond);
+  color: var(--zsur-encre);
+  font-size: var(--rail-taille-note);
+  line-height: var(--ligne-glyphe);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+/* Le titre actif emmène la poignée : un bandeau à deux couleurs se lirait
+   comme deux commandes qui ne vont pas ensemble. */
+.zone-tete:has(> .stage.zone-head.active) > .zone-plier { background: var(--primary); color: var(--on-primary); }
+.zone-plier:hover { filter: brightness(1.12); }
+.zone-plier:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
 .stage.zone-head::before { content: none; }        /* pas de puce sur un titre */
 .stage.zone-head:hover { background: var(--zsur-fond); }
 .stage.zone-head .stage-label {
