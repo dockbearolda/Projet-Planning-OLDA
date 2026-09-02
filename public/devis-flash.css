@@ -234,7 +234,14 @@
      À six, elle sortait à 50 px au plus petit poste — deux caractères de
      « NS300 » — et son intitulé chevauchait celui de « Qté ». Ce qu'elle rend,
      la désignation le prend : c'est la seule colonne qui porte une phrase. */
-  --dvf-cols: minmax(0, 1fr) 56px 76px 84px var(--ctrl-h);
+  /* LA COLONNE DU TOTAL TIENT SON NOMBRE. Mesuré au rendu le 02/09 : elle
+     faisait 84 px dont 56 utiles, et « 184,56 € » en demande 77,6 — les
+     montants débordaient déjà de leur boîte, et « À chiffrer » s'y coupait en
+     deux lignes. Douze pixels de plus, et le rembourrage GAUCHE rendu (voir
+     `.dvf-tab__lu` : un nombre calé à droite n'a rien à respirer à sa
+     gauche) : 82 px utiles, sans rien prendre de plus à la désignation, qui
+     est déjà la piste la plus serrée au petit poste. */
+  --dvf-cols: minmax(0, 1fr) 56px 76px 96px var(--ctrl-h);
   display: flex;
   flex-direction: column;
   gap: var(--pas-2);
@@ -279,7 +286,11 @@
   justify-content: flex-end;
   min-height: var(--ctrl-h);
   min-width: 0;
-  padding: 0 var(--champ-x);
+  /* À DROITE COMME LES CASES, ET RIEN À GAUCHE. C'est le bord DROIT qui aligne
+     la colonne — un montant se lit par la virgule. Le rembourrage gauche d'une
+     case sert à écarter le texte de sa bordure ; ici il n'y a pas de bordure,
+     et ces quatorze pixels manquaient au nombre. */
+  padding: 0 var(--champ-x) 0 0;
   font-size: var(--taille-texte);
   font-weight: var(--graisse-forte);
   color: var(--text-1);
@@ -289,6 +300,21 @@
    sans savoir pourquoi. C'est le gris des zones de l'application, celui qui
    dit « ici on lit ». */
 .dvf-tab__calc { background: var(--zone-bg); color: var(--text-2); cursor: default; }
+/* CE QU'ON N'A PAS ENCORE CHIFFRÉ. Le total d'une ligne sans prix ne dit pas
+   « 0,00 € » — il dit ce qui manque, dans le gris atténué de l'application et
+   à la taille des notes : c'est une CONSIGNE, pas un montant, et elle ne doit
+   pas se lire comme les autres nombres de la colonne. */
+.dvf-tab__vide {
+  justify-content: flex-end;
+  /* DEUX MOTS NE FONT PAS DEUX LIGNES. Un montant ne s'enroule pas (l'espace
+     des milliers est insécable) ; « À chiffrer » en porte une vraie, et la
+     case doublait de hauteur — dans une rangée dont toutes les autres font
+     `--ctrl-h`. */
+  white-space: nowrap;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--text-2);
+}
 
 /* --- Un article : sa ligne, son détail, ses tailles ------------------------
    Le bloc reprend la zone douce de l'application (`--zone-bg`) : ce n'est pas
@@ -315,6 +341,20 @@
   gap: var(--pas-2);
   align-items: start;
 }
+/* ⚠ `hidden` NE SUFFIT PAS SOUS UN `display` POSÉ — et ça se voyait à l'écran.
+   La rangée du volet « Référence libre » porte `hidden` tant qu'on ne l'a pas
+   demandée ; `display: grid` la rallumait, et ses trois cases sortaient sur
+   CHAQUE article, à tous les postes. Mesuré au rendu : 96,5 px de haut, avec
+   `hidden` à true. C'est le piège de `.poste-ecran` (styles.css), payé une
+   seconde fois.
+
+   La règle vaut pour la rangée ET pour ce qu'elle porte : une case de la
+   grammaire du comptoir (`.fa-case`, display: flex) et la grille des tailles
+   (`.fa-tailles`, display: flex) se masquent de la même façon — une tasse
+   n'affiche pas les champs d'un t-shirt, et réciproquement. */
+.dvf-r3[hidden],
+.dvf-art .fa-case[hidden],
+.dvf-art .fa-tailles[hidden] { display: none; }
 
 /* UN NOMBRE SE LIT PAR LA DROITE, et ses chiffres font tous la même largeur :
    sans ça, deux prix l'un sous l'autre ne s'alignent pas sur la virgule. */

@@ -4487,6 +4487,12 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
       quantite: Math.max(0, Math.round(Number(l.quantite) || 0)),
       unitaireHt: Math.max(0, Math.round((Number(l.unitaireHt) || 0) * 100) / 100),
       totalHt: Math.max(0, Math.round((Number(l.totalHt) || 0) * 100) / 100),
+      // ⚠ « PAS DE PRIX » N'EST PAS « PRIX ZÉRO », ET L'ARCHIVE DOIT S'EN
+      // SOUVENIR (02/09). Le montant est rangé à 0 — c'est ce que vaut la
+      // ligne dans l'addition — mais un article resté à chiffrer redeviendrait
+      // un article OFFERT à la reprise en V2, et le devis suivant partirait
+      // avec la promesse de le donner. Le drapeau tient la distinction.
+      sansPrix: l.sansPrix === true,
     }));
   if (!lignes.length) return res.status(400).json({ error: 'un devis sans article ne s’enregistre pas' });
 

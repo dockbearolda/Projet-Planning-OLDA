@@ -42,6 +42,10 @@ const euro = (n) => (Number.isFinite(Number(n)) ? EURO.format(Number(n)) : '');
 // L'ARGENT SE COMPTE EN CENTIMES. Une somme de flottants dérive au troisième
 // article, et c'est sur le document qui engage la maison que ça se voit.
 const cents = (n) => Math.round((Number(n) || 0) * 100) / 100;
+// CE QUE PORTE LA COLONNE D'UN ARTICLE QU'ON N'A PAS ENCORE CHIFFRÉ. Un seul
+// mot, écrit une fois : l'écran le reconnaît pour compter ses lignes en
+// attente, le papier l'imprime tel quel.
+export const SANS_PRIX = 'À chiffrer';
 
 // LA DATE CIVILE DE L'ATELIER — Saint-Martin, UTC−4, sans heure d'été. Le
 // conteneur de production tourne en UTC : dès 20 h locales, un `toISOString()`
@@ -159,7 +163,20 @@ export function calculerDevis(saisie) {
   const lignes = (Array.isArray(s.lignes) ? s.lignes : []).map((l) => {
     const quantite = Math.max(0, Number(l && l.quantite) || 0);
     const unitaireHt = Math.max(0, cents(l && l.unitaireHt));
-    return { ...l, quantite, unitaireHt, totalHt: cents(quantite * unitaireHt) };
+    // UNE LIGNE SANS PRIX N'EST PAS UNE LIGNE À ZÉRO (02/09/2026).
+    //
+    // ⚠ DÉFAUT PAYÉ UNE FOIS : une tasse choisie au catalogue sortait sur le
+    // papier du client à « 0,00 € », et le total du devis l'ignorait sans que
+    // rien ne le dise. Un devis peut légitimement porter un article OFFERT —
+    // c'est un zéro VOULU, tapé par la vendeuse. Les deux s'écrivaient pareil.
+    //
+    // On les sépare à la source : `unitaireHt` vaut `null` tant que personne
+    // n'a posé de prix (ni le catalogue, ni la grille, ni le moteur, ni la
+    // main), et `0` quand quelqu'un a décidé zéro. Le calcul, lui, ne change
+    // pas — `null` compte pour zéro dans l'addition — mais le papier et
+    // l'écran peuvent enfin le DIRE.
+    const sansPrix = l == null || l.unitaireHt == null || l.unitaireHt === '';
+    return { ...l, quantite, unitaireHt, sansPrix, totalHt: cents(quantite * unitaireHt) };
   });
   const sousTotalHt = cents(lignes.reduce((t, l) => t + l.totalHt, 0));
 
@@ -244,8 +261,11 @@ export function modeleDevis(saisie, entreprise) {
       faces: texte(l.faces),
       note: texte(l.note),
       quantite: l.quantite,
-      unitaireHt: euro(l.unitaireHt),
-      totalHt: euro(l.totalHt),
+      // CE QU'ON N'A PAS CHIFFRÉ SE DIT, il ne s'imprime pas « 0,00 € ». Un
+      // prix manquant vu par le client est une question ; un zéro est une
+      // promesse — et c'est la maison qui la tient.
+      unitaireHt: l.sansPrix ? SANS_PRIX : euro(l.unitaireHt),
+      totalHt: l.sansPrix ? SANS_PRIX : euro(l.totalHt),
     })).filter((l) => l.designation || l.totalHt),
     bat: TEXTE_BAT,
     delai: appro.texte,

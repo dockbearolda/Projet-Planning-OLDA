@@ -645,6 +645,136 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
 }
 
 // ---------------------------------------------------------------------------
+// 4 ter. LES TROIS PRIX DE LA MAISON — et celui qui manque (02/09/2026)
+// ---------------------------------------------------------------------------
+// Charlie : « c'est n'importe quoi dans devis flash, les prix bug, ne
+// s'affichent pas ». Reproduit à l'écran : une tasse choisie au catalogue
+// sortait sur le papier du client à « 0,00 € », et le total du devis l'ignorait
+// sans que rien ne le dise.
+//
+// LA MAISON A TROIS PRIX, L'ÉCRAN N'EN CONNAISSAIT QUE DEUX :
+//   · le TEXTILE se chiffre au moteur V9 ;
+//   · le RAYON a son prix au catalogue ;
+//   · la TASSE s'ADDITIONNE depuis la grille du comptoir — et personne ne la
+//     lisait ici.
+//
+// Et un quatrième défaut, celui qui rendait les trois autres silencieux : un
+// prix ABSENT s'écrivait « 0,00 € », exactement comme un article OFFERT.
+{
+  // --- Un prix absent n'est pas un prix de zéro ---------------------------
+  const compte = calculerDevis({
+    lignes: [
+      { designation: 'Sans prix', quantite: 2, unitaireHt: null },
+      { designation: 'Offert', quantite: 1, unitaireHt: 0 },
+      { designation: 'Vendu', quantite: 1, unitaireHt: 10 },
+    ],
+    regime: 'tgca', tauxTgca: 0.04, arrondi: 'aucun', acompte: 0,
+  });
+  assert.strictEqual(compte.lignes[0].sansPrix, true, 'une ligne sans prix se signale');
+  assert.strictEqual(compte.lignes[1].sansPrix, false, '… et un zéro TAPÉ reste un article offert');
+  assert.strictEqual(compte.lignes[2].sansPrix, false, '… un prix posé n’est jamais « à chiffrer »');
+  // L'ADDITION NE CHANGE PAS : ce qui manque compte pour zéro, comme avant.
+  assert.strictEqual(compte.sousTotalHt, 10, 'ce qui n’est pas chiffré ne s’invente pas dans le total');
+
+  // --- Et le papier le DIT, il n'imprime pas un zéro ----------------------
+  const t = modeleDevis({
+    numero: 'D-1', date: '2026-09-02', client: { nom: 'X' },
+    lignes: [
+      { designation: 'Tasse', quantite: 1, unitaireHt: null },
+      { designation: 'Cadeau', quantite: 1, unitaireHt: 0 },
+    ],
+    regime: 'tgca', tauxTgca: 0.04, arrondi: 'aucun', acompte: 0,
+  }, {});
+  assert.strictEqual(t.lignes[0].unitaireHt, 'À chiffrer', 'le papier dit ce qui manque');
+  assert.strictEqual(t.lignes[0].totalHt, 'À chiffrer', '… dans les deux colonnes');
+  assert.ok(/0,00/.test(t.lignes[1].totalHt), '… et un article offert s’imprime bien à zéro');
+  // UN SEUL MOT POUR LES DEUX MOITIÉS DE L'ÉCRAN. Le tableau et la feuille sont
+  // à dix centimètres l'un de l'autre : deux formulations, ce sont deux choses
+  // aux yeux de la vendeuse.
+  assert.ok(/export const SANS_PRIX = /.test(DEVIS), 'le mot est écrit une fois, dans devis.js');
+  assert.ok(/SANS_PRIX,?\n\} from '\.\/devis\.js'/.test(ECRAN) || /SANS_PRIX/.test(ECRAN),
+    '… et l’écran le reprend au lieu d’en écrire un second');
+  assert.ok(/pu\.placeholder = SANS_PRIX/.test(ECRAN), 'la case de prix vide dit ce qu’on attend d’elle');
+
+  // --- Une ligne neuve n'a pas de prix, elle n'a pas un prix de zéro ------
+  assert.ok(/quantite: 1, unitaireHt: null,/.test(ECRAN),
+    'un article ajouté part SANS prix : un zéro serait une promesse de le donner');
+  assert.ok(/String\(pu\.value\)\.trim\(\) === '' \? null :/.test(ECRAN),
+    'vider la case retire le prix ; taper 0 le pose');
+  // LE COMPTE DE L'EN-TÊTE. Le tableau des articles se replie, et c'est replié
+  // qu'on clique « Imprimer » : ce qui manque doit rester sous les yeux.
+  assert.ok(/filter\(\(l\) => l\.sansPrix\)\.length/.test(ECRAN),
+    'l’en-tête compte les lignes qui attendent encore leur prix');
+}
+{
+  // --- LA TASSE S'ADDITIONNE, ET LA GRILLE FAIT FOI -----------------------
+  assert.ok(/api\('GET', '\/api\/tarifs-tasse'\)/.test(ECRAN),
+    'l’écran lit la grille tarifaire de la tasse, pas seulement ses paramètres');
+  // LA FORMULE EST CELLE DU COMPTOIR : produit + face 1 + face 2 + dessous + BAT.
+  assert.ok(/\[t\.produitId, t\.face1Id, t\.face2Id, t\.dessousId, t\.batId\]/.test(ECRAN),
+    'les cinq puces du comptoir, et les cinq seulement');
+  assert.ok(/somme \+ \(Number\(a\.prixVenteTtc\) \|\| 0\)/.test(ECRAN),
+    'c’est une addition de prix TTC, comme dans buildLigneTasse');
+  // ⚠ AUCUN PRIX DE TASSE ÉCRIT EN DUR. « 16 € » est la tasse nue plus une
+  // face : recopié ici, il resterait celui d'avant le jour où le patron corrige
+  // sa grille — et le devis dirait un prix que le comptoir ne dit plus.
+  const chiffres = (ECRAN.match(/^(?!\s*(?:\/\/|\*)).*\b(?:prix|tarif|ttc|euro)\w*\s*[=:]\s*\d+(?:\.\d+)?/gim) || []);
+  assert.strictEqual(chiffres.length, 0,
+    `aucun prix n’est écrit en dur dans l’écran (trouvé : ${chiffres.join(' | ')})`);
+  // LE JOINT AVEC LE CATALOGUE EST LE NOM DE LA FAMILLE, comparé à plat : la
+  // grille dit « Tasse Céramique 350 ml », le catalogue « Tasse céramique
+  // 350 ml ». Une majuscule ne fait pas deux produits.
+  assert.ok(/normalize\('NFD'\)\.replace\(\/\[\\u0300-\\u036f\]\/g, ''\)/.test(ECRAN),
+    'la comparaison des noms ignore la casse ET les accents');
+  assert.ok(/aPlat\(a\.designation\) === f/.test(ECRAN),
+    'une famille du catalogue trouve son produit dans la grille par le nom');
+  // UNE TASSE ARRIVE MARQUÉE : nue elle vaut 10 €, le magasin la vend 16.
+  assert.ok(/function faceParDefaut\(\)/.test(ECRAN) && /face1Id: faceParDefaut\(\)/.test(ECRAN),
+    'une tasse arrive avec une face — sinon elle sort six euros sous son prix de rayon');
+  assert.ok(/faces\.find\(\(a\) => !estRien\(a\) && Number\(a\.prixVenteTtc\) > 0\)/.test(ECRAN),
+    '… et si le patron renomme cette face, on retombe sur la première qui coûte quelque chose');
+  // LE PRIX SUIT LA PUCE. Changer la face devant le client doit bouger le
+  // montant — et rendre la main au calcul, sinon la face est vendue pour rien.
+  assert.ok(/ligne\.tasse\[cle\] = n4\.value;[\s\S]{0,400}ligne\.puManuel = false;[\s\S]{0,80}recalculer\(\);/.test(ECRAN),
+    'une puce changée refait le prix, même après une négociation');
+  // CE QUE LE CLIENT RELIT : les faces d'une tasse sont ce qu'on lui vend.
+  assert.ok(/function texteFacesTasse\(ligne\)/.test(ECRAN)
+    && /ligne\.faces = texteFacesTasse\(ligne\)/.test(ECRAN),
+    'les faces choisies s’écrivent dans la colonne que le papier imprime déjà');
+  // UN ARTICLE SE CHIFFRE D'UNE SEULE FAÇON : les deux ne cohabitent jamais.
+  assert.ok(/ligne\.textile = null;\n\s+ligne\.tasse = null;/.test(ECRAN),
+    'un produit de rayon efface les deux chiffrages');
+  assert.ok(/ligne\.tasse = null;\n\s+if \(!ligne\.marquage\)/.test(ECRAN),
+    '… et un textile efface celui de la tasse');
+}
+{
+  // --- `hidden` NE SUFFIT PAS SOUS UN `display` POSÉ ----------------------
+  // Défaut VU À L'ÉCRAN le 02/09 : la rangée du volet « Référence libre »
+  // portait `hidden = true` et mesurait 96,5 px de haut. Ses trois cases
+  // sortaient sur CHAQUE article, à tous les postes. `.dvf-r3` est en
+  // `display: grid` — et un `display` posé rallume ce que `hidden` éteint.
+  // C'est le piège de `.poste-ecran` (styles.css), payé une seconde fois.
+  const sansCommentaire = FEUILLE.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const sel of ['\\.dvf-r3\\[hidden\\]', '\\.fa-case\\[hidden\\]', '\\.fa-tailles\\[hidden\\]']) {
+    assert.ok(new RegExp(`${sel}[^{]*\\{[^}]*display: none`).test(sansCommentaire.replace(/,\s*\n/g, ', ')),
+      `${sel.replace(/\\/g, '')} s’éteint pour de bon`);
+  }
+  // UNE TASSE N'A NI TAILLES, NI RÉFÉRENCE, NI MARQUAGE ; un t-shirt n'a ni
+  // face 1, ni dessous, ni BAT. Une seule écriture décide, appelée à la
+  // construction ET à chaque changement de produit.
+  assert.ok(/const majFamille = \(\) => \{/.test(ECRAN), 'ce que la ligne montre dépend de ce qu’elle est');
+  assert.strictEqual((ECRAN.match(/majFamille\(\);/g) || []).length, 2,
+    '… et c’est la même écriture au montage et au changement de produit');
+  assert.ok(/cases\.hidden = estTasse;/.test(ECRAN), 'une tasse ne porte pas de grille de tailles');
+  // TROIS CASES VISIBLES PAR RANGÉE DANS LES DEUX CAS : c'est la grille de
+  // `.dvf-r3`, et deux articles de familles différentes gardent la même coupe.
+  assert.ok(/detail\.append\(caseRef, caseCoul, caseMarq, caseFace1, caseFace2\)/.test(ECRAN),
+    'la première rangée porte les deux familles et n’en montre qu’une');
+  assert.ok(/detail2\.append\(caseEncre, caseFacesA, caseDessous, caseBat, champ\('Remise %'/.test(ECRAN),
+    '… la seconde aussi, la remise fermant les deux');
+}
+
+// ---------------------------------------------------------------------------
 // 5. L'ÉCRAN EST BRANCHÉ, ET SON ONGLET MÈNE QUELQUE PART
 // ---------------------------------------------------------------------------
 assert.ok(/'#devis-flash': 'devisflash',/.test(APP), 'le hash pilote la vue');
