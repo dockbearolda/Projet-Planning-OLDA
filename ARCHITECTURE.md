@@ -318,6 +318,49 @@ Vérifiés sains : la précache de `sw.js` (48 entrées, toutes présentes ; `bu
 
 Dans l'ordre : ce qui part sans discussion, puis ce qui demande d'adapter des tests ou de regarder la prod, enfin ce qui engage une décision du patron ou des données.
 
+### ✅ Fait le 01/09 (lot 3) — les 950 lignes sans écran
+
+Le point 12 du plan, celui que l’audit avait cru intouchable, est fait — dans
+l’ordre qui le rendait possible :
+
+1. **Le chiffrage de la tasse sort** dans `tarif-tasse.js`, pur, et
+   `test/tarif-tasse-prix-magasin.test.js` prouve les 16 / 14 / 22 € et le +6 €
+   **sans passer par aucun écran**. Il vérifie en plus ce que l’ancien ne disait
+   pas : que le coût compte le temps d’atelier, et qu’un morceau inconnu refuse
+   au lieu de valoir zéro.
+2. **L’équivalence est prouvée avant le retrait** : le module a d’abord été
+   branché dans l’ancienne route, dont les 141 assertions sont restées vertes.
+3. **La route part**, et 688 lignes s’élaguent en cascade derrière elle.
+   `server.js` : **5 450 → 4 741 lignes**. `GET /api/delais` part aussi (elle
+   servait un barème que plus rien n’appliquait), et `catalog.json` tombe de
+   **96 à 10 lignes**.
+
+**La production avait déjà tranché** : huit dossiers par cette route, du 27 au
+31/07, aucun depuis — contre 73 par le comptoir sur la même période.
+
+**Aucune garantie perdue.** `test/dossier.js` fabrique un dossier par la porte
+vivante pour six tests ; `test/numeros-du-jour.test.js` recueille les garanties
+des deux séries de numéros, bien vivantes, avant que leurs fichiers d’accueil
+ne partent.
+
+Retirés aussi : les deux interrupteurs de Réglages qui ne commandaient rien
+(`projets`, `marges` — seul `comptes` en commande un), et le dossier
+`archives/` (l’étiquette `comptoir-avant-simplification` garde tout).
+
+### ⚠ Deux choses que ce lot a mises au jour, et qui ne sont pas au code de trancher
+
+1. **La pondération « machine » du Point du jour n’est plus alimentée depuis le
+   31/07.** Elle lit `fiche.techniques`, que seule l’ancienne route savait
+   écrire. Six dossiers en portent, tous de juillet. Le classement du Point du
+   jour tourne donc sans cette composante depuis un mois, sans que personne
+   l’ait remarqué. À décider : la rebrancher depuis le comptoir, ou retirer la
+   composante du calcul.
+2. **Deux barèmes d’urgence disaient des choses différentes.** Celui du patron
+   (jour J +20 %, express sous 3 jours +10 %) n’était appliqué que par la route
+   morte. Celui de la vente directe (dans 5 / 10 / 15 jours) est le seul qui
+   s’applique aujourd’hui. Ce sont des prix facturés au client : à trancher avec
+   le patron, pas dans le code.
+
 ### ✅ Fait le 01/09 (lot 2) — le garde-fou
 
 Le nettoyage vaut ce que vaut ce qui l’empêche de se défaire. `outils/chercher-code-mort.mjs`

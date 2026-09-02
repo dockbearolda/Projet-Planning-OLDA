@@ -260,7 +260,6 @@ personne sur place n'a de raison de deviner qu'il faudrait recharger. Depuis le
 | PUT | `/api/ordre-manuel` | `{ etape, range }` — ne touche QUE cette étape, le serveur fusionne avec ce que les autres postes ont décidé et rend la liste à jour. Diffusé en SSE. Envoyer la liste entière (ancienne forme, toujours acceptée pour un onglet resté ouvert sur le JS d'avant) impose aux autres la vision qu'on avait AVANT leur geste : deux vendeuses rangeant deux étapes dans la même minute, et la seconde effaçait la décision de la première. |
 | GET | `/api/pipeline` | Familles et leurs sous-étapes (destination d'une commande). |
 | POST | `/api/comptoir/projet` | **Le dossier d'un des deux parcours du comptoir** → crée la ligne dans le planning (`stage` + `sub_stage` retrouvée par son libellé), remplit la fiche client et archive le récapitulatif complet dans `fiche`. Répond `{ id, stage, subStage }`. Refuse seulement un dossier sans nom de client. |
-| POST | `/api/projets` | Enregistre un projet (panier multi-produits) → crée la ligne dans le planning, à la destination demandée (`stage` + `subStage`). Refuse un corps sans délai ni date précise. Champs de vente directe facultatifs : `numero`, `heureSouhaitee` (`HH:MM`), `noteInterne`, `retraitImmediat`. **Plus appelé par l'interface** depuis le passage aux parcours du patron (31/07). ⚠ ET POURTANT ON LE GARDE, constat de l'audit du 01/09 : c'est le SEUL endroit du serveur qui CALCULE un prix depuis la grille tarifaire tasse. Le comptoir, lui, envoie un montant déjà chiffré à l'écran (`prixComptoir` ne fait que le valider). C'est par cette route que `test/tarifs-tasse.test.js` prouve qu'une tasse sort à 16, 14 et 22 €, et qu'un logo client sur l'autre face vaut +6 € — les prix du fichier V9. Tant que ce calcul n'a pas d'autre porte, la route reste, et `catalog.json` avec elle. |
 | POST | `/api/vente/numero` | Réserve le numéro du ticket de vente directe (`{ jour }` → `{ numero, jour, rang }`). Compteur par journée en `app_meta` : un numéro attribué n'est jamais réutilisé. |
 | POST | `/api/devis/numero` | Même compteur, série distincte, pour une demande de devis (`DEV-26.07.30-001`). |
 | POST | `/api/devis` | **Le devis chiffré** de l'onglet « Devis flash » → crée la ligne à `demande_chiffrage / devis_envoye`, nature `demande` (le client n'a rien signé), `project_value` = le TTC annoncé, et archive dans `fiche.devis` le devis TEL QU'IL A ÉTÉ IMPRIMÉ. Réserve le numéro si l'écran n'a rien imprimé. Idempotent sur le numéro : renvoyer deux fois le même dossier rend la ligne existante. Refuse un devis sans client, sans article, ou dont le montant est illisible. |
@@ -500,19 +499,26 @@ passage sur la vue, et le document d'un parcours qu'au premier passage **sur ce
 parcours** : le planning ne paie rien tant qu'on ne prend pas de commande, et
 l'accueil à deux tuiles ne coûte rien du tout.
 
-### Le catalogue vit dans `catalog.json`
+### `catalog.json` : les modes de paiement, et plus rien d'autre (01/09/2026)
 
-Des listes de référence, rien d'autre. Ce que le **serveur** revalide : la
-**nature** d'une ligne (demande à chiffrer / commande validée), les **délais**
-raccourcis avec leur majoration, les **modes de paiement**, les **emplacements**
-de marquage et les **types de logo**. Ce que **Nouveau Projet** y puise pour
-proposer sans imposer : les **vêtements**, la **grille de tailles** et les
-**typos** — le comptoir peut toujours taper autre chose.
+Il portait huit listes de référence : la nature d'une ligne, les délais
+raccourcis avec leur majoration, les emplacements de marquage, les types de
+logo, les vêtements, la grille de tailles, les typos, et les modes de paiement.
 
-Le fichier ne contient plus que ce qui a un lecteur : une entrée sans lecteur
-n'est pas de la configuration, c'est du décor. C'est le seul endroit à modifier
-pour ajuster ces listes, et il n'est lu qu'**au démarrage** : après une
-modification, il faut redémarrer le serveur.
+**Sept sont parties le 01/09.** Elles n'étaient lues que par `POST /api/projets`,
+l'ancien « Nouveau Projet » interne, remplacé le 31/07 par les deux parcours du
+patron et retiré ce jour-là. Une entrée sans lecteur n'est pas de la
+configuration, c'est du décor — et un décor qu'on croit encore appliqué : le
+barème d'urgence du patron (jour J +20 %, express +10 %) était dans ce fichier
+et n'était plus appliqué nulle part. **Ce qui majore aujourd'hui, ce sont les
+suppléments express réglables** (dans 5 / 10 / 15 jours), en base, modifiables
+depuis Réglages.
+
+Reste donc les **modes de paiement**, que le serveur revalide à chaque prise de
+commande. Le planning en garde un miroir en clair (`PAIEMENT_MODES` dans
+`app.js`) parce qu'un écran ne peut pas lire un JSON du serveur sans un appel de
+plus au démarrage ; `test/paiement-modes-miroir.js` empêche les deux listes de
+diverger. Le fichier est lu **au démarrage** : après modification, redémarrer.
 
 Les **secteurs d'activité**, eux, vivent en base
 (`app_meta.client_secteurs`) et se complètent depuis Base clients, sans
@@ -899,11 +905,13 @@ Deux exceptions assumées :
 ├── server.js         Express, routes API, statique, Basic Auth
 ├── db.js             pool pg, init schéma + seed au démarrage
 ├── schema.sql        CREATE TABLE IF NOT EXISTS requests ...
-├── catalog.json      natures, délais, zones, techniques et modes de paiement.
-│                     ⚠ SEULS les modes de paiement servent encore à un écran
-│                     (le planning en garde un miroir, tenu par
-│                     test/paiement-modes-miroir.js). Tout le reste n'est lu que
-│                     par POST /api/projets — voir la note de cette route.
+├── catalog.json      les modes de paiement, et rien d'autre. Il portait aussi
+│                     natures, délais, zones, typos, techniques et logos : ces
+│                     listes n'étaient lues que par POST /api/projets, partie le
+│                     01/09. Le planning garde un miroir des modes de paiement,
+│                     tenu par test/paiement-modes-miroir.js
+├── tarif-tasse.js    LE PRIX D'UNE TASSE : la somme de ses morceaux dans la
+│                     grille du patron, et son coût de revient. Pur, sans base
 ├── catalogue-csv.js  lecture du CSV de prix + rapport d'import (pur, sans base)
 ├── catalogue-produits-seed.json  la SEMENCE du catalogue du comptoir (82 lignes vendables)
 ├── catalogue-import-regles.json  rayons écartés, variantes nommées, correspondance des rayons

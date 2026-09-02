@@ -3555,10 +3555,22 @@ async function toucherConnexion(id) {
 // Tous à `false` par défaut. Un interrupteur absent d'`app_meta` vaut « éteint »,
 // jamais « allumé » : au pire on n'a pas la nouveauté, jamais un écran cassé.
 // Down : DELETE FROM app_meta WHERE key = 'flags'.
+// UN INTERRUPTEUR QUI NE COMMANDE RIEN EST PIRE QU'UN MANQUE (01/09/2026).
+// Il y en avait trois. Un seul en commandait quelque chose : `comptes`, qui
+// décide si la connexion nominative existe (voir `flags()` dans server.js).
+// Les deux autres s'affichaient dans Réglages, se cochaient, se retenaient en
+// base — et ne changeaient RIEN :
+//   · `projets` (« Regroupement Projet et liste de tâches ») : les routes
+//     existent côté serveur, aucun écran ne les appelle. L'allumer ne faisait
+//     apparaître aucun regroupement.
+//   · `marges` (« Décomposition des coûts et marge ») : ce qui garde vraiment
+//     la marge, c'est la CAPACITÉ du rôle (`peut(moi, 'marge')`), pas ce
+//     drapeau. L'écran Pilotage s'ouvrait déjà sans lui, et restait fermé avec.
+// Ils sont retirés de la liste. `getFlags` repart toujours des noms CONNUS :
+// une valeur restée en base pour l'un d'eux disparaît d'elle-même de la
+// réponse. Le jour où l'un revient, il revient avec ce qu'il commande.
 const FLAGS_CONNUS = {
   comptes: 'Connexion nominative et rôles',
-  projets: 'Regroupement Projet et liste de tâches',
-  marges: 'Décomposition des coûts et marge',
 };
 const FLAGS_SLUGS = Object.keys(FLAGS_CONNUS);
 const FLAGS_ETEINTS = Object.fromEntries(FLAGS_SLUGS.map((s) => [s, false]));
