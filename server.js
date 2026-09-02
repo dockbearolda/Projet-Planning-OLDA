@@ -4543,7 +4543,14 @@ app.post('/api/projets', exige('clients'), asyncH(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------------------
-// COMPTOIR — les deux parcours validés par le patron (public/comptoir/*.html).
+// COMPTOIR — les deux parcours validés par le patron (les deux pages HTML de
+// `public/comptoir`).
+// ⚠ NE PAS Y REMETTRE D'ÉTOILE APRÈS UNE BARRE. Ces deux caractères, même
+// dans un commentaire de LIGNE, ouvrent un bloc pour tout lecteur qui
+// dépouille les commentaires à l'expression régulière — et plusieurs tests le
+// font. Celui-ci avalait alors trois cents lignes du fichier, dont la requête
+// qui cherche un dossier par sa référence : le test d'archivage a fini par le
+// dire, mais seulement le jour où cette requête a changé de place.
 // ---------------------------------------------------------------------------
 // Ces écrans ne connaissent RIEN du planning : ils recueillent un dossier
 // complet et le postent tel quel. C'est ici qu'il devient une ligne de planning.
@@ -5167,6 +5174,11 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
       couleur: borner(l.couleur, 80),
       tailles: borner(l.tailles, 120),
       marquage: borner(l.marquage, 120),
+      // CE QU'ON IMPRIME, AVEC QUOI, ET OÙ (02/09). L'atelier les lit sur la
+      // fiche, le client sur le devis.
+      encre: borner(l.encre, 80),
+      faces: borner(l.faces, 160),
+      remise: Math.min(100, Math.max(0, Number(l.remise) || 0)),
       note: borner(l.note, 400),
       quantite: Math.max(0, Math.round(Number(l.quantite) || 0)),
       unitaireHt: Math.max(0, Math.round((Number(l.unitaireHt) || 0) * 100) / 100),
@@ -5190,21 +5202,70 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     numero = `DEV-${r.numero}`;
   }
 
-  // IDEMPOTENCE. Le réseau peut avaler la RÉPONSE d'un envoi qui a pourtant
-  // abouti : l'écran annonce un échec, on réessaie, et le devis entrerait une
-  // seconde fois sous le même numéro. On rend alors la ligne existante.
-  const { rows: deja } = await pool.query(
-    "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'ref' = $1 LIMIT 1", [numero],
-  );
-  if (deja.length) {
-    return res.json({
-      id: deja[0].id, stage: deja[0].stage, subStage: deja[0].sub_stage,
-      numero, dejaEnregistre: true,
-    });
+  // LA REPRISE D'UN DEVIS EXISTANT — V2, V3, V4… (02/09/2026)
+  // ---------------------------------------------------------------------------
+  // Charlie : « ce devis pourra être modifié directement depuis la ligne pour
+  // créer la v2, 3, 4… dans le cas où le client souhaite une modification ».
+  //
+  // UNE VERSION NE REMPLACE PAS LA PRÉCÉDENTE, ELLE LA RANGE. Le client a une
+  // feuille en main avec un numéro et un montant : le jour où il rappelle, il
+  // faut pouvoir dire ce qu'on lui avait chiffré. La version courante prend donc
+  // la place, et l'ancienne descend dans `fiche.devisPassees` — d'où sort
+  // l'historique du dossier.
+  //
+  // ⚠ ET LE DOSSIER NE SE DÉDOUBLE PAS. Créer une deuxième ligne au planning
+  // pour le même client et le même projet, c'est deux dossiers qu'il faudra
+  // rapprocher à la main, et un des deux qu'on relancera pour rien.
+  // ⚠ UN IDENTIFIANT DE DOSSIER EST UNE CHAÎNE, PAS UN NOMBRE. `requests.id` est
+  // un UUID : `Number('00000000-0000-4000-…')` rend NaN, la reprise passait pour
+  // absente, et l'écran ouvrait un SECOND dossier pour le même client au lieu
+  // d'écrire la version 2 sur le premier. Trouvé en le jouant de bout en bout.
+  const repriseId = typeof b.dossierId === 'string' && b.dossierId.trim()
+    ? b.dossierId.trim().slice(0, 64) : null;
+  if (repriseId) {
+    // ⚠ UN IDENTIFIANT MAL FORMÉ N'EST PAS UNE PANNE, C'EST UN DOSSIER
+    // INTROUVABLE. `requests.id` est un UUID : Postgres refuse la comparaison et
+    // lève — l'écran recevait un 500 « erreur interne » là où la seule chose à
+    // dire est « ce dossier n'existe pas ».
+    let anc = [];
+    try {
+      ({ rows: anc } = await pool.query('SELECT id, fiche FROM requests WHERE id = $1', [repriseId]));
+    } catch (_) { anc = []; }
+    if (!anc.length) return res.status(404).json({ error: 'dossier introuvable' });
+    const ficheAnc = anc[0].fiche && typeof anc[0].fiche === 'object' ? anc[0].fiche : {};
+    if (!String(ficheAnc.kind || '').startsWith('devis')) {
+      return res.status(400).json({ error: 'ce dossier n’est pas un devis' });
+    }
+    const version = Math.max(1, Math.round(Number(ficheAnc.version) || 1)) + 1;
+    // LE NUMÉRO GARDE SA RACINE et gagne son rang : « DEV-26.09.02-001-V2 ». Le
+    // client retrouve son devis, et on sait tout de suite laquelle des deux
+    // feuilles il a sous les yeux.
+    const racine = String(ficheAnc.devis && ficheAnc.devis.numero ? ficheAnc.devis.numero : numero)
+      .replace(/-V\d+$/, '');
+    numero = `${racine}-V${version}`;
+  } else {
+    // IDEMPOTENCE. Le réseau peut avaler la RÉPONSE d'un envoi qui a pourtant
+    // abouti : l'écran annonce un échec, on réessaie, et le devis entrerait une
+    // seconde fois sous le même numéro. On rend alors la ligne existante.
+    const { rows: deja } = await pool.query(
+      "SELECT id, stage, sub_stage FROM requests WHERE fiche->>'ref' = $1 LIMIT 1", [numero],
+    );
+    if (deja.length) {
+      return res.json({
+        id: deja[0].id, stage: deja[0].stage, subStage: deja[0].sub_stage,
+        numero, dejaEnregistre: true,
+      });
+    }
   }
 
-  const famille = 'demande_chiffrage';
-  const sousEtape = 'devis_envoye';
+  // ⚠ LE DEVIS ENTRE PAR « À TRIER » (02/09, Charlie). Il allait droit à
+  // « Demande & chiffrage / Devis envoyé — Attente client », ce qui répondait à
+  // la question « qui le relance ? » mais présumait de la suivante : un devis
+  // composé devant un client n'est pas forcément un devis PARTI. « À trier » est
+  // le sur-dossier de l'atelier — la corbeille d'entrée qu'on vide chaque matin
+  // — et c'est de là qu'il se range.
+  const famille = 'a_trier';
+  const sousEtape = null;
   const clientType = COMPTOIR_CLIENT_TYPE[String(cl.type || '').toLowerCase()] || 'pro';
   const responsable = RESPONSABLE_SET.has(b.responsable) ? b.responsable : 'À attribuer';
   const quantite = lignes.reduce((t, l) => t + l.quantite, 0) || null;
@@ -5221,6 +5282,16 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     source: 'Devis',
     ref: numero,
     creeLe: new Date().toISOString(),
+    // LE RANG DE CETTE VERSION. 1 au premier enregistrement, puis 2, 3, 4 à
+    // chaque reprise. ⚠ Ce n'est PAS `kind` : `devis-v1` nomme la FORME de la
+    // fiche (le format de données), celle-ci nomme la version du DEVIS remis au
+    // client. Deux choses qui n'ont aucune raison de bouger ensemble.
+    version: 1,
+    // CE QUI SUIT LE DOSSIER SANS S'IMPRIMER : l'heure de retrait souhaitée, le
+    // travail de maquette à prévoir, et ce qu'on se dit entre nous.
+    dueHeure: /^\d{2}:\d{2}$/.test(String(b.dueHeure || '')) ? b.dueHeure : null,
+    maquette: b.maquette === true,
+    noteInterne: borner(b.noteInterne, 600),
     // LE DEVIS TEL QU'IL A ÉTÉ IMPRIMÉ. C'est l'archive : elle ne se retouche
     // pas, et c'est elle qu'on ressort quand le client revient avec sa feuille.
     devis: {
@@ -5245,9 +5316,50 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     client: [
       ['Client', nomDossier], ['Code client', borner(cl.code, 20)],
       ['Ville', borner(cl.ville, 120)], ['Personne à contacter', borner(cl.contact, 120)],
-      ['Téléphone', borner(cl.tel, 40)], ['E-mail', borner(cl.email, 160)],
+      ['Téléphone', borner(cl.tel, 40)], ['WhatsApp', borner(cl.whatsapp, 40)],
+      ['E-mail', borner(cl.email, 160)],
     ].filter(([, v]) => v).map(([k, v]) => ({ k, v })),
   };
+
+  // UNE REPRISE ÉCRIT SUR LE DOSSIER, ELLE N'EN OUVRE PAS UN SECOND.
+  if (repriseId) {
+    const { rows: anc } = await pool.query('SELECT fiche FROM requests WHERE id = $1', [repriseId]);
+    const ficheAnc = anc.length && anc[0].fiche && typeof anc[0].fiche === 'object' ? anc[0].fiche : {};
+    const version = Math.max(1, Math.round(Number(ficheAnc.version) || 1)) + 1;
+    // LES VERSIONS PASSÉES, DE LA PLUS RÉCENTE À LA PLUS ANCIENNE, et bornées :
+    // une fiche qu'on reprend vingt fois ne doit pas devenir un objet d'un méga.
+    const passees = Array.isArray(ficheAnc.devisPassees) ? ficheAnc.devisPassees : [];
+    const neuve = {
+      ...fiche,
+      version,
+      creeLe: ficheAnc.creeLe || fiche.creeLe,
+      repriseLe: new Date().toISOString(),
+      devisPassees: (ficheAnc.devis
+        ? [{ version: Math.max(1, Number(ficheAnc.version) || 1), devis: ficheAnc.devis }, ...passees]
+        : passees).slice(0, 20),
+    };
+    await pool.query(
+      `UPDATE requests SET billing_company = $2, contact_referent = $3, contact_phone = $4,
+              contact_email = $5, quantity = $6, product = $7, description = $8,
+              deadline = $9, fiche = $10, project_value = $11, client_type = $12
+       WHERE id = $1`,
+      [
+        repriseId, nomDossier, borner(cl.contact, 120), borner(cl.tel, 40),
+        borner(cl.email, 160), quantite, produit, borner(b.projet, DESCRIPTION_MAX),
+        isDay(b.dueDate) ? b.dueDate : null, JSON.stringify(neuve), prix.valeur, clientType,
+      ],
+    );
+    // LE JOURNAL DIT QU'UNE VERSION EST NÉE. Sans lui, le montant du dossier
+    // change tout seul entre deux relectures et personne ne sait pourquoi.
+    await pool.query(
+      'INSERT INTO request_events (request_id, field, value_before, value_after, who) VALUES ($1,$2,$3,$4,$5)',
+      [repriseId, 'devis',
+        `V${version - 1}${ficheAnc.devis && ficheAnc.devis.ttc != null ? ` — ${ficheAnc.devis.ttc} €` : ''}`,
+        `V${version} — ${prix.valeur} €`, quiDemande(req)],
+    ).catch(() => { /* le journal est un confort, il ne fait pas échouer la reprise */ });
+    broadcast({ kind: 'update', ids: [repriseId] });
+    return res.json({ id: repriseId, stage: null, numero, version, reprise: true });
+  }
 
   const { rows: posRows } = await pool.query(
     'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],

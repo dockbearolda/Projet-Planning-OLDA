@@ -3609,6 +3609,27 @@ function contexteFicheAtelier(r, marquage) {
     // L'onglet était MORT sans que rien ne le dise — le symptôme exact de la
     // mémoire « vue et hash doivent rester alignés ». Une clé de `VIEWS`, jamais
     // une chaîne écrite à la main : c'est ce qui a laissé passer la barre.
+    // REPRENDRE LE DEVIS D'UN DOSSIER. On ferme la fiche, on bascule sur
+    // l'écran du devis, et c'est LUI qui relit l'archive — la fiche ne sait pas
+    // ce qu'est un devis, et n'a pas à l'apprendre.
+    reprendreDevis: (ligne) => {
+      fermerFicheAtelier();
+      location.hash = '#devis-flash';
+      // ⚠ LE MODULE PEUT NE PAS ÊTRE ENCORE DEMANDÉ. Il se charge à la demande,
+      // et c'est le changement de hash qui le déclenche — de façon asynchrone.
+      // Lire `dfLoading` à cet instant, c'est lire `null` sur un poste qui n'a
+      // jamais ouvert l'écran : la reprise se perdait, et la fiche s'était déjà
+      // fermée. On attend qu'il réponde, sans y passer la journée.
+      let restant = 40;
+      const quandPret = () => {
+        if (dfModule && dfModule.reprendreDevis) {
+          Promise.resolve(dfLoading).then(() => dfModule.reprendreDevis(ligne.id)).catch(() => {});
+          return;
+        }
+        if (restant -= 1) setTimeout(quandPret, 100);
+      };
+      quandPret();
+    },
     ouvrirClient: (ligne) => {
       const cible = ligne || r;
       clientVise = cible.billing_company || cible.contact_referent || '';

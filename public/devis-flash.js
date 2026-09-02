@@ -173,6 +173,13 @@ let entreprise = {};
 let transports = {};
 // Un devis DÉJÀ enregistré ne se réenregistre pas en double : on garde son id.
 let dossierId = null;
+// LA REPRISE D'UN DEVIS EXISTANT (02/09). Charlie : « ce devis pourra être
+// modifié directement depuis la ligne pour créer la v2, 3, 4… dans le cas où le
+// client souhaite une modification ». `repriseDe` porte l'id du dossier tant que
+// la nouvelle version n'est pas enregistrée ; `version` dit à l'écran laquelle
+// on est en train d'écrire.
+let repriseDe = null;
+let version = 1;
 
 // LE BROUILLON EST PAR APPAREIL. Un devis se compose devant le client, en
 // quelques minutes, et un poste qui se ferme au milieu ne doit pas faire tout
@@ -350,6 +357,126 @@ export async function refreshDevisFlash() {
   if (!ROOT) return;
   await rechargerReglages();
   redessiner();
+}
+
+// ===========================================================================
+// REPRENDRE UN DEVIS — la V2, la V3 (02/09/2026)
+// ===========================================================================
+// « Ce devis pourra être modifié directement depuis la ligne pour créer la v2,
+// 3, 4… dans le cas où le client souhaite une modification » (Charlie).
+//
+// ON RELIT L'ARCHIVE, PAS UN RÉSUMÉ. `fiche.devis` porte le devis TEL QU'IL A
+// ÉTÉ IMPRIMÉ — ses lignes, ses prix, son régime, son acompte. C'est ce qu'il
+// faut pour repartir de ce que le client a en main : une V2 qui ne reprendrait
+// que le client et le projet obligerait à retaper les articles, et c'est
+// exactement là qu'on se trompe d'un chiffre.
+//
+// ⚠ ELLE N'ÉCRASE PAS UN BROUILLON SANS LE DIRE. Le poste peut être en train de
+// composer un autre devis : on demande.
+export async function reprendreDevis(id) {
+  if (!ROOT || !id) return false;
+  let ligne;
+  try { ligne = await api('GET', `/api/requests/${id}`); } catch (err) {
+    dire(err.message || 'Dossier illisible', 'is-ko');
+    return false;
+  }
+  const fiche = ligne && ligne.fiche && typeof ligne.fiche === 'object' ? ligne.fiche : null;
+  const dv = fiche && fiche.devis && typeof fiche.devis === 'object' ? fiche.devis : null;
+  if (!dv) {
+    dire('Ce dossier ne porte pas de devis à reprendre', 'is-ko');
+    return false;
+  }
+  if (!dossierId && saisie.lignes.length && repriseDe !== id
+    && !window.confirm('Un devis est en cours sur ce poste. Le remplacer par la reprise de celui-ci ?')) {
+    return false;
+  }
+
+  const neuve = saisieNeuve();
+  saisie = {
+    ...neuve,
+    // LE NUMÉRO NE SE REPREND PAS : le serveur en pose un neuf, « …-V2 ». Garder
+    // celui de la V1 ferait deux feuilles au même numéro pour deux montants.
+    numero: '',
+    date: neuve.date,
+    validite: dv.validite || neuve.validite,
+    projet: dv.projet || '',
+    dueDate: ligne.deadline ? String(ligne.deadline).slice(0, 10) : '',
+    dueHeure: fiche.dueHeure || '',
+    maquette: fiche.maquette === true,
+    noteInterne: fiche.noteInterne || '',
+    appro: dv.appro || neuve.appro,
+    regime: dv.regime || neuve.regime,
+    tauxTgca: Number(dv.tauxTgca) || neuve.tauxTgca,
+    arrondi: dv.arrondi || neuve.arrondi,
+    acompte: dv.acompte && dv.acompte.pourcent != null ? Number(dv.acompte.pourcent) : neuve.acompte,
+    client: {
+      ...neuve.client,
+      nom: ligne.billing_company || '',
+      code: valeurClient(fiche, 'Code client'),
+      ville: valeurClient(fiche, 'Ville'),
+      contact: ligne.contact_referent || '',
+      tel: ligne.contact_phone || '',
+      whatsapp: valeurClient(fiche, 'WhatsApp') || ligne.contact_phone || '',
+      email: ligne.contact_email || '',
+      type: ligne.client_type === 'perso' ? 'perso' : 'pro',
+    },
+    lignes: (Array.isArray(dv.lignes) ? dv.lignes : []).map((l) => ({
+      designation: l.designation || '', reference: l.reference || '', couleur: l.couleur || '',
+      tailles: l.tailles || '', marquage: l.marquage || '', encre: l.encre || '',
+      faces: l.faces || '', note: l.note || '',
+      parTaille: lireTailles(l.tailles),
+      remise: Number(l.remise) || 0,
+      quantite: Number(l.quantite) || 0,
+      unitaireHt: Number(l.unitaireHt) || 0,
+      // ⚠ LE PRIX REPRIS EST TENU POUR MANUEL. Il a été remis au client sur une
+      // feuille : le moteur ne doit pas le refaire tout seul parce qu'un tarif a
+      // bougé depuis. « Recalculer » le rend, article par article, quand on veut.
+      puManuel: true,
+      textile: null, libre: null, simple: false,
+    })),
+  };
+  repriseDe = id;
+  version = Math.max(1, Math.round(Number(fiche.version) || 1));
+  dossierId = null;
+  remettreChamps();
+  poserLignes();
+  redessiner();
+  dire(`Devis ${dv.numero || ''} repris — vous écrivez la version ${version + 1}`.trim(), 'is-ok');
+  return true;
+}
+
+// Le client d'une fiche est une liste de paires : c'est le format d'archive, et
+// il n'y a pas de raison de le changer pour une lecture.
+function valeurClient(fiche, cle) {
+  const l = Array.isArray(fiche.client) ? fiche.client : [];
+  const p = l.find((x) => x && x.k === cle);
+  return p ? String(p.v || '') : '';
+}
+
+// LES CHAMPS SE REMPLISSENT DEPUIS LA SAISIE. Le squelette est posé une fois et
+// ne se reconstruit pas (il reprendrait le curseur) : quand la saisie change en
+// bloc — une reprise, un devis vierge — c'est à l'écran de redescendre dedans.
+function remettreChamps() {
+  for (const [id, v] of [
+    ['#dvf-cl-nom', saisie.client.nom], ['#dvf-cl-code', saisie.client.code],
+    ['#dvf-cl-ville', saisie.client.ville], ['#dvf-cl-email', saisie.client.email],
+    ['#dvf-cl-contact', saisie.client.contact], ['#dvf-cl-tel', saisie.client.tel],
+    ['#dvf-cl-wa', saisie.client.whatsapp], ['#dvf-cherche', saisie.client.nom],
+    ['#dvf-projet', saisie.projet], ['#dvf-due', saisie.dueDate],
+    ['#dvf-heure', saisie.dueHeure], ['#dvf-validite', saisie.validite],
+    ['#dvf-note-interne', saisie.noteInterne], ['#dvf-appro', saisie.appro],
+    ['#dvf-regime', saisie.regime], ['#dvf-arrondi', saisie.arrondi],
+    ['#dvf-acompte', String(saisie.acompte)],
+    ['#dvf-maquette', saisie.maquette ? 'oui' : 'non'],
+  ]) {
+    const n = $(id);
+    if (n) n.value = v == null ? '' : v;
+  }
+  // Les menus déjà habillés ne voient pas une valeur posée par programme.
+  for (const id of ['#dvf-appro', '#dvf-regime', '#dvf-arrondi', '#dvf-acompte', '#dvf-maquette']) {
+    const n = $(id);
+    if (n) menuRafraichir(n);
+  }
 }
 
 async function rechargerReglages() {
@@ -1604,13 +1731,18 @@ function peindre() {
   const compteur = $('#dvf-compte');
   if (compteur) {
     const n = saisie.lignes.length;
-    const etatDevis = dossierId ? 'au planning' : 'brouillon local';
+    const etatDevis = repriseDe ? `reprise du dossier — version ${version + 1}`
+      : (dossierId ? 'au planning' : 'brouillon local');
     compteur.textContent = `${n} article${n > 1 ? 's' : ''} · ${euro(compte.ttc)} · ${etatDevis}`;
   }
   const bSave = $('#dvf-enregistrer');
   if (bSave) {
-    bSave.disabled = !!dossierId || !saisie.lignes.length || !String(saisie.client.nom || '').trim();
-    bSave.textContent = dossierId ? 'Enregistré au planning' : 'Enregistrer au planning';
+    bSave.disabled = (!!dossierId && !repriseDe) || !saisie.lignes.length
+      || !String(saisie.client.nom || '').trim();
+    // LE BOUTON DIT CE QU'IL FERA, pas ce qu'il est. « Enregistrer » sur une
+    // reprise laisserait croire qu'on ouvre un second dossier.
+    bSave.textContent = repriseDe ? `Enregistrer la version ${version + 1}`
+      : (dossierId ? 'Enregistré au planning' : 'Enregistrer dans « À trier »');
   }
 
   const feuille = $('#dvf-feuille');
@@ -1688,6 +1820,9 @@ async function enregistrer() {
   try {
     const compte = calculerDevis(saisie);
     const r = await api('POST', '/api/devis', {
+      // LA REPRISE. Présent, le serveur écrit sur CE dossier et range la version
+      // d'avant ; absent, il en ouvre un neuf.
+      dossierId: repriseDe,
       numero: saisie.numero,
       jour: jourAtelier(),
       date: saisie.date,
@@ -1715,7 +1850,14 @@ async function enregistrer() {
     });
     dossierId = r && r.id ? r.id : null;
     if (r && r.numero) saisie.numero = r.numero;
-    dire(r && r.dejaEnregistre ? 'Ce devis était déjà au planning' : 'Devis enregistré au planning', 'is-ok');
+    if (r && r.version) version = r.version;
+    // La reprise est FAITE : un second clic ne doit pas fabriquer une V3 de la
+    // même modification.
+    repriseDe = null;
+    dire(r && r.reprise
+      ? `Version ${r.version} enregistrée sur le dossier`
+      : (r && r.dejaEnregistre ? 'Ce devis était déjà au planning' : 'Devis enregistré — dans « À trier »'),
+    'is-ok');
     peindre();
   } catch (err) {
     dire(err.message || 'Enregistrement impossible', 'is-ko');
