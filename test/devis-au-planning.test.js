@@ -241,6 +241,27 @@ delete process.env.APP_PASSWORD;
     assert.strictEqual(ko.status, 404, 'un dossier introuvable se dit, il ne crée pas un devis orphelin');
   }
 
+  // --- « PAS DE PRIX » SURVIT À L'ARCHIVE (02/09/2026) --------------------
+  // Le montant se range à 0 — c'est ce que la ligne vaut dans l'addition — mais
+  // un article resté « à chiffrer » ne doit pas revenir OFFERT à la reprise en
+  // V2 : le devis suivant partirait avec la promesse de le donner.
+  {
+    const r = await call('POST', '/api/devis', {
+      ...DEVIS,
+      numero: '',
+      lignes: [
+        { designation: 'Tasse à chiffrer', quantite: 3, unitaireHt: 0, totalHt: 0, sansPrix: true },
+        { designation: 'Goodie offert', quantite: 1, unitaireHt: 0, totalHt: 0, sansPrix: false },
+      ],
+    });
+    assert.strictEqual(r.status, 201, JSON.stringify(r.body));
+    const f = (await call('GET', `/api/requests/${r.body.id}`)).body;
+    const [aChiffrer, offert] = f.fiche.devis.lignes;
+    assert.strictEqual(aChiffrer.sansPrix, true, 'l’archive se souvient de ce qui n’était pas chiffré');
+    assert.strictEqual(aChiffrer.unitaireHt, 0, '… et le montant reste zéro dans l’addition');
+    assert.strictEqual(offert.sansPrix, false, 'un article offert reste un article offert');
+  }
+
   console.log('✓ devis au planning : « À trier », nature demande, numéro unique, '
     + 'reprise en V2/V3 sur UN seul dossier, et un prix qui ne se retarife jamais');
   process.exit(0);

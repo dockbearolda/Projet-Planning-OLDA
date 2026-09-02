@@ -34,6 +34,7 @@
 import {
   APPROS, APPRO_DEFAUT, ACOMPTES, ARRONDIS, REGIMES,
   calculerDevis, modeleDevis, dessinerDevis, CSS_DEVIS, jourAtelier, jourPlus,
+  SANS_PRIX,
 } from './devis.js';
 // LE MENU DÉROULANT AVEC RECHERCHE, celui des deux écrans du comptoir. Charlie,
 // 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
@@ -416,12 +417,16 @@ export async function reprendreDevis(id) {
       parTaille: lireTailles(l.tailles),
       remise: Number(l.remise) || 0,
       quantite: Number(l.quantite) || 0,
-      unitaireHt: Number(l.unitaireHt) || 0,
+      // UNE V2 REPART DES PRIX DE LA V1 — y compris de ce qui n'en avait pas.
+      // Un article resté « à chiffrer » ne doit pas devenir zéro en changeant
+      // de version : ce serait la promesse de le donner.
+      unitaireHt: l.sansPrix || l.unitaireHt == null || l.unitaireHt === ''
+        ? null : (Number(l.unitaireHt) || 0),
       // ⚠ LE PRIX REPRIS EST TENU POUR MANUEL. Il a été remis au client sur une
       // feuille : le moteur ne doit pas le refaire tout seul parce qu'un tarif a
       // bougé depuis. « Recalculer » le rend, article par article, quand on veut.
       puManuel: true,
-      textile: null, libre: null, simple: false,
+      textile: null, tasse: null, libre: null, simple: false,
     })),
   };
   repriseDe = id;
@@ -469,7 +474,7 @@ function remettreChamps() {
 }
 
 async function rechargerReglages() {
-  const [cl, cat, ent, par, tr, tex, logos] = await Promise.all([
+  const [cl, cat, ent, par, tr, tex, logos, grilleTasse] = await Promise.all([
     api('GET', '/api/clients').catch(() => []),
     api('GET', '/api/catalogue-produits').catch(() => []),
     api('GET', '/api/settings/entreprise').catch(() => ({})),
@@ -477,6 +482,7 @@ async function rechargerReglages() {
     api('GET', '/api/tarifs-transport').catch(() => ({})),
     api('GET', '/api/settings/textile').catch(() => null),
     api('GET', '/api/tailles-logo').catch(() => null),
+    api('GET', '/api/tarifs-tasse').catch(() => []),
   ]);
   clients = Array.isArray(cl) ? cl : [];
   catalogue = Array.isArray(cat) ? cat : [];
@@ -484,6 +490,7 @@ async function rechargerReglages() {
   transports = tr && typeof tr === 'object' ? tr : {};
   if (par && Number.isFinite(Number(par.tgca))) saisie.tauxTgca = Number(par.tgca);
   reglagesTextile = tex && typeof tex === 'object' ? tex : null;
+  rangerTarifsTasse(grilleTasse);
   // LES FACES DE TOUTES LES FAMILLES, dédoublonnées et dans l'ordre du tableau.
   // Une face qui n'existe que pour la tasse doit rester proposable : le devis ne
   // sait pas encore quelle famille porte la ligne.
@@ -1138,6 +1145,120 @@ async function chiffrerTextile(ligne) {
   return ligne.unitaireHt;
 }
 
+// ===========================================================================
+// LA TASSE — MÊME BASE, SA PROPRE GRILLE
+// ===========================================================================
+// ⚠ DÉFAUT DU 02/09 : UNE TASSE SORTAIT À 0,00 € SUR LE PAPIER DU CLIENT.
+// L'écran connaissait deux prix — celui du moteur textile et le prix de rayon
+// du catalogue — et la maison en a TROIS. Une tasse n'a pas de prix de rayon
+// (les dix-sept lignes « TC 01 … TC 17 » du catalogue sont des DÉCORS, pas des
+// tarifs) et elle ne passe pas par le moteur V9. Elle s'ADDITIONNE, depuis la
+// grille que le comptoir emploie déjà : la tasse nue, plus chaque face, plus le
+// dessous, plus le BAT.
+//
+// C'EST LA GRILLE QUI FAIT FOI, PAS UN NOMBRE RECOPIÉ ICI. Le prix de rayon
+// d'une tasse (16 €) est la tasse nue (10 €) plus une face (6 €) : l'écrire en
+// dur, c'est le jour où le patron corrige sa grille avoir deux prix pour une
+// tasse — et le devis dirait celui d'avant. Même règle que le tarif de
+// transport et que les six réglages du moteur.
+//
+// LE JOINT ENTRE LES DEUX TABLES EST LE NOM DE LA FAMILLE. Le catalogue range
+// ses décors sous « Tasse céramique 350 ml » ; la grille nomme son produit
+// « Tasse Céramique 350 ml ». C'est le même objet à une majuscule près : on
+// compare donc À PLAT (sans casse, sans accent). Une famille qui ne tombe sur
+// aucun produit de la grille reste un article de rayon ordinaire — c'est ce qui
+// laisse « Tasses » et « Mug », vendues toutes faites et tarifées à l'import,
+// suivre le chemin des goodies.
+let tarifsTasse = [];
+const tasseParId = new Map();
+// Deux noms qui ne diffèrent que par une majuscule ou un accent désignent la
+// même chose. Une seule écriture de cette mise à plat : deux qui se ressemblent
+// finiraient par ne plus s'accorder.
+const aPlat = (v) => String(v == null ? '' : v)
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase().replace(/\s+/g, ' ').trim();
+
+function rangerTarifsTasse(liste) {
+  tarifsTasse = (Array.isArray(liste) ? liste : []).filter((a) => a && a.actif !== false);
+  tasseParId.clear();
+  for (const a of tarifsTasse) tasseParId.set(String(a.id), a);
+}
+const optionsTasse = (categorie) => tarifsTasse.filter((a) => a.categorie === categorie);
+// LES PUCES D'UNE CATÉGORIE, DANS LA FORME QUE LE MENU ATTEND. `menu()` lit
+// `label` ; la grille du patron écrit `designation`. Sans cette traduction les
+// sept options sortaient VIDES — le prix était juste, la liste illisible.
+const puces = (categorie) => optionsTasse(categorie).map((a) => ({ id: a.id, label: a.designation }));
+// LA CASE « RIEN » D'UNE CATÉGORIE. La grille la nomme « Aucune » pour les faces
+// et le dessous, « Non » pour le BAT : c'est celle qui ne coûte rien et qui ne
+// s'imprime pas sur le devis.
+const estRien = (a) => !a || /^(aucun|aucune|non)$/.test(aPlat(a.designation));
+const idRien = (categorie) => {
+  const a = optionsTasse(categorie).find(estRien);
+  return a ? a.id : '';
+};
+
+// UNE TASSE ARRIVE MARQUÉE D'UNE FACE, PAS NUE. « Le composant est la tasse
+// NUE, le prix de rayon c'est elle plus une face » (01/09) : posée sans face,
+// elle sortirait à 10 € quand le magasin la vend 16, et c'est exactement
+// l'écart de six euros déjà payé une fois sur la grille.
+//
+// LA FACE CHOISIE EST CELLE DU CAS COURANT — un client qui demande un devis
+// veut SON logo dessus. Si le patron la renomme, on retombe sur la première
+// face de sa grille qui coûte quelque chose : le prix reste juste, seul
+// l'intitulé change, et il est sous les yeux de la vendeuse.
+const FACE_DEVIS = 'Logo client vectorisé';
+function faceParDefaut() {
+  const faces = optionsTasse('face');
+  const voulue = faces.find((a) => aPlat(a.designation) === aPlat(FACE_DEVIS));
+  const payante = faces.find((a) => !estRien(a) && Number(a.prixVenteTtc) > 0);
+  return (voulue || payante || faces[0] || { id: '' }).id;
+}
+
+// Le produit de la grille qui correspond à une famille du catalogue, ou `null`.
+function produitTasse(famille) {
+  const f = aPlat(famille);
+  if (!f) return null;
+  return optionsTasse('produit').find((a) => aPlat(a.designation) === f) || null;
+}
+
+// LE PRIX D'UNE TASSE — une addition, et rien d'autre. C'est la formule du
+// comptoir (`buildLigneTasse`, server.js) : produit + face 1 + face 2 + dessous
+// + BAT, en TTC, converti au HT du devis.
+//
+// LA REMISE EST DEDANS, comme sur un textile : le moteur l'applique lui-même,
+// et une ligne qui se chiffre ne doit pas voir son prix retouché par ailleurs —
+// deux mains sur le même nombre, ce sont deux remises composées.
+function chiffrerTasse(ligne) {
+  if (!ligne || !ligne.tasse || ligne.puManuel) return null;
+  const t = ligne.tasse;
+  const parts = [t.produitId, t.face1Id, t.face2Id, t.dessousId, t.batId]
+    .map((id) => tasseParId.get(String(id)))
+    .filter(Boolean);
+  if (!parts.length) return null;
+  const ttc = parts.reduce((somme, a) => somme + (Number(a.prixVenteTtc) || 0), 0);
+  const ht = saisie.tauxTgca ? ttc / (1 + saisie.tauxTgca) : ttc;
+  const remise = ligne.remise ? ht * (1 - ligne.remise / 100) : ht;
+  ligne.unitaireHt = Math.round(remise * 100) / 100;
+  return ligne.unitaireHt;
+}
+
+// CE QUE LE CLIENT RELIT SUR SON DEVIS. Les faces d'une tasse sont ce qu'on lui
+// vend : elles vont dans la colonne `faces`, celle que le papier imprime déjà
+// pour les autres articles. Une option « Aucune » ne s'écrit pas — c'est la
+// règle de toutes les cases du document.
+function texteFacesTasse(ligne) {
+  const t = ligne && ligne.tasse;
+  if (!t) return '';
+  const bouts = [];
+  for (const [cle, quoi] of [['face1Id', 'Face 1'], ['face2Id', 'Face 2'], ['dessousId', 'Dessous']]) {
+    const a = tasseParId.get(String(t[cle]));
+    if (a && !estRien(a)) bouts.push(`${quoi} : ${a.designation}`);
+  }
+  const bat = tasseParId.get(String(t.batId));
+  if (bat && !estRien(bat)) bouts.push('BAT');
+  return bouts.join(' · ');
+}
+
 // CHOISIR UN PRODUIT SUR UNE LIGNE QUI EXISTE DÉJÀ. C'est le seul chemin depuis
 // le 01/09 : la liste « Ajouter un article du catalogue » de la barre est
 // partie, le choix se fait dans la DÉSIGNATION de la ligne.
@@ -1156,11 +1277,35 @@ function choisirProduit(ligne, nom, apres) {
     // table des temps ; introuvable, il vaudrait zéro mètre de DTF, donc un
     // marquage facturé 2,30 € au lieu de 9,90 €.
     ligne.textile = { ref: p.reference || '', genre: p.note || '' };
+    ligne.tasse = null;
     if (!ligne.marquage) ligne.marquage = MARQUAGE_AUCUN;
     chiffrerTextile(ligne).then(() => { if (apres) apres(); redessiner(); });
     return true;
   }
+  // UNE TASSE NON PLUS N'A PAS DE PRIX DE RAYON — elle s'additionne. Voir la
+  // section « LA TASSE » : le joint avec la grille du comptoir est le nom de la
+  // famille, et une famille inconnue de la grille retombe sur le rayon.
+  const prodTasse = produitTasse(p.famille);
+  if (prodTasse) {
+    ligne.textile = null;
+    ligne.tasse = {
+      produitId: prodTasse.id,
+      face1Id: faceParDefaut(),
+      face2Id: idRien('face'),
+      dessousId: idRien('dessous'),
+      batId: idRien('bat'),
+    };
+    // LE DÉCOR EST CE QUE LE CLIENT RELIT. « TC 01 » ne dit pas que la tasse est
+    // rouge : le catalogue le range dans la note du produit (« Rouge / Blanc »,
+    // extérieur / intérieur), et c'est la couleur de la ligne.
+    if (p.note && !ligne.couleur) ligne.couleur = p.note;
+    ligne.faces = texteFacesTasse(ligne);
+    chiffrerTasse(ligne);
+    if (apres) apres();
+    return true;
+  }
   ligne.textile = null;
+  ligne.tasse = null;
   // UN PRIX DE CATALOGUE EST TTC (c'est le prix de rayon). Le devis compte en
   // HT : la conversion se fait ici, au taux du moment.
   //
@@ -1189,7 +1334,10 @@ function ajouterTransport() {
     designation: `Transport ${nom}`,
     note: 'Acheminement à Saint-Martin.',
     quantite: qte,
-    unitaireHt: prix,
+    // PAS DE TARIF DE TRANSPORT AUX RÉGLAGES = PAS DE PRIX, pas un transport
+    // gratuit. C'est la même règle que pour un article du catalogue sans prix :
+    // la ligne dit « à chiffrer » et la vendeuse pose le montant.
+    unitaireHt: prix > 0 ? prix : null,
     // ⚠ UNE LIGNE SIMPLE (02/09, Charlie : « ça crée une bulle comme un
     // article, ça prend trop de place »). Un acheminement n'a ni couleur, ni
     // marquage, ni tailles : il sortait pourtant avec les trois rangées d'un
@@ -1223,10 +1371,17 @@ function ajouterLigne(modele) {
     // est dérivé — une seule source, sinon le papier dit une répartition et
     // l'écran une autre.
     parTaille: {},
-    quantite: 1, unitaireHt: 0,
+    // ⚠ `null`, PAS `0`. Une ligne neuve n'a pas de prix ; un zéro serait un
+    // prix — celui d'un article offert. Les deux s'écrivaient pareil, et une
+    // tasse sans tarif sortait sur le papier du client à « 0,00 € ». Voir
+    // `calculerDevis` : c'est là que la distinction est tenue.
+    quantite: 1, unitaireHt: null,
     // `textile` : la référence et le genre du moteur, quand la ligne se chiffre.
+    // `tasse` : les cinq puces de la grille du comptoir (produit, deux faces,
+    // dessous, BAT) quand la ligne EST une tasse. Les deux ne cohabitent
+    // jamais : un article se chiffre d'UNE façon.
     // `puManuel` : le prix a été repris à la main, le moteur n'y touche plus.
-    textile: null, puManuel: false,
+    textile: null, tasse: null, puManuel: false,
     ...modele,
   });
   const hote = $('#dvf-liste');
@@ -1329,8 +1484,14 @@ function rangeeArticle(ligne) {
   const marq = entree(`dvf-a-${n}-m`, { valeur: ligne.marquage, exemple: 'Cœur + dos' });
   marq.id = `dvf-a-${n}-m`;
   const qte = entree(`dvf-a-${n}-q`, { type: 'number', valeur: ligne.quantite, classe: 'dvf-nb' });
-  const pu = entree(`dvf-a-${n}-p`, { type: 'number', valeur: ligne.unitaireHt, classe: 'dvf-nb' });
+  // LE PRIX SE TAPE, OU IL SE CHIFFRE — et tant qu'il n'existe ni l'un ni
+  // l'autre, la case reste VIDE et le dit. Un « 0 » affiché est un prix : il
+  // laisse partir un devis à zéro euro sans que personne ne le remarque.
+  const pu = entree(`dvf-a-${n}-p`, {
+    type: 'number', valeur: ligne.unitaireHt == null ? '' : ligne.unitaireHt, classe: 'dvf-nb',
+  });
   pu.step = '0.01';
+  pu.placeholder = SANS_PRIX;
   // LE TOTAL DE LA LIGNE EST UNE CASE, PAS UN CHAMP : il ne se tape pas, il se
   // lit. Il prend le rail des cases pour tomber sur elles.
   const total = el('div', 'dvf-tab__lu dvf-nb');
@@ -1374,8 +1535,39 @@ function rangeeArticle(ligne) {
   const remise = entree(`dvf-a-${n}-rm`, { type: 'number', valeur: ligne.remise || '', classe: 'dvf-nb' });
   remise.max = '100';
   remise.placeholder = '0';
-  detail2.append(champ('Couleur du marquage', encre), champ('Faces à marquer', faces),
-    champ('Remise %', remise));
+
+  // --- LES QUATRE PUCES D'UNE TASSE ---------------------------------------
+  // Elles FONT le prix (produit + face 1 + face 2 + dessous + BAT), et elles
+  // sortent de la grille des Réglages — pas d'une liste écrite ici.
+  //
+  // ⚠ ELLES SONT POSÉES DÈS LA CONSTRUCTION, MASQUÉES. Une ligne devient une
+  // tasse quand on choisit son produit — après sa construction — et une rangée
+  // ne se reconstruit pas : elle reprendrait le curseur à qui écrit. C'est
+  // exactement la raison qui vaut déjà pour « Recalculer ».
+  const t0 = ligne.tasse || {};
+  const face1 = menu(`dvf-a-${n}-tf1`, puces('face'), t0.face1Id || '');
+  const face2 = menu(`dvf-a-${n}-tf2`, puces('face'), t0.face2Id || '');
+  const dessous = menu(`dvf-a-${n}-td`, puces('dessous'), t0.dessousId || '');
+  const bat = menu(`dvf-a-${n}-tb`, puces('bat'), t0.batId || '');
+
+  // LES DEUX RANGÉES PORTENT LES DEUX FAMILLES, ET N'EN MONTRENT QU'UNE. Trois
+  // cases visibles par rangée dans les deux cas — c'est la grille de `.dvf-r3`,
+  // et deux articles de familles différentes gardent donc la même hauteur.
+  //
+  // Ce qui tombe pour une tasse : la RÉFÉRENCE (elle n'en a pas), le MARQUAGE
+  // (ce sont les emplacements du moteur textile), la COULEUR DU MARQUAGE (une
+  // sublimation est en quadrichromie) et les FACES À MARQUER — ces dernières
+  // parce que la rangée du dessus les NOMME déjà, une par une et tarifées.
+  const caseRef = champ('Référence', refe);
+  const caseCoul = champ('Couleur', coul);
+  const caseMarq = champ('Marquage', marq);
+  const caseFace1 = champ('Face 1', face1);
+  const caseFace2 = champ('Face 2', face2);
+  const caseEncre = champ('Couleur du marquage', encre);
+  const caseFacesA = champ('Faces à marquer', faces);
+  const caseDessous = champ('Dessous', dessous);
+  const caseBat = champ('BAT', bat);
+  detail2.append(caseEncre, caseFacesA, caseDessous, caseBat, champ('Remise %', remise));
 
   // LE VOLET DE LA RÉFÉRENCE LIBRE. Il n'existe que quand on l'a demandé : trois
   // cases de plus sur chaque article, pour un cas sur vingt, c'est exactement ce
@@ -1405,15 +1597,6 @@ function rangeeArticle(ligne) {
   //
   // PAS D'INTITULÉ « TAILLES » AU-DESSUS : chaque case porte le sien, et six
   // lettres de taille sous un article ne se confondent avec rien.
-  // LES TAILLES SONT DES CASES, PAS UNE PHRASE (01/09). Charlie : « des inputs
-  // par défaut pour chaque taille de t-shirt, de XS à 2XL ». Elles s'écrivaient
-  // à la main — « 2 × S · 3 × M » — dans un champ de texte : la répartition ne
-  // se comptait donc pas, elle se recopiait, et la quantité d'à côté pouvait la
-  // contredire sans que rien ne le dise.
-  //
-  // C'EST LA GRILLE DE LA FICHE DE PRODUCTION (`.fa-tailles`, fiche-atelier.css)
-  // — celle où l'atelier compte déjà ses pièces, à un clic d'ici. Pas une grille
-  // qui lui ressemble.
   //
   // ELLES SONT SOUS LA RANGÉE, PAS DEDANS. Six colonnes de plus dans le tableau
   // le poussaient à ~1220 px : il aurait défilé horizontalement à tous les
@@ -1449,7 +1632,7 @@ function rangeeArticle(ligne) {
   // de la place à revendre, et il tombe sur le rail des champs plutôt que sur
   // une rangée à lui.
   caseNote.lastChild.append(reprendre);
-  detail.append(champ('Référence', refe), champ('Couleur', coul), champ('Marquage', marq));
+  detail.append(caseRef, caseCoul, caseMarq, caseFace1, caseFace2);
   // ⚠ UNE LIGNE SIMPLE S'ARRÊTE À SA RANGÉE. Un transport n'a ni référence, ni
   // couleur, ni marquage, ni tailles, et sa note est écrite d'avance.
   if (!ligne.simple) bloc.append(detail, detail2, libre, caseNote, cases);
@@ -1470,9 +1653,32 @@ function rangeeArticle(ligne) {
     ligne.tailles = texteTailles(ligne.parTaille);
   };
 
+  // CE QUE LA LIGNE MONTRE DÉPEND DE CE QU'ELLE EST. Une seule écriture, appelée
+  // à la construction ET à chaque changement de produit : deux qui se
+  // ressemblent laisseraient un jour une tasse afficher une grille de tailles.
+  const majFamille = () => {
+    const estTasse = !!ligne.tasse;
+    for (const [c, pourTasse] of [[caseRef, false], [caseMarq, false], [caseEncre, false],
+      [caseFacesA, false], [caseFace1, true], [caseFace2, true],
+      [caseDessous, true], [caseBat, true]]) {
+      c.hidden = pourTasse !== estTasse;
+    }
+    // UNE TASSE N'A PAS DE TAILLES. Six cases vides sous chaque tasse, c'est
+    // six occasions d'y écrire un nombre qui ne veut rien dire — et la quantité
+    // deviendrait leur somme.
+    cases.hidden = estTasse;
+  };
+
   const rafraichirTete = () => {
-    total.textContent = euro((Number(ligne.quantite) || 0) * (Number(ligne.unitaireHt) || 0));
-    reprendre.hidden = !(ligne.textile && ligne.puManuel);
+    // CE QU'ON N'A PAS CHIFFRÉ SE DIT, ici comme sur le papier — et c'est le
+    // MÊME mot, celui de `devis.js` : deux écritures finiraient par ne plus se
+    // ressembler, et l'écran dirait autre chose que la feuille.
+    const sansPrix = ligne.unitaireHt == null;
+    total.textContent = sansPrix
+      ? SANS_PRIX
+      : euro((Number(ligne.quantite) || 0) * (Number(ligne.unitaireHt) || 0));
+    total.classList.toggle('dvf-tab__vide', sansPrix);
+    reprendre.hidden = !((ligne.textile || ligne.tasse) && ligne.puManuel);
   };
   // LE PRIX QUE LE MOTEUR VIENT DE POSER REDESCEND DANS LE CHAMP. C'est la
   // seule case que l'écran écrit lui-même : partout ailleurs la saisie va vers
@@ -1482,10 +1688,22 @@ function rangeeArticle(ligne) {
     // On ne reprend PAS le champ sous les doigts : si le curseur y est, c'est
     // que quelqu'un est en train d'y écrire.
     if (document.activeElement === pu) return;
-    pu.value = String(ligne.unitaireHt);
+    pu.value = ligne.unitaireHt == null ? '' : String(ligne.unitaireHt);
   };
 
+  // REFAIRE LE PRIX — par la grille de la tasse, ou par le moteur du textile.
+  // Une ligne se chiffre d'UNE façon : c'est ce qu'elle porte qui décide, pas
+  // l'endroit d'où l'on appelle.
   const recalculer = () => {
+    if (ligne.tasse) {
+      ligne.faces = texteFacesTasse(ligne);
+      faces.value = ligne.faces;
+      if (chiffrerTasse(ligne) == null) return;
+      majPu();
+      rafraichirTete();
+      redessiner();
+      return;
+    }
     chiffrerTextile(ligne).then((prix) => {
       if (prix == null) return;
       majPu();
@@ -1493,6 +1711,22 @@ function rangeeArticle(ligne) {
       redessiner();
     });
   };
+
+  // LES QUATRE PUCES REFONT LE PRIX. C'est tout ce qu'elles font — et c'est
+  // pour ça qu'elles sont sur la ligne plutôt que dans un volet : on change la
+  // face devant le client, et le montant bouge sous ses yeux.
+  for (const [n4, cle] of [[face1, 'face1Id'], [face2, 'face2Id'],
+    [dessous, 'dessousId'], [bat, 'batId']]) {
+    n4.addEventListener('change', () => {
+      if (!ligne.tasse) return;
+      ligne.tasse[cle] = n4.value;
+      // ⚠ UNE PUCE CHANGÉE REND LA MAIN AU CALCUL. Sans ça, une tasse dont on
+      // a négocié le prix garderait ce prix en ajoutant une face à 6 € : on
+      // aurait vendu la face pour rien.
+      ligne.puManuel = false;
+      recalculer();
+    });
+  }
 
   for (const [n2, cle] of [[refe, 'reference'], [coul, 'couleur'], [note, 'note'],
     [encre, 'encre'], [faces, 'faces']]) {
@@ -1542,6 +1776,15 @@ function rangeeArticle(ligne) {
     // choses qui se contredisent à l'écran, et le devis part avec un marquage
     // qu'on croit avoir oublié de choisir.
     if (ligne.textile) marq.value = ligne.marquage || '';
+    // LA LIGNE VIENT PEUT-ÊTRE DE CHANGER DE FAMILLE — un t-shirt corrigé en
+    // tasse, ou l'inverse. Ce sont ses cases qui changent, pas sa hauteur.
+    if (ligne.tasse) {
+      for (const [n5, cle] of [[face1, 'face1Id'], [face2, 'face2Id'],
+        [dessous, 'dessousId'], [bat, 'batId']]) n5.value = String(ligne.tasse[cle] || '');
+      faces.value = ligne.faces || '';
+      coul.value = ligne.couleur || '';
+    }
+    majFamille();
     rafraichirTete();
     redessiner();
   });
@@ -1561,6 +1804,8 @@ function rangeeArticle(ligne) {
     ligne.quantite = Math.max(0, Number(qte.value) || 0);
     rafraichirTete();
     redessiner();
+    // UNE TASSE NE SUIT PAS LA QUANTITÉ : sa grille n'a pas de dégressif, le
+    // prix à la pièce est le même pour une tasse et pour cent.
     // LE COEFFICIENT EST DÉGRESSIF : dix t-shirts et cent t-shirts n'ont pas le
     // même prix à la pièce. Le prix suit donc la quantité, sinon il faudrait le
     // savoir et le refaire à la main — c'est exactement ce qu'on vient
@@ -1573,7 +1818,11 @@ function rangeeArticle(ligne) {
   // départ retenue à la première remise.
   remise.addEventListener('input', () => {
     ligne.remise = Math.min(100, Math.max(0, Number(remise.value) || 0));
-    if (ligne.textile) { recalculer(); return; }
+    if (ligne.textile || ligne.tasse) { recalculer(); return; }
+    // ⚠ ON NE REMISE PAS CE QU'ON N'A PAS CHIFFRÉ. Sans ce garde-fou, taper une
+    // remise sur une ligne « à chiffrer » lui posait un prix de 0,00 € — la
+    // ligne cessait de réclamer son prix, et le devis partait avec.
+    if (ligne.unitaireHt == null) { rafraichirTete(); redessiner(); return; }
     // ⚠ ON GARDE LE PRIX PLEIN. Sans lui, deux remises successives se
     // composeraient (10 % puis 10 % feraient 19 %), et revenir à 0 ne rendrait
     // jamais le prix de départ.
@@ -1610,14 +1859,17 @@ function rangeeArticle(ligne) {
   }
 
   pu.addEventListener('input', () => {
-    ligne.unitaireHt = Math.max(0, Number(pu.value) || 0);
+    // VIDE ET ZÉRO NE DISENT PAS LA MÊME CHOSE. Vider la case, c'est retirer le
+    // prix (la ligne repart « à chiffrer ») ; taper 0, c'est décider que
+    // l'article est offert — et ça s'imprime « 0,00 € », comme il se doit.
+    ligne.unitaireHt = String(pu.value).trim() === '' ? null : Math.max(0, Number(pu.value) || 0);
     // Un prix tapé à la main devient le nouveau prix PLEIN : la remise repartira
     // de lui, pas de celui d'avant.
     ligne.pleinHt = ligne.remise ? null : ligne.unitaireHt;
     // ON REPREND LA MAIN, ET LE MOTEUR LA REND. Un prix tapé pendant une
     // négociation ne doit pas se faire écraser au prochain changement de
     // quantité ; « Recalculer » le rend au moteur quand on a fini.
-    if (ligne.textile) ligne.puManuel = true;
+    if (ligne.textile || ligne.tasse) ligne.puManuel = true;
     rafraichirTete();
     redessiner();
   });
@@ -1647,6 +1899,7 @@ function rangeeArticle(ligne) {
   // liste de marquages sans qu'on ait à rechoisir le produit.
   if (estTextile) poserMarquages(marq);
 
+  majFamille();
   rafraichirQte();
   rafraichirTete();
   return bloc;
@@ -1722,7 +1975,13 @@ function peindre() {
     const n = saisie.lignes.length;
     const etatDevis = repriseDe ? `reprise du dossier — version ${version + 1}`
       : (dossierId ? 'au planning' : 'brouillon local');
-    compteur.textContent = `${n} article${n > 1 ? 's' : ''} · ${euro(compte.ttc)} · ${etatDevis}`;
+    // CE QUI MANQUE SE COMPTE ICI, une fois pour tout le devis. Une ligne « à
+    // chiffrer » se voit dans le tableau — mais le tableau se replie, et c'est
+    // justement replié qu'on clique « Imprimer ». Le compte, lui, est toujours
+    // sous les yeux.
+    const manquants = compte.lignes.filter((l) => l.sansPrix).length;
+    const reste = manquants ? ` · ${manquants} à chiffrer` : '';
+    compteur.textContent = `${n} article${n > 1 ? 's' : ''} · ${euro(compte.ttc)}${reste} · ${etatDevis}`;
   }
   const bSave = $('#dvf-enregistrer');
   if (bSave) {
