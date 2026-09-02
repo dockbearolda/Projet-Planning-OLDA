@@ -268,8 +268,12 @@ const TE = global.window.TextileEngine;
   const iClients = nav.indexOf('id="viewClients"');
   assert.ok(iLogos > 0 && iClients > 0 && iClients < iLogos, 'l’onglet vient après la Base clients');
   assert.ok(!/id="view/.test(nav.slice(iLogos + 20)), '… et plus rien après lui : il ferme la rangée');
-  assert.match(nav.slice(iLogos), /material-symbols-outlined"[^>]*>draw</,
-    '« draw » est vérifié présent dans le sous-ensemble figé de la police');
+  // L'onglet portait « draw », vérifié présent dans le sous-ensemble figé de la
+  // police. Les onglets sont devenus des MOTS le 01/09 : plus de glyphe, donc
+  // plus de piège — un nom absent de la police se rendait en TEXTE réduit à sa
+  // première lettre, sans la moindre erreur.
+  assert.match(nav.slice(iLogos), /<span class="nav-switch-label">Tailles logos</,
+    'l’onglet se nomme, il ne se dessine plus');
   // VUE ET HASH DOIVENT RESTER ALIGNÉS : un hash absent de la table rend
   // l'onglet MORT (il retombe sur le planning sans rien dire).
   assert.match(APP, /'#tailles-logos': 'tailleslogos'/);

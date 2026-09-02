@@ -7982,24 +7982,25 @@ monterPoste(EMPLOYEES);
 //
 // Comptes éteints, `puisJe()` rend `true` partout : rien ne se cache, l'écran
 // est exactement celui d'avant.
-// DERNIER RECOURS : LES LIBELLÉS CÈDENT, JAMAIS LA RANGÉE (26/08).
+// DERNIER RECOURS : LES FLANCS CÈDENT, JAMAIS LES MOTS (01/09).
 //
 // Le rail s'est déjà resserré autant qu'il pouvait. S'il manque encore de la
-// place, il y avait deux mauvaises sorties : replier la barre en DEUX rangées
-// d'onglets — deux endroits où chercher, et 40 px de barre sur tous les écrans
-// — ou faire défiler la rangée, ce qui pose le dernier onglet hors de l'écran
-// derrière une barre de défilement que rien n'annonce. Un onglet qu'on ne voit
-// pas est un écran qui n'existe pas.
-// On retire donc les libellés : les icônes sont distinctes, chacune reprend son
-// mot en infobulle, et la rangée reste une rangée.
+// place, il y a deux mauvaises sorties : replier la barre en DEUX rangées
+// d'onglets — deux endroits où chercher — ou faire défiler la rangée, ce qui
+// pose le dernier onglet hors de l'écran derrière une barre de défilement que
+// rien n'annonce. Un onglet qu'on ne voit pas est un écran qui n'existe pas.
 //
-// ON MESURE TOUJOURS AVEC LES LIBELLÉS. Mesurer la rangée déjà réduite dirait
-// « ça tient » et on ne les remettrait jamais — la barre resterait muette pour
-// toujours après un seul passage sur une fenêtre étroite.
+// CE QUI CÉDAIT JUSQU'AU 01/09, C'ÉTAIENT LES LIBELLÉS : il ne restait que des
+// pictogrammes muets, chacun avec son mot en infobulle qu'il fallait aller
+// chercher au survol. Charlie : « je ne veux pas des icône mais les texte ».
+// Ce sont donc les ICÔNES qui sont parties — la rangée passe de 1 028 px à
+// 810 et tient ses mots dès 1 280, avec 58 px de reste. Ce qui se resserre
+// ici, ce sont les flancs, et ça vaut pour la fenêtre plus étroite que le
+// plancher de travail.
 //
-// Le cas arrive dès que les comptes allument « Mon travail » et « Pilotage » :
-// dix onglets au lieu de huit, 1 170 px de contenu pour 960 disponibles à
-// 1 280. À huit onglets, la rangée tient dès 1 280 et les mots restent.
+// ON MESURE TOUJOURS DESSERRÉ. Mesurer la rangée déjà réduite dirait « ça
+// tient » et on ne la rouvrirait jamais — elle resterait serrée pour toujours
+// après un seul passage sur une fenêtre étroite.
 //
 // DÉCLARATION DE FONCTION, pas une constante : le bloc du rail l'appelle six
 // cents lignes plus haut, et une `let` y serait dans sa zone morte.
@@ -8007,16 +8008,8 @@ function ajusterLesOnglets() {
   const nav = document.querySelector('.nav-switch');
   if (!nav) return;
   nav.classList.remove('est-serree');
-  const onglets = nav.querySelectorAll('.nav-switch-btn');
-  if (nav.scrollWidth <= nav.clientWidth + 1) {
-    for (const a of onglets) a.removeAttribute('title');
-    return;
-  }
+  if (nav.scrollWidth <= nav.clientWidth + 1) return;
   nav.classList.add('est-serree');
-  for (const a of onglets) {
-    const mot = a.querySelector('.nav-switch-label');
-    if (mot) a.title = mot.textContent.trim();
-  }
 }
 
 function appliquerDroits() {

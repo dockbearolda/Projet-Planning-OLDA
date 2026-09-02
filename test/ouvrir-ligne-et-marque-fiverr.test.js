@@ -68,17 +68,19 @@ assert.ok(!/fiverr|dupliquer/i.test(FICHE.split('const outils')[1] || ''),
 assert.ok(/outils\.append\(etatSauve, bouton\('fa-btn fa-btn--carre', '×'/.test(FICHE),
   'l’en-tête ne garde que ce qu’on fait DEPUIS la fiche : la fermer');
 
-// L'ONGLET Fiverr du bandeau porte LE MÊME dessin : c'est ce qui fait
-// comprendre que le bouton de la ligne mène à cet onglet-là. Les deux tracés
-// doivent rester identiques — sinon ils divergent en silence.
-// Dans app.js le tracé est écrit en morceaux (un par contre-forme) puis
-// recollé ; dans le HTML il tient en un seul attribut `d`. On recolle avant de
-// comparer, sinon on comparerait deux mises en forme, pas deux dessins.
+// LE BADGE NE VIT PLUS QU'À UN ENDROIT (01/09). L'onglet Fiverr du bandeau le
+// reprenait, pour qu'on comprenne que le bouton de la ligne mène à cet
+// onglet-là — et il fallait tenir les deux tracés identiques, sinon ils
+// divergeaient en silence. Les onglets sont devenus des MOTS (Charlie : « je ne
+// veux pas des icône mais les texte ») : le mot « Fiverr » dit ce que le badge
+// disait, sans rien à tenir en double.
 const traceApp = (ICONE.match(/'(M[^']+)'/g) || []).map((s) => s.slice(1, -1)).join('');
-const traceHtml = (HTML.match(/id="viewFiverr"[\s\S]*?<path[^>]*\sd="([^"]+)"/) || [])[1];
 assert.ok(traceApp.length > 100, 'le tracé du badge doit être lisible dans fiverrIcon()');
-assert.strictEqual(traceHtml, traceApp,
-  'l’onglet Fiverr doit reprendre exactement le tracé de fiverrIcon()');
+const ongletFiverr = (HTML.match(/id="viewFiverr"[\s\S]*?<\/a>/) || [''])[0];
+assert.ok(!/<svg|<path/.test(ongletFiverr),
+  'l’onglet Fiverr est un mot : le badge ne se recopie plus dans le bandeau');
+assert.match(ongletFiverr, /<span class="nav-switch-label">Fiverr<\/span>/,
+  '… et ce mot est bien « Fiverr », celui que porte le bouton de la ligne');
 assert.ok(!/id="viewFiverr"[\s\S]{0,200}material-symbols-outlined/.test(HTML),
   'l’onglet Fiverr ne doit plus afficher le glyphe « draw »');
 

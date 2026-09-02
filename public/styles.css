@@ -3616,22 +3616,18 @@ a,
    rangée illisible. Ils débordent, donc, et c'est ce débordement qui déclenche
    le retrait des libellés. */
 .topbar .nav-switch-btn { flex: 0 0 auto; }
-/* Les flancs des onglets, sur la rangée qui leur est propre. C'est le premier
-   levier quand la place manque, et le seul qui ne coûte rien à la lecture :
-   « Fiverr » et « À commander » ne se devinent pas à l'icône. */
-.topbar .nav-switch-btn { padding-inline: 7px; }
 /* LA RANGÉE SERRÉE — posée par la mesure, jamais par une largeur devinée (voir
-   `ajusterLesOnglets` dans app.js). Les mots s'en vont, les icônes restent, et
-   chacune reprend son mot en infobulle.
-   8 PX DE FLANC DEPUIS LE 01/09, contre 11. Les 11 rouvraient les flancs pour
-   ne pas descendre la cible sous 44 px — une justification TACTILE, et
-   l'atelier n'a plus une seule tablette (voir CLAUDE.md). À la souris, une
-   cible de 36 px se vise sans y penser, et les 60 px que ça rend sont ce qui
-   permet à la rangée unique de tenir à 1 280 : mesuré, dix onglets passent de
-   472 à 412 px. */
-.nav-switch.est-serree .nav-switch-label { display: none; }
-.topbar .nav-switch.est-serree .nav-switch-btn { padding-inline: 8px; }
-.topbar .nav-switch.est-serree .nav-switch-btn--projet-fin { padding-right: 11px; }
+   `ajusterLesOnglets` dans app.js).
+   CE SONT LES FLANCS QUI CÈDENT, PLUS LES MOTS (01/09, Charlie : « je ne veux
+   pas des icône mais les texte »). Ce qui partait, c'étaient les libellés : il
+   restait neuf pictogrammes muets, chacun avec son mot en infobulle qu'il
+   fallait aller chercher au survol. Les icônes sont parties à leur place, la
+   rangée est passée de 1 028 px à 810, et elle tient ses mots dès 1 280.
+   Il reste ce cran, pour la fenêtre plus étroite que le plancher de travail :
+   les flancs se referment, les mots restent. Après lui il n'y a plus que le
+   défilement, et un onglet qu'on ne voit pas est un écran qui n'existe pas. */
+.nav-switch.est-serree { gap: 0; }
+.topbar .nav-switch.est-serree .nav-switch-btn { padding-inline: var(--pas-1); }
 .topbar .nav-switch-btn--projet-fin { padding-right: 11px; margin-right: 4px; }
 /* LA DROITE SE TIENT PAR LA RANGÉE, JAMAIS PAR SON PREMIER ONGLET. Elle s'est
    tenue un temps par un `margin-left: auto` posé sur l'onglet lui-même : une
@@ -3800,10 +3796,8 @@ a,
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.nav-switch-btn .material-symbols-outlined { font-size: var(--ic); flex: 0 0 auto; }
-/* Marque dessinée (Fiverr) : même encombrement qu'un glyphe de la police, pour
-   qu'elle s'aligne sur les six autres onglets sans décaler leur rangée. */
-.nav-switch-mark { width: 20px; height: 20px; flex: 0 0 auto; display: block; }
+/* PLUS D'ICÔNE DANS UN ONGLET (01/09) : ni glyphe de la police, ni marque
+   dessinée pour Fiverr. Un onglet est un MOT. */
 /* UN ONGLET EST UN INTITULÉ, pas du texte courant : il prend donc la taille
    des intitulés (14 px), déjà dans l'échelle de l'application — celle des
    étiquettes de champ et des en-têtes de colonne. En 17 px, les huit onglets
@@ -3839,16 +3833,11 @@ a,
 }
 .nav-switch-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3); }
 
-/* « Vente » et « Devis » restent reconnaissables par leur icône accentuée et
-   leur texte gras — plus par un aplat plein en permanence, qui rivalisait avec
-   le VRAI bouton d'action de l'écran (Enregistrer la commande, etc.). Un seul
-   remplissage plein par écran : celui de l'action, jamais celui de la nav. */
-.nav-switch-btn--projet {
-  font-weight: var(--graisse-note);
-}
-.nav-switch-btn--projet .material-symbols-outlined { color: var(--primary); }
-.nav-switch-btn--projet.active { background: transparent; color: var(--text-1); }
-.nav-switch-btn--projet.active .material-symbols-outlined { color: var(--primary); }
+/* « Vente » et « Devis » se reconnaissaient à leur icône accentuée. Les icônes
+   sont parties le 01/09 et l'accent avec : il reste RÉSERVÉ au seul bouton
+   d'action principal d'un écran (Enregistrer, Ajouter au panier…), et un
+   accent posé en permanence sur deux onglets lui faisait concurrence. Ce qui
+   les groupe, c'est le filet qui ferme la paire — voir juste dessous. */
 /* LE FILET FERME LE GROUPE, PAS CHAQUE ENTRÉE. Les deux seules entrées qui
    CRÉENT quelque chose ouvrent la marche ; un filet les détache de celles qui
    ne font que consulter (même grammaire que Réglages, à l'autre bout). Il
