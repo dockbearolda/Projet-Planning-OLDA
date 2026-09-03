@@ -36,6 +36,7 @@ const {
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,
   getEntreprise, setEntreprise,
+  getMentionsRegime, setMentionsRegime,
   getTaillesLogo, majTailleLogo, compterTaillesLogo,
   creerFamilleLogo, majFamilleLogo, retirerFamilleLogo,
   SUB_TO_FAMILY, getOrdreManuel, setOrdreManuel, basculerOrdreManuel,
@@ -1225,6 +1226,27 @@ app.put('/api/settings/entreprise', exige('reglages'), asyncH(async (req, res) =
   const entreprise = await setEntreprise(body);
   broadcast({ kind: 'settings' });
   res.json(entreprise);
+}));
+
+// LA PHRASE QUI JUSTIFIE UNE EXONÉRATION, par régime. Lecture ouverte (tout
+// poste compose une facture), écriture réservée aux réglages — comme
+// l'identité juste au-dessus, et pour la même raison : deux postes ne peuvent
+// pas justifier la même exonération par deux textes différents.
+//
+// ⚠ NOUS N'EN INVENTONS AUCUNE : voir `getMentionsRegime` (db.js). Vide = rien
+// ne s'imprime.
+app.get('/api/settings/mentions-regime', asyncH(async (req, res) => {
+  res.json(await getMentionsRegime());
+}));
+
+app.put('/api/settings/mentions-regime', exige('reglages'), asyncH(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Objet de mentions attendu' });
+  }
+  const mentions = await setMentionsRegime(body);
+  broadcast({ kind: 'settings' });
+  res.json(mentions);
 }));
 
 // LE TABLEAU DES TAILLES DE LOGO. La largeur du logo à imprimer, par famille,
@@ -4780,6 +4802,23 @@ async function reserverNumeroFacture(cx, annee) {
   return { numero: `FA-${annee}-${String(rang).padStart(4, '0')}`, rang };
 }
 
+// SA PROPRE SÉRIE, SON PROPRE COMPTEUR. `avoir_seq_<annee>`, jamais celui des
+// factures : deux séries qui se partagent un compteur donnent deux suites
+// trouées, et un trou dans une suite est exactement ce qu'un contrôle cherche.
+// Réservé DANS la transaction d'insertion, pour la même raison qu'un numéro de
+// facture — un rejet annule le rang avec la ligne.
+async function reserverNumeroAvoir(cx, annee) {
+  const metaKey = `avoir_seq_${annee}`;
+  const { rows } = await cx.query(
+    `INSERT INTO app_meta (key, value) VALUES ($1, '1')
+     ON CONFLICT (key) DO UPDATE SET value = ((app_meta.value)::int + 1)::text
+     RETURNING value`,
+    [metaKey],
+  );
+  const rang = Number.parseInt(rows[0].value, 10);
+  return { numero: `AV-${annee}-${String(rang).padStart(4, '0')}`, rang };
+}
+
 // POST /api/factures → émet une facture pour un dossier déjà créé par
 // POST /api/comptoir/projet. IDEMPOTENT sur `dossierId` : une resoumission
 // après perte de réponse réseau (le grand classique du comptoir — voir
@@ -4858,13 +4897,17 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
   // arithmétique que `calculerDevis` (arrondi TTC, puis HT au centime, la
   // taxe est ce qui reste) — voir devis.js si les deux doivent un jour être
   // unifiées (hors scope de ce lot).
+  // LE RÉGIME SE DÉCIDE UNE FOIS, ici, et sert PARTOUT ensuite : le taux, le
+  // document archivé, la mention d'exonération. Il était relu de `b.regime` à
+  // deux endroits — deux lectures, deux vérités le jour où l'une bouge.
+  const regime = b.regime === 'revente' || b.regime === 'export' ? b.regime : 'tgca';
   const sousTotalHt = Math.round(lignes.reduce((t, l) => t + l.quantite * l.unitaireHt, 0) * 100) / 100;
   const ajustementUnite = b.ajustement && b.ajustement.unite === 'pct' ? 'pct' : 'eur';
   const ajustementValeur = Number(b.ajustement && b.ajustement.valeur) || 0;
   const ajustementMontant = Math.round((ajustementUnite === 'pct'
     ? sousTotalHt * (ajustementValeur / 100) : ajustementValeur) * 100) / 100;
   const sousTotalAjuste = Math.round((sousTotalHt + ajustementMontant) * 100) / 100;
-  const taux = b.regime === 'tgca' ? Math.max(0, Number(b.tauxTgca) || 0) : 0;
+  const taux = regime === 'tgca' ? Math.max(0, Number(b.tauxTgca) || 0) : 0;
   const vise = Math.round(sousTotalAjuste * (1 + taux) * 100) / 100;
   let ttc = vise;
   if (b.arrondi === 'euro') ttc = Math.floor(vise + 1e-9);
@@ -4884,6 +4927,11 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
   // quelle ; c'est `ouvrirFacture` (app.js) qui rappelle `modeleFacture` avec,
   // exactement comme le fait l'écran de composition pour l'aperçu vivant.
   const entreprise = await getEntreprise();
+  // LA PHRASE D'EXONÉRATION EST FIGÉE ICI, comme l'identité : la facture porte
+  // celle du jour de l'émission, et un changement de texte plus tard ne
+  // réécrit rien. Le serveur la lit LUI-MÊME plutôt que de croire l'écran —
+  // c'est une mention légale, pas une préférence d'affichage.
+  const mentionRegime = (await getMentionsRegime())[regime] || '';
 
   const cx = await pool.connect();
   try {
@@ -4896,7 +4944,8 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
         projet: borner(b.projet, 160),
         client,
         lignes,
-        regime: b.regime === 'revente' || b.regime === 'export' ? b.regime : 'tgca',
+        regime,
+        mentionRegime,
         tauxTgca: Number(b.tauxTgca) || 0,
         arrondi: ['euro', 'dix'].includes(b.arrondi) ? b.arrondi : 'aucun',
         ajustement: { unite: ajustementUnite, valeur: ajustementValeur },
@@ -4911,6 +4960,22 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
        RETURNING id, numero, document, montant_ttc`,
       [numero, annee, rang, dossierId, nomClient, ttc, borner(req.headers['x-qui'] ? decodeURIComponent(req.headers['x-qui']) : null, 80), document],
     );
+    // LE DOSSIER SAIT QU'IL EST FACTURÉ. Sans cette marque, rien dans la
+    // fiche ne distingue un dossier facturé d'un autre — et le bouton
+    // « Facture » aurait dû paraître partout pour ne mener nulle part la
+    // plupart du temps, ce qu'on n'apprend qu'à ne plus lire (même règle que
+    // « Reprendre le devis », fiche-atelier.js).
+    //
+    // ON FUSIONNE EN JS PLUTÔT QU'EN SQL : `fiche || $1::jsonb` demanderait à
+    // pg-mem un opérateur jsonb qu'elle n'a pas, et la base locale de test est
+    // la seule qu'on puisse casser sans le voir. La transaction et
+    // `unDossierALaFois` tiennent déjà la concurrence.
+    const { rows: dossierRows } = await cx.query('SELECT fiche FROM requests WHERE id = $1', [dossierId]);
+    if (dossierRows.length) {
+      const ficheDossier = (dossierRows[0].fiche && typeof dossierRows[0].fiche === 'object') ? dossierRows[0].fiche : {};
+      await cx.query('UPDATE requests SET fiche = $1 WHERE id = $2',
+        [{ ...ficheDossier, factureNumero: numero, factureId: rows[0].id }, dossierId]);
+    }
     await cx.query('COMMIT');
     return res.status(201).json({
       id: rows[0].id, numero: rows[0].numero, montantTtc: Number(rows[0].montant_ttc), document: rows[0].document,
@@ -4936,6 +5001,189 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
   }
 })));
 
+// ---------------------------------------------------------------------------
+// L'AVOIR — la SEULE façon de corriger une facture (03/09/2026)
+// ---------------------------------------------------------------------------
+// UNE FACTURE ÉMISE NE SE MODIFIE NI NE S'EFFACE : c'est ce qui fait qu'un
+// journal de ventes vaut quelque chose. Une erreur, un retour, une annulation
+// se rattrapent donc par un document DE PLUS, qui cite celui qu'il corrige.
+//
+// ⚠ L'AVOIR NE RELIT AUCUN RÉGLAGE. Régime, taux, arrondi, identité de
+// l'atelier, mention d'exonération : TOUT vient du `document` archivé de la
+// facture corrigée. Un avoir qui rendrait 4 % de TGCA sur une facture émise à
+// 3 % ne corrigerait pas cette facture-là, il en inventerait une autre. C'est
+// la même règle que « un prix de catalogue ne retarife jamais une commande
+// passée », appliquée un cran plus haut.
+//
+// L'AJUSTEMENT GLOBAL SUIT AU PRORATA du HT rendu. Sur un avoir TOTAL le
+// prorata vaut 1 et le TTC retombe au centime sur celui de la facture — c'est
+// la propriété qui compte, et un test la tient. Sur un avoir partiel, une
+// remise négociée sur l'ensemble se rend dans la proportion de ce qu'on rend.
+const avoirLignes = (brutes) => (Array.isArray(brutes) ? brutes : [])
+  .filter((l) => l && typeof l === 'object' && trimOrNull(l.designation))
+  .slice(0, 60)
+  .map((l) => ({
+    designation: borner(l.designation, 200),
+    reference: borner(l.reference, 60),
+    couleur: borner(l.couleur, 80),
+    tailles: borner(l.tailles, 120),
+    marquage: borner(l.marquage, 120),
+    encre: borner(l.encre, 80),
+    faces: borner(l.faces, 160),
+    note: borner(l.note, 400),
+    quantite: Math.max(0, Math.round(Number(l.quantite) || 0)),
+    unitaireHt: Math.max(0, Math.round((Number(l.unitaireHt) || 0) * 100) / 100),
+  }));
+
+app.post('/api/avoirs', exige('argent'), asyncH(async (req, res) => unDossierALaFois(async () => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+
+  // LA CLÉ VIENT DE L'ÉCRAN, tirée à l'OUVERTURE du formulaire. C'est elle qui
+  // protège du doublon quand le réseau avale la réponse : la resoumission
+  // porte la même clé et retombe sur la ligne déjà écrite. Deux avoirs VOULUS
+  // viennent de deux formulaires, donc de deux clés — c'est pour ça qu'on ne
+  // dédoublonne PAS sur `invoice_id` (une facture peut recevoir plusieurs
+  // avoirs partiels).
+  const cle = borner(b.cle, 80);
+  if (!cle) return res.status(400).json({ error: 'cle requise' });
+
+  const { rows: deja } = await pool.query(
+    'SELECT id, numero, document, montant_ttc FROM credit_notes WHERE cle = $1', [cle],
+  );
+  if (deja.length) {
+    return res.status(201).json({
+      id: deja[0].id, numero: deja[0].numero, montantTtc: Number(deja[0].montant_ttc), document: deja[0].document,
+    });
+  }
+
+  const invoiceId = trimOrNull(b.invoiceId);
+  if (!invoiceId) return res.status(400).json({ error: 'invoiceId requis' });
+  const { rows: fRows } = await pool.query(
+    'SELECT id, numero, client_nom, montant_ttc, document FROM invoices WHERE id = $1', [invoiceId],
+  );
+  if (!fRows.length) return res.status(404).json({ error: 'Facture introuvable' });
+  const facture = fRows[0];
+  const source = (facture.document && facture.document.saisie) || {};
+
+  const lignes = avoirLignes(b.lignes);
+  if (!lignes.length) return res.status(400).json({ error: 'un avoir sans ligne ne s’émet pas' });
+
+  // L'ARITHMÉTIQUE DE LA FACTURE CORRIGÉE, pas celle du jour.
+  const tauxSource = source.regime === 'tgca' ? Math.max(0, Number(source.tauxTgca) || 0) : 0;
+  const sousTotalHt = Math.round(lignes.reduce((t, l) => t + l.quantite * l.unitaireHt, 0) * 100) / 100;
+  const htFacture = Math.round((Array.isArray(source.lignes) ? source.lignes : [])
+    .reduce((t, l) => t + (Number(l.quantite) || 0) * (Number(l.unitaireHt) || 0), 0) * 100) / 100;
+  // Prorata borné à 1 : un avoir ne rend pas plus de remise qu'il n'y en avait.
+  const part = htFacture > 0 ? Math.min(1, sousTotalHt / htFacture) : 0;
+  const ajSource = (source.ajustement && typeof source.ajustement === 'object') ? source.ajustement : { unite: 'eur', valeur: 0 };
+  const ajUnite = ajSource.unite === 'pct' ? 'pct' : 'eur';
+  // En POURCENTAGE, la valeur s'applique déjà au sous-total rendu : le prorata
+  // est dans l'assiette, l'appliquer une seconde fois le compterait deux fois.
+  const ajValeur = ajUnite === 'pct' ? (Number(ajSource.valeur) || 0)
+    : Math.round((Number(ajSource.valeur) || 0) * part * 100) / 100;
+  const ajMontant = Math.round((ajUnite === 'pct'
+    ? sousTotalHt * (ajValeur / 100) : ajValeur) * 100) / 100;
+  const sousTotalAjuste = Math.round((sousTotalHt + ajMontant) * 100) / 100;
+  const vise = Math.round(sousTotalAjuste * (1 + tauxSource) * 100) / 100;
+  let ttc = vise;
+  if (source.arrondi === 'euro') ttc = Math.floor(vise + 1e-9);
+  else if (source.arrondi === 'dix') ttc = Math.floor(vise * 10 + 1e-9) / 10;
+  ttc = Math.round(ttc * 100) / 100;
+  if (ttc <= 0) return res.status(400).json({ error: 'un avoir à zéro ne s’émet pas' });
+
+  // ON NE REND JAMAIS PLUS QU'ON N'A FACTURÉ, avoirs précédents compris. Sans
+  // ce garde-fou, deux avoirs partiels successifs pouvaient dépasser le total
+  // de la facture sans que rien ne proteste — et c'est le genre d'écart qui ne
+  // se voit qu'au bilan.
+  const { rows: dejaRendu } = await pool.query(
+    'SELECT COALESCE(SUM(montant_ttc), 0)::numeric AS ttc FROM credit_notes WHERE invoice_id = $1', [invoiceId],
+  );
+  const rendu = Number(dejaRendu[0].ttc) || 0;
+  const reste = Math.round((Number(facture.montant_ttc) - rendu) * 100) / 100;
+  if (ttc > reste + 0.004) {
+    return res.status(400).json({
+      error: `Un avoir ne peut pas dépasser ce qui reste à rendre sur ${facture.numero} : ${reste.toFixed(2)} €`,
+    });
+  }
+
+  const jour = isDay(b.jour) ? b.jour : todayPlus(0);
+  const annee = Number(jour.slice(0, 4));
+  const motif = borner(b.motif, 240);
+
+  const cx = await pool.connect();
+  try {
+    await cx.query('BEGIN');
+    const { numero, rang } = await reserverNumeroAvoir(cx, annee);
+    const document = {
+      // MÊME FORME QUE LA FACTURE : c'est `modeleFacture` (public/facture.js)
+      // qui compose les DEUX papiers, et `saisie.avoir` est tout ce qui les
+      // distingue. Un second fichier de rendu à 95 % identique aurait dérivé.
+      saisie: {
+        numero,
+        date: jour,
+        projet: source.projet || '',
+        client: source.client || {},
+        lignes,
+        regime: source.regime || 'tgca',
+        mentionRegime: source.mentionRegime || '',
+        tauxTgca: Number(source.tauxTgca) || 0,
+        arrondi: source.arrondi || 'aucun',
+        ajustement: { unite: ajUnite, valeur: ajValeur },
+        vedette: source.vedette === 'ht' ? 'ht' : 'ttc',
+        mode: source.mode || '',
+        avoir: { surFacture: facture.numero, surDate: source.date || '', motif },
+      },
+      // L'IDENTITÉ DE LA FACTURE CORRIGÉE, pas celle d'aujourd'hui : les deux
+      // papiers doivent porter le même émetteur, même après un déménagement.
+      entreprise: (facture.document && facture.document.entreprise) || {},
+    };
+    const { rows } = await cx.query(
+      `INSERT INTO credit_notes (numero, annee, rang, cle, invoice_id, facture_numero, client_nom, montant_ttc, motif, emis_par, document)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id, numero, document, montant_ttc`,
+      [numero, annee, rang, cle, invoiceId, facture.numero, facture.client_nom, ttc, motif,
+        borner(req.headers['x-qui'] ? decodeURIComponent(req.headers['x-qui']) : null, 80), document],
+    );
+    await cx.query('COMMIT');
+    return res.status(201).json({
+      id: rows[0].id, numero: rows[0].numero, montantTtc: Number(rows[0].montant_ttc), document: rows[0].document,
+    });
+  } catch (err) {
+    await cx.query('ROLLBACK');
+    // Une autre requête a gagné la course sur la même clé : on rend LE SIEN.
+    if (err && err.code === '23505') {
+      const { rows: apres } = await pool.query(
+        'SELECT id, numero, document, montant_ttc FROM credit_notes WHERE cle = $1', [cle],
+      );
+      if (apres.length) {
+        return res.status(201).json({
+          id: apres[0].id, numero: apres[0].numero, montantTtc: Number(apres[0].montant_ttc), document: apres[0].document,
+        });
+      }
+    }
+    throw err;
+  } finally {
+    cx.release();
+  }
+})));
+
+// Les avoirs posés sur une facture — ce que la modale doit dire avant de
+// proposer d'en établir un de plus.
+async function avoirsDeFacture(invoiceId) {
+  const { rows } = await pool.query(
+    `SELECT id, numero, montant_ttc, motif, emis_le, document
+       FROM credit_notes WHERE invoice_id = $1 ORDER BY rang ASC`, [invoiceId],
+  );
+  return rows.map((a) => ({
+    id: a.id,
+    numero: a.numero,
+    montantTtc: Number(a.montant_ttc),
+    motif: a.motif || '',
+    emisLe: a.emis_le,
+    document: a.document,
+  }));
+}
+
 // GET /api/requests/:id/facture → relit la facture d'un dossier, TELLE QUE
 // STOCKÉE. Aucun recalcul, aucune lecture des Réglages courants : `document`
 // porte déjà tout ce qu'il faut (saisie + entreprise figées à l'émission)
@@ -4946,8 +5194,16 @@ app.get('/api/requests/:id/facture', exige('clients'), asyncH(async (req, res) =
     'SELECT id, numero, document, montant_ttc FROM invoices WHERE dossier_id = $1', [req.params.id],
   );
   if (!rows.length) return res.status(404).json({ error: 'Aucune facture pour ce dossier' });
+  // LES AVOIRS VIENNENT AVEC. La facture archivée, elle, ne bouge pas d'un
+  // caractère : ce qu'on a remis au client reste ce qu'on a remis au client.
+  // C'est l'APPLICATION qui sait qu'elle a été corrigée, pas le papier — d'où
+  // ces deux champs à côté du document, et non dedans.
+  const avoirs = await avoirsDeFacture(rows[0].id);
+  const rendu = avoirs.reduce((t, a) => t + a.montantTtc, 0);
   res.json({
     id: rows[0].id, numero: rows[0].numero, montantTtc: Number(rows[0].montant_ttc), document: rows[0].document,
+    avoirs,
+    resteARendre: Math.round((Number(rows[0].montant_ttc) - rendu) * 100) / 100,
   });
 }));
 
@@ -4996,6 +5252,39 @@ function ligneJournal(r) {
   };
 }
 
+// UN AVOIR SE LIT COMME UNE FACTURE, au signe près : mêmes colonnes, même
+// arithmétique, et `ttc` reste POSITIF ici. C'est l'export qui le passe en
+// négatif — voir plus bas — parce que c'est là que la somme d'une colonne doit
+// donner le chiffre d'affaires réel.
+function ligneAvoir(a) {
+  const doc = a.document && typeof a.document === 'object' ? a.document : {};
+  const saisie = doc.saisie && typeof doc.saisie === 'object' ? doc.saisie : {};
+  const client = saisie.client && typeof saisie.client === 'object' ? saisie.client : {};
+  const ttc = Number(a.montant_ttc) || 0;
+  const taux = saisie.regime === 'tgca' ? Math.max(0, Number(saisie.tauxTgca) || 0) : 0;
+  const totalHt = taux ? Math.round((ttc / (1 + taux)) * 100) / 100 : ttc;
+  return {
+    id: a.id,
+    numero: a.numero,
+    surFacture: a.facture_numero,
+    invoiceId: a.invoice_id,
+    date: saisie.date || null,
+    client: a.client_nom,
+    clientType: client.type === 'perso' ? 'perso' : 'pro',
+    clientAdresse: client.adresse || '',
+    projet: saisie.projet || '',
+    motif: a.motif || '',
+    regime: saisie.regime || 'tgca',
+    tauxTgca: taux,
+    totalHt,
+    taxe: Math.round((ttc - totalHt) * 100) / 100,
+    ttc,
+    mode: saisie.mode || '',
+    emiseLe: a.emis_le,
+    emisePar: a.emis_par || '',
+  };
+}
+
 // L'ANNÉE EST LA MAILLE DU JOURNAL, parce que c'est celle de la NUMÉROTATION
 // (`FA-<annee>-<rang>`, colonne `annee`) — et donc celle sur laquelle un
 // contrôle vérifie qu'il ne manque aucun numéro. Sans année : tout, la plus
@@ -5008,12 +5297,52 @@ app.get('/api/factures', exige('argent'), asyncH(async (req, res) => {
       ORDER BY annee DESC, rang DESC`,
     annee ? [annee] : [],
   );
+  // CE QUI A ÉTÉ RENDU, PAR FACTURE. Une facture entièrement avoirée reste au
+  // journal — elle ne s'efface pas, elle se lit « annulée par AV-… ». Une
+  // requête pour tout le monde plutôt qu'une par ligne : la liste d'une année
+  // en compte des centaines.
+  const { rows: avoirs } = await pool.query(
+    `SELECT id, numero, annee, rang, invoice_id, facture_numero, client_nom, montant_ttc, motif, emis_le, emis_par, document
+       FROM credit_notes ${annee ? 'WHERE annee = $1' : ''}
+      ORDER BY annee DESC, rang DESC`,
+    annee ? [annee] : [],
+  );
+  const rendusParFacture = new Map();
+  for (const a of avoirs) {
+    const e = rendusParFacture.get(a.invoice_id) || { ttc: 0, numeros: [] };
+    e.ttc = Math.round((e.ttc + Number(a.montant_ttc)) * 100) / 100;
+    e.numeros.push(a.numero);
+    rendusParFacture.set(a.invoice_id, e);
+  }
   const { rows: annees } = await pool.query(
     'SELECT annee, COUNT(*)::int AS n, SUM(montant_ttc)::numeric AS ttc FROM invoices GROUP BY annee ORDER BY annee DESC',
   );
+  const { rows: anneesAv } = await pool.query(
+    'SELECT annee, COUNT(*)::int AS n, SUM(montant_ttc)::numeric AS ttc FROM credit_notes GROUP BY annee',
+  );
+  const rendusParAnnee = new Map(anneesAv.map((a) => [a.annee, { n: a.n, ttc: Number(a.ttc) || 0 }]));
   res.json({
-    factures: rows.map(ligneJournal),
-    annees: annees.map((a) => ({ annee: a.annee, n: a.n, ttc: Number(a.ttc) || 0 })),
+    factures: rows.map((r) => {
+      const l = ligneJournal(r);
+      const rendu = rendusParFacture.get(r.id);
+      return {
+        ...l,
+        rendu: rendu ? rendu.ttc : 0,
+        avoirs: rendu ? rendu.numeros : [],
+        // « Annulée » = tout a été rendu. Le mot compte : c'est ce qu'un
+        // comptable cherche du regard dans une liste.
+        annulee: !!rendu && Math.abs(rendu.ttc - l.ttc) < 0.005,
+      };
+    }),
+    avoirs: avoirs.map(ligneAvoir),
+    annees: annees.map((a) => {
+      const av = rendusParAnnee.get(a.annee) || { n: 0, ttc: 0 };
+      const ttc = Number(a.ttc) || 0;
+      return { annee: a.annee, n: a.n, ttc, avoirs: av.n, rendu: av.ttc,
+        // LE NET EST CE QUI COMPTE : facturé moins rendu. C'est le chiffre que
+        // le patron cherche, et le seul qui corresponde à l'export.
+        net: Math.round((ttc - av.ttc) * 100) / 100 };
+    }),
   });
 }));
 
@@ -5023,18 +5352,28 @@ app.get('/api/factures', exige('argent'), asyncH(async (req, res) => {
 // raison — sans lui, « Réglé » arrive en « RÃ©glÃ© ».
 //
 // LES NOMBRES PARTENT À LA VIRGULE DÉCIMALE, eux aussi pour le tableur français.
+//
+// LES AVOIRS Y SONT, EN NÉGATIF. C'est le seul choix qui rende la colonne
+// « Total TTC » sommable : additionner un journal où les avoirs sont positifs
+// donne un chiffre d'affaires faux, et de la pire façon — trop haut. La
+// colonne « Nature » dit lequel des deux on lit, la colonne « Sur facture »
+// dit laquelle un avoir corrige.
+const euroCsv = (n) => n.toFixed(2).replace('.', ',');
 const CSV_COLONNES = [
+  ['Nature', (f) => (f.nature === 'avoir' ? 'Avoir' : 'Facture')],
   ['Numero', (f) => f.numero],
+  ['Sur facture', (f) => f.surFacture || ''],
   ['Date de vente', (f) => f.date || ''],
   ['Client', (f) => f.client],
-  ['Type', (f) => (f.clientType === 'perso' ? 'Particulier' : 'Professionnel')],
+  ['Type de client', (f) => (f.clientType === 'perso' ? 'Particulier' : 'Professionnel')],
   ['Adresse client', (f) => f.clientAdresse],
   ['Projet', (f) => f.projet],
+  ['Motif', (f) => f.motif || ''],
   ['Regime', (f) => f.regime],
-  ['Taux', (f) => (f.tauxTgca * 100).toFixed(2).replace('.', ',')],
-  ['Total HT', (f) => f.totalHt.toFixed(2).replace('.', ',')],
-  ['Taxe', (f) => f.taxe.toFixed(2).replace('.', ',')],
-  ['Total TTC', (f) => f.ttc.toFixed(2).replace('.', ',')],
+  ['Taux', (f) => euroCsv(f.tauxTgca * 100)],
+  ['Total HT', (f) => euroCsv(f.signe * f.totalHt)],
+  ['Taxe', (f) => euroCsv(f.signe * f.taxe)],
+  ['Total TTC', (f) => euroCsv(f.signe * f.ttc)],
   ['Reglement', (f) => f.mode],
   ['Emise le', (f) => (f.emiseLe ? new Date(f.emiseLe).toISOString() : '')],
   ['Poste', (f) => f.emisePar],
@@ -5056,9 +5395,27 @@ app.get('/api/factures.csv', exige('argent'), asyncH(async (req, res) => {
       ORDER BY annee ASC, rang ASC`,
     annee ? [annee] : [],
   );
+  const { rows: avoirs } = await pool.query(
+    `SELECT id, numero, annee, rang, invoice_id, facture_numero, client_nom, montant_ttc, motif, emis_le, emis_par, document
+       FROM credit_notes ${annee ? 'WHERE annee = $1' : ''}
+      ORDER BY annee ASC, rang ASC`,
+    annee ? [annee] : [],
+  );
+  // TRIÉ PAR DATE PUIS PAR NUMÉRO, les deux séries mêlées : un journal
+  // comptable se lit dans l'ordre où les documents sont sortis, pas en deux
+  // blocs. Le numéro départage deux documents du même jour, et il est
+  // croissant dans chaque série par construction.
+  const tout = [
+    ...rows.map((r) => ({ ...ligneJournal(r), nature: 'facture', signe: 1, motif: '', surFacture: '' })),
+    ...avoirs.map((a) => ({ ...ligneAvoir(a), nature: 'avoir', signe: -1 })),
+  ].sort((x, y) => String(x.date || '').localeCompare(String(y.date || ''))
+    // LA FACTURE AVANT SON AVOIR le même jour : sans ce départage, « AV »
+    // passe avant « FA » par l'alphabet et l'avoir se lit avant ce qu'il
+    // corrige — l'inverse de l'ordre dans lequel ils sont sortis.
+    || (x.nature === y.nature ? 0 : (x.nature === 'facture' ? -1 : 1))
+    || String(x.numero).localeCompare(String(y.numero)));
   const lignes = [CSV_COLONNES.map(([nom]) => nom).join(';')];
-  for (const r of rows) {
-    const f = ligneJournal(r);
+  for (const f of tout) {
     lignes.push(CSV_COLONNES.map(([, prendre]) => csvChamp(prendre(f))).join(';'));
   }
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');

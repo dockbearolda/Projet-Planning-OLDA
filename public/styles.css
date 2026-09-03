@@ -3341,6 +3341,20 @@ body.col-resizing .grid-wrap { pointer-events: none; }
   color: var(--on-danger-plein);
 }
 .ask__btn--danger:hover { background: var(--danger-plein-hover); }
+/* L'action qui ENGAGE, dans la même famille et la même boîte que les autres :
+   c'est un modificateur de `.ask__btn`, pas un second bouton. */
+.ask__btn--primary { border-color: transparent; background: var(--primary); color: var(--on-primary); }
+.ask__btn--primary:hover:not(:disabled) { background: var(--primary-hover); }
+/* Un bouton qu'on ne peut pas actionner doit LE MONTRER. Il n'y en avait aucun
+   dans cette famille jusqu'à l'avoir, dont le bouton s'éteint tant que le
+   montant dépasse ce qui reste à rendre — sans cette règle il restait plein et
+   cliquable à l'œil. Porte (0,2,0), donc devant `--primary` et `--danger`. */
+.ask__btn:disabled {
+  border-color: transparent;
+  background: var(--inactif);
+  color: var(--inactif-encre);
+  cursor: default;
+}
 @media (max-width: 480px) {
   .ask__actions { flex-direction: column-reverse; }
   .ask__btn { width: 100%; }
@@ -3423,6 +3437,46 @@ body.col-resizing .grid-wrap { pointer-events: none; }
   text-align: center;
 }
 .tk-modal__actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* --- ÉTABLIR UN AVOIR ------------------------------------------------------
+   Le formulaire prend la place du papier DANS la modale de la facture : une
+   seconde boîte par-dessus la première ferait deux voiles et deux pièges de
+   focus, pour un geste qui tient en trois champs.
+
+   TOUT CE QUI SE CLIQUE ET SE REMPLIT GARDE `--ctrl-h`, comme partout ailleurs
+   dans l'application : le motif, la quantité et les deux boutons sortent de la
+   même boîte. Une hauteur est un JETON, jamais un nombre. */
+.av-form { display: flex; flex-direction: column; gap: var(--pas-2); }
+.av-form__titre {
+  margin: 0; font-size: var(--taille-texte); font-weight: var(--graisse-forte);
+  color: var(--text-1); letter-spacing: -.02em;
+}
+.av-champ {
+  min-height: var(--ctrl-h);
+  padding: var(--champ-y) var(--champ-x);
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-champ);
+  background: var(--surface);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--taille-texte);
+}
+.av-champ:focus-visible { outline: none; border-color: var(--primary); background: var(--field-focus); }
+/* La quantité est le SEUL champ borné en largeur : trois chiffres suffisent, et
+   un champ pleine ligne pour « 2 » ferait croire qu'on attend une phrase. */
+.av-champ--qte { width: 84px; flex: 0 0 auto; text-align: right; }
+.av-ligne {
+  display: flex; align-items: center; gap: var(--pas-2);
+  padding-bottom: var(--pas-1);
+  border-bottom: 1px solid var(--border);
+}
+.av-ligne__nom { flex: 1 1 auto; min-width: 0; font-size: var(--taille-texte); color: var(--text-1); }
+.av-ligne__pu { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); }
+.av-ligne__sur { flex: 0 0 auto; font-size: var(--taille-note); color: var(--text-2); }
+.av-total { font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1); }
+/* LA COULEUR DIT UN ÉTAT : on rend plus qu'il ne reste, ou l'émission a
+   échoué. Rien d'autre sur cet écran n'est coloré. */
+.av-total.is-trop { color: var(--danger); }
 .tk-modal__print {
   border-color: transparent;
   background: var(--primary);

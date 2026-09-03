@@ -2779,6 +2779,56 @@ async function semerIdentiteAtelier() {
   await poserMeta('entreprise_seed_v1', '1');
 }
 
+// --- La mention qui justifie une exonération ---------------------------------
+// TROIS RÉGIMES, TROIS PHRASES LIBRES (03/09/2026). Le papier sait déjà dire
+// QUEL régime s'applique — « TGCA 4 % », « TGCA non applicable — Revente »,
+// « … — Exportation ». Ce qu'il ne savait pas dire, c'est POURQUOI : une
+// exonération se justifie par un texte, et c'est cette référence que le
+// comptable du client cherche sur la facture.
+//
+// ⚠ CE N'EST PAS UNE CONSTANTE, ET SURTOUT PAS UNE QUE NOUS INVENTONS.
+// Saint-Martin a son propre code des contributions — la TGCA n'est pas la TVA
+// métropolitaine, et recopier ici un article du CGI parce qu'il « ressemble »
+// mettrait une citation FAUSSE sur un document opposable. La phrase se saisit
+// dans les Réglages, telle que le comptable la donne. Vide = rien ne
+// s'imprime : c'est la règle des quatre papiers, et elle vaut ici aussi.
+//
+// FIGÉE À L'ÉMISSION, comme l'identité de l'atelier : la facture archive la
+// phrase du jour (voir `document.saisie.mentionRegime`, server.js). Un
+// changement de texte plus tard ne réécrit aucune facture déjà sortie.
+// Down : DELETE FROM app_meta WHERE key = 'mentions_regime';
+const MENTIONS_REGIME_CHAMPS = Object.freeze(['tgca', 'revente', 'export']);
+const MENTIONS_REGIME_DEFAULTS = Object.freeze({ tgca: '', revente: '', export: '' });
+const MENTION_REGIME_MAX = 240;
+
+function nettoyerMentionsRegime(brut) {
+  const out = { ...MENTIONS_REGIME_DEFAULTS };
+  if (!brut || typeof brut !== 'object') return out;
+  for (const cle of MENTIONS_REGIME_CHAMPS) {
+    if (!(cle in brut)) continue;
+    const v = brut[cle];
+    if (typeof v !== 'string') continue;
+    out[cle] = v.replace(/\s+/g, ' ').trim().slice(0, MENTION_REGIME_MAX);
+  }
+  return out;
+}
+
+async function getMentionsRegime() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'mentions_regime'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return { ...MENTIONS_REGIME_DEFAULTS };
+  try {
+    return nettoyerMentionsRegime(JSON.parse(rows[0].value));
+  } catch {
+    return { ...MENTIONS_REGIME_DEFAULTS };
+  }
+}
+
+async function setMentionsRegime(patch) {
+  const propre = nettoyerMentionsRegime({ ...(await getMentionsRegime()), ...(patch || {}) });
+  await poserMeta('mentions_regime', JSON.stringify(propre));
+  return propre;
+}
+
 // --- Tailles de logo ----------------------------------------------------------
 // LA LARGEUR DU LOGO À IMPRIMER, en millimètres : par famille, par référence,
 // par FACE et par taille. Ce n'est pas une constante par référence — sur NS300
@@ -3975,6 +4025,7 @@ module.exports = {
   // second passage NE RÉÉCRIVE PAS une identité saisie à la main. Un test doit
   // pouvoir rejouer la semence sans redémarrer le service.
   semerIdentiteAtelier,
+  getMentionsRegime, setMentionsRegime,
   // Exportée pour la même raison : le chemin qui compte n'est pas le nominal,
   // c'est celui d'une base qui porte DÉJÀ des numéros en double. Un test doit
   // pouvoir le rejouer sans redémarrer le service.

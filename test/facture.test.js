@@ -179,4 +179,56 @@ assert.ok(complete.mentions.includes('trois fois'),
   `les mentions doivent reprendre le taux des CGV : ${complete.mentions}`);
 assert.ok(complete.mentions.includes('40 €') && complete.mentions.includes('L441-10'));
 
-console.log('✓ facture : arithmétique, règlement soldé, mentions légales, adresse client, pièges accent/jeton');
+// --- L'AVOIR, LE MÊME PAPIER À TROIS LIGNES PRÈS (03/09/2026) --------------
+// Un second fichier de rendu à 95 % identique aurait dérivé du premier au
+// premier changement : c'est `modeleFacture` qui compose les DEUX documents, et
+// `saisie.avoir` est tout ce qui les distingue.
+const AVOIR = {
+  ...CLIENT_PRO,
+  numero: 'AV-2026-0001',
+  lignes: [{ designation: 'Tasse céramique', quantite: 1, unitaireHt: 8.5 }],
+  avoir: { surFacture: 'FA-2026-0001', surDate: '2026-09-03', motif: 'Tasse ébréchée' },
+};
+const avoir = modeleFacture(AVOIR, IDENTITE);
+const papierAvoir = texteEntier(dessinerFacture(avoir, faireDoc()));
+
+assert.strictEqual(avoir.titre, 'AVOIR');
+// IL CITE LA FACTURE QU'IL CORRIGE, et il la cite en haut : sans ce lien, un
+// avoir est un document qui rend de l'argent sans dire pourquoi.
+assert.ok(papierAvoir.includes('SUR FACTURE') && papierAvoir.includes('FA-2026-0001'),
+  'un avoir doit citer la facture qu’il corrige');
+assert.ok(papierAvoir.includes('Tasse ébréchée'), 'le motif doit s’imprimer avec le montant');
+assert.ok(papierAvoir.includes('MONTANT DE L’AVOIR'), 'le grand total doit dire ce qu’il est');
+// UN AVOIR N'EST PAS UNE VENTE : le mot compte, à côté de « FACTURE DU » juste
+// au-dessus — les deux dates diffèrent dès que l'avoir sort un autre jour.
+assert.ok(papierAvoir.includes('DATE DE L’AVOIR') && !papierAvoir.includes('DATE DE VENTE'),
+  'un avoir date l’avoir, pas une vente');
+// LE CADRE NE DIT PAS COMMENT ON A PAYÉ : y laisser « Carte bancaire » ferait
+// croire que le remboursement part sur la carte, ce que ce papier ne décide pas.
+assert.strictEqual(avoir.reglement.mode, '');
+assert.ok(!papierAvoir.includes('Carte bancaire'));
+// ET SURTOUT : un avoir ne réclame rien. Lui laisser les mentions de la facture
+// (« réglée en totalité à la remise », pénalités de retard, 40 €) lui faisait
+// dire exactement le contraire de ce qu'il fait.
+assert.ok(!avoir.mentions.includes('40 €') && !avoir.mentions.includes('pénalité'),
+  `un avoir ne porte pas les mentions de recouvrement : ${avoir.mentions}`);
+assert.ok(avoir.mentions.includes('rectification'));
+// La facture, elle, ne devient PAS un avoir au passage.
+assert.strictEqual(complete.titre, 'FACTURE');
+assert.strictEqual(complete.avoir, null);
+
+// --- LA MENTION QUI JUSTIFIE UNE EXONÉRATION -------------------------------
+// Vide = rien ne s'imprime : nous n'inventons AUCUNE citation d'article —
+// Saint-Martin a son propre code des contributions.
+assert.strictEqual(modeleFacture(CLIENT_PRO, IDENTITE).mentionRegime, '');
+const exonere = modeleFacture({
+  ...CLIENT_PRO, regime: 'export',
+  mentionRegime: 'Exoneration de TGCA — exportation, article a preciser',
+}, IDENTITE);
+const papierExonere = texteEntier(dessinerFacture(exonere, faireDoc()));
+assert.ok(papierExonere.includes('Exoneration de TGCA'), 'la mention de régime doit s’imprimer');
+// SUR SA PROPRE LIGNE, avant les mentions de règlement : noyée dans le
+// paragraphe des pénalités de retard, elle reviendrait à ne pas être écrite.
+assert.ok(papierExonere.indexOf('Exoneration de TGCA') < papierExonere.indexOf('Aucun escompte'));
+
+console.log('✓ facture : arithmétique, mentions légales, adresse client, avoir, exonération, pièges accent/jeton');

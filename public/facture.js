@@ -60,6 +60,15 @@ const MENTIONS_REGLEMENT = 'Facture réglée en totalité à la remise. Aucun es
   + 'le taux d’intérêt légal en vigueur, exigible sans qu’un rappel soit nécessaire, et indemnité '
   + 'forfaitaire de recouvrement de 40 € (articles L441-10 et D441-5 du code de commerce).';
 
+// UN AVOIR NE RÉCLAME RIEN — IL REND. Lui laisser les mentions de la facture
+// (« réglée en totalité à la remise », pénalités de retard, indemnité de 40 €)
+// faisait dire au document exactement le contraire de ce qu'il fait. Trouvé en
+// rendant le premier avoir, le 03/09.
+const MENTIONS_AVOIR = 'Avoir émis en rectification de la facture citée ci-dessus, qu’il annule '
+  + 'à hauteur du montant indiqué. Il vient en déduction des sommes dues ou donne lieu à '
+  + 'remboursement. La facture d’origine reste acquise et n’est ni modifiée ni annulée par '
+  + 'ailleurs.';
+
 // ===========================================================================
 // LE MODÈLE
 // ===========================================================================
@@ -73,9 +82,20 @@ export function modeleFacture(saisie, entreprise) {
   const compte = calculerDevis(s);
   const mode = MODE_PAR_ID.get(s.mode) || null;
 
+  // L'AVOIR EST LE MÊME PAPIER, au titre et à trois lignes près. Un second
+  // fichier de rendu à 95 % identique aurait dérivé du premier au premier
+  // changement — c'est la règle des deux papiers de l'atelier (`papier.js`),
+  // tenue ici entre la facture et son avoir.
+  const av = s.avoir && typeof s.avoir === 'object' ? s.avoir : null;
+
   return {
     maison: maisonPapier(entreprise),
-    titre: 'FACTURE',
+    titre: av ? 'AVOIR' : 'FACTURE',
+    avoir: av ? {
+      surFacture: texte(av.surFacture),
+      surDate: dateSeule(av.surDate),
+      motif: texte(av.motif),
+    } : null,
     numero: texte(s.numero),
     date: dateSeule(s.date) || dateSeule(jourAtelier()),
     projet: texte(s.projet),
@@ -120,8 +140,17 @@ export function modeleFacture(saisie, entreprise) {
     },
     // LE RÈGLEMENT NE S'IMPRIME QUE SUR UNE FACTURE CHIFFRÉE. Même logique
     // que `totaux` ci-dessus : sans prix, il n'y a rien à régler.
-    reglement: mode && !compte.aucunPrix ? { mode: mode.label, montant: euro(compte.ttc) } : null,
-    mentions: MENTIONS_REGLEMENT,
+    // SUR UN AVOIR, LE CADRE NE DIT PAS COMMENT ON A PAYÉ MAIS CE QU'ON REND.
+    // Y laisser « Carte bancaire » ferait croire que le remboursement part sur
+    // la carte, ce que ce document ne décide pas.
+    reglement: compte.aucunPrix ? null
+      : (av ? { titre: 'AVOIR', montant: euro(compte.ttc), mode: '' }
+        : (mode ? { titre: 'RÈGLEMENT', montant: euro(compte.ttc), mode: mode.label } : null)),
+    // LA PHRASE QUI JUSTIFIE L'EXONÉRATION, figée à l'émission par le serveur
+    // (`document.saisie.mentionRegime`). Vide = rien ne s'imprime : nous
+    // n'inventons aucune citation d'article — voir l'avertissement en tête.
+    mentionRegime: texte(s.mentionRegime),
+    mentions: av ? MENTIONS_AVOIR : MENTIONS_REGLEMENT,
     compte,
   };
 }
@@ -203,6 +232,10 @@ export const CSS_FACTURE = SOCLE_PAPIER + `
 
   .fa__mentions { padding: 10px var(--pap-marge) 0; color: var(--pap-ardoise);
                   line-height: 1.5; font-size: 11px; }
+  /* MÊME CRAN DE TEXTE que les autres mentions — la lisibilité d'une mention
+     légale ne se hiérarchise pas — mais l'encre pleine et la graisse : celle-ci
+     JUSTIFIE le montant taxé juste au-dessus, elle n'accompagne pas. */
+  .fa__mentions--regime { padding-bottom: 0; color: var(--pap-encre); font-weight: 700; }
 
   .fa__pied { margin-top: auto; padding: 14px var(--pap-marge) 22px; text-align: center;
               color: var(--pap-ardoise); line-height: 1.5; }
@@ -266,7 +299,17 @@ export function dessinerFacture(t, doc) {
   // le même jour — le libellé est ce qui distingue les deux lignes, et il ne
   // coûte rien de le poser juste maintenant plutôt que le jour où une vente
   // se facturera en différé.
-  const droite = [['PROJET', t.projet], ['DATE DE VENTE', t.date]].filter(([, v]) => v);
+  // UN AVOIR CITE LA FACTURE QU'IL CORRIGE, et il la cite en haut : c'est la
+  // première chose que cherche celui qui classe le papier. Sans ce lien, un
+  // avoir est un document qui rend de l'argent sans dire pourquoi.
+  const droite = [
+    ['PROJET', t.projet],
+    ...(t.avoir ? [['SUR FACTURE', t.avoir.surFacture], ['FACTURE DU', t.avoir.surDate]] : []),
+    // SUR UN AVOIR, CE N'EST PAS UNE VENTE. Le mot compte à côté de « FACTURE
+    // DU » juste au-dessus : les deux dates diffèrent dès que l'avoir sort un
+    // autre jour, et « DATE DE VENTE » désignerait alors la mauvaise.
+    [t.avoir ? 'DATE DE L’AVOIR' : 'DATE DE VENTE', t.date],
+  ].filter(([, v]) => v);
   const rangs = Math.max(1 + gauche.length, droite.length);
   for (let i = 0; i < rangs; i += 1) {
     if (i === 0) grille.append(el('div', 'fa__nom', t.client.nom));
@@ -307,9 +350,13 @@ export function dessinerFacture(t, doc) {
   const pay = el('div');
   if (t.reglement) {
     const cadre = el('div', 'fa__pay');
-    cadre.append(el('div', 'pap-cap', 'RÈGLEMENT'));
+    cadre.append(el('div', 'pap-cap', t.reglement.titre));
     cadre.append(el('div', 'fa__pay-v', t.reglement.montant));
-    cadre.append(el('div', 'fa__art-d', t.reglement.mode));
+    if (t.reglement.mode) cadre.append(el('div', 'fa__art-d', t.reglement.mode));
+    // LE MOTIF EST DANS LE CADRE, pas en note de bas de page : c'est la seule
+    // phrase qui explique pourquoi cet argent repart, et elle se lit avec le
+    // montant, pas dix centimètres plus bas.
+    if (t.avoir && t.avoir.motif) cadre.append(el('div', 'fa__art-n', t.avoir.motif));
     pay.append(cadre);
   }
   bas.append(pay);
@@ -335,7 +382,8 @@ export function dessinerFacture(t, doc) {
     } else {
       totaux.append(ligneTotal('Total HT', t.totaux.totalHt));
       totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
-      grand.append(el('div', 'pap-cap', 'TOTAL TTC'), el('div', 'fa__grand-v', t.totaux.ttc));
+      grand.append(el('div', 'pap-cap', t.avoir ? 'MONTANT DE L’AVOIR' : 'TOTAL TTC'),
+        el('div', 'fa__grand-v', t.totaux.ttc));
     }
     totaux.append(grand);
     bas.append(totaux);
@@ -345,6 +393,12 @@ export function dessinerFacture(t, doc) {
   f.append(corps);
 
   // --- Mentions légales ---
+  // LA JUSTIFICATION DE L'EXONÉRATION D'ABORD, et sur sa propre ligne : c'est
+  // celle qu'un comptable cherche, et la noyer dans le paragraphe des
+  // pénalités de retard reviendrait à ne pas l'écrire.
+  if (t.mentionRegime) {
+    f.append(el('div', 'fa__mentions fa__mentions--regime', t.mentionRegime));
+  }
   if (t.mentions) {
     f.append(el('div', 'fa__mentions', t.mentions));
   }

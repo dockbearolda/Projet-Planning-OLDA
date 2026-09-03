@@ -409,7 +409,8 @@ CREATE INDEX IF NOT EXISTS idx_catalogue_produits_ordre ON catalogue_produits (p
 --
 -- Une facture Vente Flash naît TOUJOURS d'un dossier déjà créé par
 -- POST /api/comptoir/projet — d'où `dossier_id NOT NULL UNIQUE` : au plus une
--- facture par dossier en v1 (les avoirs, hors scope, seront un second lot).
+-- facture par dossier — un avoir ne consomme pas cette place, il vit dans sa
+-- propre table (`credit_notes`).
 --
 -- `document` porte le modèle ENTIER tel qu'imprimé (sortie de modeleFacture),
 -- identité de la maison comprise : un changement plus tard dans Réglages ne
@@ -417,7 +418,7 @@ CREATE INDEX IF NOT EXISTS idx_catalogue_produits_ordre ON catalogue_produits (p
 -- `fiche.devis`, qui fige le prix d'un devis déjà remis au client.
 --
 -- AUCUNE ROUTE D'ÉCRITURE APRÈS CRÉATION, jamais. Une facture émise ne se
--- corrige pas — elle se conteste par un avoir (hors scope ici).
+-- corrige pas — elle se conteste par un AVOIR (table `credit_notes`, plus bas).
 -- Down : DROP TABLE invoices; DELETE FROM app_meta WHERE key LIKE 'facture_seq_%';
 CREATE TABLE IF NOT EXISTS invoices (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -433,3 +434,44 @@ CREATE TABLE IF NOT EXISTS invoices (
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_invoices_dossier ON invoices (dossier_id);
+
+-- L'AVOIR — la SEULE façon de corriger une facture (03/09/2026).
+--
+-- UNE FACTURE ÉMISE NE SE MODIFIE NI NE S'EFFACE. Ce n'est pas une préférence
+-- de conception : c'est ce qui fait qu'un journal de ventes vaut quelque chose.
+-- Une erreur se rattrape donc par un document DE PLUS, qui cite celui qu'il
+-- corrige et rend l'argent — jamais en retouchant l'original.
+--
+-- SA PROPRE SÉRIE, SON PROPRE COMPTEUR : « AV-2026-0001 », garde
+-- `avoir_seq_<annee>` (JAMAIS `facture_seq_<annee>` — deux séries qui se
+-- partagent un compteur font deux suites trouées, et c'est exactement ce qu'un
+-- contrôle cherche). Le rang se réserve DANS la transaction d'insertion, comme
+-- pour la facture : un rejet annule les deux ensemble.
+--
+-- `montant_ttc` EST POSITIF : c'est un montant RENDU, et le document le dit en
+-- toutes lettres. C'est l'export comptable qui le passe en négatif, parce que
+-- c'est là que la somme de la colonne doit donner le chiffre d'affaires réel.
+--
+-- PAS D'UNIQUE SUR `invoice_id` : une facture peut recevoir plusieurs avoirs
+-- partiels (deux retours successifs sur la même commande). C'est `cle` qui
+-- protège du doublon — un identifiant tiré par l'écran à l'ouverture du
+-- formulaire, renvoyé tel quel si le réseau avale la réponse. Deux avoirs
+-- VOULUS viennent de deux formulaires, donc de deux clés.
+-- Down : DROP TABLE credit_notes; DELETE FROM app_meta WHERE key LIKE 'avoir_seq_%';
+CREATE TABLE IF NOT EXISTS credit_notes (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  numero         text NOT NULL UNIQUE,      -- "AV-2026-0001"
+  annee          int  NOT NULL,
+  rang           int  NOT NULL,
+  cle            text NOT NULL UNIQUE,      -- idempotence : la clé du formulaire qui l'a émis
+  invoice_id     uuid NOT NULL,             -- la facture corrigée
+  facture_numero text NOT NULL,             -- dénormalisé : le papier la cite, et on liste sans jointure
+  client_nom     text NOT NULL,
+  montant_ttc    numeric(12,2) NOT NULL,    -- POSITIF : ce qui est rendu
+  motif          text,
+  emis_le        timestamptz NOT NULL DEFAULT now(),
+  emis_par       text,
+  document       jsonb NOT NULL,            -- le modèle COMPLET tel qu'imprimé
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_credit_notes_invoice ON credit_notes (invoice_id);

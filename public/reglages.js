@@ -135,6 +135,19 @@ function buildStatic() {
     + 'bon de commande. Ce qui est laissé vide ne s’imprime pas — et sur une '
     + 'facture, un SIRET absent la vide de sa valeur.', 'reg-entreprise'));
 
+  // --- Carte « Mentions de régime » -------------------------------------------
+  // POURQUOI CETTE VENTE N'EST PAS TAXÉE. Le papier savait déjà dire QUEL
+  // régime s'applique ; il ne savait pas dire sur quel texte l'exonération
+  // s'appuie — et c'est précisément ce que le comptable du client cherche.
+  // NOUS N'EN INVENTONS AUCUNE : Saint-Martin a son propre code des
+  // contributions, recopier un article du CGI parce qu'il « ressemble »
+  // mettrait une citation fausse sur un document opposable.
+  page.appendChild(carteSimple('badge', 'Mentions de régime',
+    'La phrase qui justifie l’exonération, telle que le comptable la donne. '
+    + 'Elle s’imprime sous les totaux de la facture, et se fige à l’émission : '
+    + 'la changer ne réécrit aucune facture déjà sortie. Vide = rien ne '
+    + 's’imprime.', 'reg-mentions'));
+
   // --- Carte « Journal des factures » -----------------------------------------
   // CE QUE LE COMPTABLE DEMANDE. Une facture se relisait une par une, depuis sa
   // fiche : personne ne pouvait sortir « les ventes du mois », ni vérifier
@@ -514,6 +527,42 @@ const ENTREPRISE_LIGNES = [
   ['bic', 'BIC', 'CMCIFR2A'],
 ];
 
+// Les trois régimes, dans l'ordre où ils tombent dans le menu de la vente.
+let mentionsRegime = {};
+const MENTIONS_LIGNES = [
+  ['tgca', 'TGCA', 'rarement rempli — la vente taxée n’a rien à justifier'],
+  ['revente', 'Revente', 'ex. : Exonération de TGCA — revente en l’état, art. … '],
+  ['export', 'Exportation', 'ex. : Exonération de TGCA — exportation, art. … '],
+];
+
+function renderMentionsRegime() {
+  const hote = $('#reg-mentions');
+  if (!hote) return;
+  // MÊME COMPOSANT QUE L'IDENTITÉ DE L'ATELIER — même classe, donc mêmes
+  // bords gauches et mêmes hauteurs. Deux cartes de réglages qui se
+  // ressemblent doivent sortir de la même règle, pas de deux qui convergent.
+  hote.classList.add('reg-liste--paires');
+  hote.replaceChildren(...MENTIONS_LIGNES.map(([cle, nom, exemple]) => {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', nom));
+    const champ = el('input', 'reg-tarif-input reg-tarif-input--nom');
+    champ.type = 'text';
+    champ.value = mentionsRegime[cle] == null ? '' : String(mentionsRegime[cle]);
+    champ.placeholder = exemple;
+    champ.setAttribute('aria-label', `Mention — ${nom}`);
+    // À LA PERTE DU FOCUS, comme l'identité : un enregistrement par touche
+    // ferait un appel par caractère tapé.
+    champ.addEventListener('change', async () => {
+      try {
+        mentionsRegime = await api('PUT', '/api/settings/mentions-regime', { [cle]: champ.value });
+        flash('Enregistré', 'is-ok');
+      } catch (err) { flash(err.message, 'is-ko'); }
+    });
+    l.append(champ);
+    return l;
+  }));
+}
+
 // ===========================================================================
 // LE JOURNAL DES FACTURES (03/09/2026)
 // ===========================================================================
@@ -526,7 +575,7 @@ const ENTREPRISE_LIGNES = [
 // qui les tient lui-même de la colonne archivée. Un total recalculé à l'écran
 // serait un second moteur d'argent, et deux moteurs finissent par se
 // contredire — la règle est la même que pour le papier (voir facture.js).
-let journal = { factures: [], annees: [] };
+let journal = { factures: [], avoirs: [], annees: [] };
 let journalAnnee = null;
 
 function renderJournal() {
@@ -549,7 +598,13 @@ function renderJournal() {
   const choix = el('select', 'reg-tarif-input reg-tarif-input--nom');
   choix.setAttribute('aria-label', 'Année du journal');
   for (const a of journal.annees) {
-    const o = el('option', '', `${a.annee} — ${a.n} facture${a.n > 1 ? 's' : ''} · ${euroTexte(a.ttc)}`);
+    // LE NET EST CE QU'ON MONTRE quand des avoirs existent : facturé moins
+    // rendu. Annoncer le brut à côté d'un avoir de 130 € ferait lire deux fois
+    // la même vente.
+    const somme = a.avoirs
+      ? `${euroTexte(a.net)} net (${euroTexte(a.ttc)} − ${euroTexte(a.rendu)})`
+      : euroTexte(a.ttc);
+    const o = el('option', '', `${a.annee} — ${a.n} facture${a.n > 1 ? 's' : ''} · ${somme}`);
     o.value = String(a.annee);
     if (a.annee === journalAnnee) o.selected = true;
     choix.append(o);
@@ -571,15 +626,37 @@ function renderJournal() {
     hote.append(el('p', 'reg-corb__vide', 'Aucune facture cette année-là.'));
     return;
   }
-  for (const f of dedans) {
+  // LES DEUX SÉRIES DANS UNE SEULE LISTE, par date puis par numéro : un
+  // journal comptable se lit dans l'ordre où les documents sont sortis, pas en
+  // deux blocs — c'est aussi ce que fait l'export.
+  const avoirs = (journal.avoirs || []).filter((a) => String(a.numero).startsWith(`AV-${journalAnnee}-`));
+  const tout = [...dedans.map((f) => ({ ...f, nature: 'facture' })),
+    ...avoirs.map((a) => ({ ...a, nature: 'avoir' }))]
+    // LA FACTURE AVANT SON AVOIR le même jour : sans ce départage, « AV » passe
+    // avant « FA » par l'alphabet et l'avoir se lit avant ce qu'il corrige.
+    .sort((x, y) => String(x.date || '').localeCompare(String(y.date || ''))
+      || (x.nature === y.nature ? 0 : (x.nature === 'facture' ? -1 : 1))
+      || String(x.numero).localeCompare(String(y.numero)));
+  for (const f of tout) {
     const l = el('div', 'reg-ligne');
     l.append(el('span', 'reg-ligne__nom', `${f.numero} — ${f.client}`));
-    // CE QUI MANQUE SE DIT DANS LE JOURNAL, pas seulement à l'émission : c'est
-    // ici qu'on repère les factures à rattraper, une fois la file passée.
-    const manque = f.clientType !== 'perso' && !String(f.clientAdresse || '').trim()
-      ? ' · adresse manquante' : '';
-    l.append(el('span', 'reg-ligne__aide',
-      `${f.date || ''} · ${euroTexte(f.ttc)} TTC${manque}`));
+    if (f.nature === 'avoir') {
+      // LE SIGNE EST DANS LE TEXTE, PAS DANS UNE COULEUR : un avoir n'est pas
+      // une alerte, c'est un document normal — et la couleur ne dit qu'un état.
+      const pourquoi = f.motif ? ` · ${f.motif}` : '';
+      l.append(el('span', 'reg-ligne__aide',
+        `${f.date || ''} · avoir sur ${f.surFacture} · −${euroTexte(f.ttc)}${pourquoi}`));
+    } else {
+      // CE QUI MANQUE SE DIT DANS LE JOURNAL, pas seulement à l'émission :
+      // c'est ici qu'on repère les factures à rattraper, une fois la file
+      // passée. Et une facture annulée doit se lire annulée.
+      const manque = f.clientType !== 'perso' && !String(f.clientAdresse || '').trim()
+        ? ' · adresse manquante' : '';
+      const rendu = f.annulee ? ` · annulée par ${f.avoirs.join(', ')}`
+        : (f.rendu ? ` · ${euroTexte(f.rendu)} rendus` : '');
+      l.append(el('span', 'reg-ligne__aide',
+        `${f.date || ''} · ${euroTexte(f.ttc)} TTC${rendu}${manque}`));
+    }
     hote.append(l);
   }
 }
@@ -1255,6 +1332,7 @@ export async function refreshReglages() {
     // Le journal se relit à chaque retour sur l'onglet : une facture émise
     // depuis un autre poste doit y être sans qu'on recharge la page.
     api('GET', '/api/factures').then((d) => { if (d && Array.isArray(d.factures)) journal = d; }).catch(() => {}),
+    api('GET', '/api/settings/mentions-regime').then((d) => { if (d) mentionsRegime = d; }).catch(() => {}),
     api('GET', '/api/settings/textile').then((d) => { if (d) chiffrage = d; }).catch(() => {}),
   ]);
   renderMarges();
@@ -1266,6 +1344,11 @@ export async function refreshReglages() {
   renderFlags();
   renderCatalogue();
   renderJournal();
+  // MÊME GARDE QUE L'IDENTITÉ : redessiner pendant qu'on tape reprendrait le
+  // champ sous les doigts.
+  if (!ROOT.contains(document.activeElement) || !document.activeElement.closest('#reg-mentions')) {
+    renderMentionsRegime();
+  }
   // UN APERÇU EN COURS DE LECTURE N'EST PAS ÉCRASÉ. Revenir sur l'onglet
   // pendant qu'on relit un rapport de 55 refus le ferait disparaître sous les
   // yeux — même règle que le message WhatsApp et l'identité de l'atelier.
