@@ -108,6 +108,16 @@ const sansMode = modeleFacture({ ...SAISIE, mode: 'inconnu' }, MAISON);
 assert.strictEqual(sansMode.reglement, null);
 assert.doesNotThrow(() => dessinerFacture(sansMode, faireDoc()));
 
+// --- Une facture VIERGE n'affiche aucun total (trouvé en vérifiant l'écran
+// vide, 03/09 — même règle que le devis, 02/09 : « par défaut je ne veux pas
+// de prix, ça doit être vierge »). Réclamer 0,00 € serait une fausse
+// promesse de règlement sur ce document précis.
+const vierge = modeleFacture({ ...SAISIE, lignes: [] }, MAISON);
+assert.strictEqual(vierge.totaux, null, 'une facture sans ligne ne doit afficher AUCUN total');
+assert.strictEqual(vierge.reglement, null, 'une facture sans prix ne doit rien réclamer');
+const rendVierge = texteEntier(dessinerFacture(vierge, faireDoc()));
+assert.ok(!rendVierge.includes('0,00'), 'aucun montant à zéro ne doit apparaître sur une facture vierge');
+
 // --- MODES_PAIEMENT couvre les cinq modes validés par le serveur -----------
 // Array.from(...) plutôt que MODES_PAIEMENT.map(...) : le tableau vient du
 // bac à sable vm (autre realm) — un .map() dessus produirait un tableau du

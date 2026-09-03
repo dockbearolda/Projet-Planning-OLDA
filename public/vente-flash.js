@@ -628,6 +628,14 @@ function mettreALEchelle() {
   if (!dispo) return;
   const k = Math.min(1, dispo / LARGEUR_A4);
   feuille.style.setProperty('--dvf-echelle', String(k));
+  // ⚠ LARGEUR EXPLICITE, DÉCOUVERTE EN VÉRIFIANT (03/09/2026) : sur cet écran,
+  // le calcul flex « shrink-to-fit » de `.dvf-feuille` (devis-flash.css)
+  // retombait à 0 pour la facture alors qu'il vaut 794px pour le devis — même
+  // CSS partagée, même structure, cause exacte non identifiée dans le temps
+  // imparti. Fixer la largeur ici court-circuite le calcul implicite plutôt
+  // que d'en dépendre : la feuille reprend sa taille réelle (voir LARGEUR_A4),
+  // centrée par `.dvf-cadre` (justify-content: center) comme prévu.
+  feuille.style.width = `${LARGEUR_A4}px`;
   // `transform` ne réserve aucune place : sans cette hauteur rendue au
   // conteneur, la moitié droite ne défilerait pas jusqu'au bas de la feuille.
   const h = feuille.firstElementChild ? feuille.firstElementChild.offsetHeight : 0;

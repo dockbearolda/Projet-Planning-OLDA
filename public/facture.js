@@ -32,10 +32,7 @@
 // contrôle.
 
 import { JETONS_PAPIER, SOCLE_PAPIER, maisonPapier } from './papier.js';
-import {
-  texte, euro, cents, dateSeule, jourAtelier, calculerDevis,
-  REGIMES, ARRONDIS, AJUSTEMENT_UNITES, VEDETTES,
-} from './devis.js';
+import { texte, euro, dateSeule, jourAtelier, calculerDevis } from './devis.js';
 import { nomClientAffiche } from './nom-client.js';
 
 // LES MODES DE RÈGLEMENT — miroir de catalog.json → commande.paiementModes,
@@ -97,7 +94,13 @@ export function modeleFacture(saisie, entreprise) {
       unitaireHt: euro(l.unitaireHt),
       totalHt: euro(l.totalHt),
     })).filter((l) => l.designation || l.totalHt),
-    totaux: {
+    // TANT QU'AUCUNE LIGNE N'A DE PRIX, IL N'Y A PAS DE TOTAL (même règle que
+    // le devis, 02/09 : « par défaut je ne veux pas de prix, ça doit être
+    // vierge »). Une facture VIERGE ne doit pas afficher « TOTAL TTC 0,00 € »
+    // en géant — c'est un montant que personne n'a décidé, et sur ce
+    // document-ci, réclamer 0,00 € serait en plus une fausse promesse de
+    // règlement. Trouvé en vérifiant l'écran vide (03/09).
+    totaux: compte.aucunPrix ? null : {
       sousTotalHt: euro(compte.sousTotalHt),
       ajustement: compte.ajustement.montant ? euro(compte.ajustement.montant) : '',
       ecart: compte.ecart ? euro(compte.ecart) : '',
@@ -109,12 +112,9 @@ export function modeleFacture(saisie, entreprise) {
       ttc: euro(compte.ttc),
       vedette: compte.vedette,
     },
-    // LE RÈGLEMENT N'EST JAMAIS NULL sur une facture émise : le mode est
-    // obligatoire côté écran ET côté serveur (voir server.js). `null` ne peut
-    // apparaître que si un appelant construit un modèle hors du parcours
-    // normal — le papier l'affiche alors sans bloc de règlement plutôt que de
-    // planter, pour rester lisible en cas d'anomalie amont.
-    reglement: mode ? { mode: mode.label, montant: euro(compte.ttc) } : null,
+    // LE RÈGLEMENT NE S'IMPRIME QUE SUR UNE FACTURE CHIFFRÉE. Même logique
+    // que `totaux` ci-dessus : sans prix, il n'y a rien à régler.
+    reglement: mode && !compte.aucunPrix ? { mode: mode.label, montant: euro(compte.ttc) } : null,
     mentions: MENTIONS_REGLEMENT,
     compte,
   };
@@ -297,27 +297,32 @@ export function dessinerFacture(t, doc) {
   }
   bas.append(pay);
 
-  const totaux = el('div');
-  const ligneTotal = (k, v) => {
-    const l = el('div', 'fa__tot-l');
-    l.append(el('span', 'fa__tot-k', k), el('span', 'fa__tot-v', v));
-    return l;
-  };
-  totaux.append(ligneTotal('Sous-total HT', t.totaux.sousTotalHt));
-  if (t.totaux.ajustement) totaux.append(ligneTotal('Ajustement', t.totaux.ajustement));
-  if (t.totaux.ecart) totaux.append(ligneTotal('Arrondi commercial', t.totaux.ecart));
-  const grand = el('div', 'fa__grand');
-  if (t.totaux.vedette === 'ht') {
-    totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
-    totaux.append(ligneTotal('TTC', t.totaux.ttc));
-    grand.append(el('div', 'pap-cap', 'TOTAL HT'), el('div', 'fa__grand-v', t.totaux.totalHt));
-  } else {
-    totaux.append(ligneTotal('Total HT', t.totaux.totalHt));
-    totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
-    grand.append(el('div', 'pap-cap', 'TOTAL TTC'), el('div', 'fa__grand-v', t.totaux.ttc));
+  // PAS DE BLOC DE TOTAUX SUR UNE FACTURE VIERGE (voir modeleFacture) : la
+  // colonne de droite reste réservée par la grille, le premier prix posé la
+  // remplit sans rien décaler — même principe que le devis.
+  if (t.totaux) {
+    const totaux = el('div');
+    const ligneTotal = (k, v) => {
+      const l = el('div', 'fa__tot-l');
+      l.append(el('span', 'fa__tot-k', k), el('span', 'fa__tot-v', v));
+      return l;
+    };
+    totaux.append(ligneTotal('Sous-total HT', t.totaux.sousTotalHt));
+    if (t.totaux.ajustement) totaux.append(ligneTotal('Ajustement', t.totaux.ajustement));
+    if (t.totaux.ecart) totaux.append(ligneTotal('Arrondi commercial', t.totaux.ecart));
+    const grand = el('div', 'fa__grand');
+    if (t.totaux.vedette === 'ht') {
+      totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
+      totaux.append(ligneTotal('TTC', t.totaux.ttc));
+      grand.append(el('div', 'pap-cap', 'TOTAL HT'), el('div', 'fa__grand-v', t.totaux.totalHt));
+    } else {
+      totaux.append(ligneTotal('Total HT', t.totaux.totalHt));
+      totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
+      grand.append(el('div', 'pap-cap', 'TOTAL TTC'), el('div', 'fa__grand-v', t.totaux.ttc));
+    }
+    totaux.append(grand);
+    bas.append(totaux);
   }
-  totaux.append(grand);
-  bas.append(totaux);
   corps.append(bas);
 
   f.append(corps);
