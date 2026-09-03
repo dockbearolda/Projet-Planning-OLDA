@@ -17,9 +17,10 @@ existante `POST /api/comptoir/projet` pour créer le dossier (routage
 production inchangé), puis `POST /api/factures` pour émettre le document.
 
 **Tech Stack:** Node.js/Express (`server.js`), PostgreSQL (`schema.sql`, pool
-`pg`/pg-mem en local), modules ES natifs côté client (aucun build), tests via
-`node --test` (`node:assert`, bootstrap serveur réel pour les routes,
-bac-à-sable `vm` pour les modules papier).
+`pg`/pg-mem en local), modules ES natifs côté client (aucun build), tests
+lancés en scripts autonomes `node fichier.test.js` (`npm test` les enchaîne
+tous, voir `package.json`), `node:assert`, bootstrap serveur réel pour les
+routes, bac-à-sable `vm` pour les modules papier.
 
 **Spec:** [docs/superpowers/specs/2026-09-03-facture-vente-flash-design.md](../specs/2026-09-03-facture-vente-flash-design.md)
 
@@ -747,7 +748,7 @@ console.log('✓ facture : arithmétique, règlement toujours soldé, pièges ac
 
 - [ ] **Step 3: Lancer le test et vérifier qu'il passe**
 
-Run: `node --test test/facture.test.js`
+Run: `node test/facture.test.js`
 Expected: PASS. En cas d'échec sur l'arithmétique, vérifier l'arrondi des
 centimes (`cents`) et l'ordre HT→TTC dans `calculerDevis` (déjà testé côté
 devis — un échec ici indique presque toujours un mauvais champ passé dans
@@ -925,7 +926,7 @@ delete process.env.APP_PASSWORD;
 
 - [ ] **Step 2: Lancer le test, vérifier qu'il échoue**
 
-Run: `node --test test/factures-api.test.js`
+Run: `node test/factures-api.test.js`
 Expected: FAIL — `404` sur `POST /api/factures` (route inexistante).
 
 - [ ] **Step 3: Ajouter les routes dans `server.js`**
@@ -969,15 +970,25 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
 
   // RETOMBÉE IDEMPOTENTE — AUCUN numéro consommé sur ce chemin.
   const { rows: existante } = await pool.query(
-    'SELECT id, numero, document FROM invoices WHERE dossier_id = $1', [dossierId],
+    'SELECT id, numero, document, montant_ttc FROM invoices WHERE dossier_id = $1', [dossierId],
   );
   if (existante.length) {
-    return res.status(201).json({ id: existante[0].id, numero: existante[0].numero, document: existante[0].document });
+    return res.status(201).json({
+      id: existante[0].id, numero: existante[0].numero, montantTtc: Number(existante[0].montant_ttc), document: existante[0].document,
+    });
   }
 
   const cl = b.client && typeof b.client === 'object' ? b.client : {};
   const nomClient = borner(cl.nom, 120);
   if (!nomClient) return res.status(400).json({ error: 'le nom du client est requis' });
+  const client = {
+    nom: nomClient,
+    ville: borner(cl.ville, 80),
+    contact: borner(cl.contact, 120),
+    tel: borner(cl.tel, 40),
+    email: borner(cl.email, 160),
+    type: cl.type === 'perso' ? 'perso' : 'pro',
+  };
 
   const mode = b.mode;
   if (!PAIEMENT_MODE_SET.has(mode)) return res.status(400).json({ error: `mode de paiement invalide : ${mode}` });
@@ -1029,25 +1040,50 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
   else if (b.arrondi === 'dix') ttc = Math.floor(vise * 10 + 1e-9) / 10;
   ttc = Math.round(ttc * 100) / 100;
 
-  const document = {
-    titre: 'FACTURE', client: { nom: nomClient, ville: borner(cl.ville, 80), type: cl.type },
-    lignes, sousTotalHt, totalHt: taux ? Math.round((ttc / (1 + taux)) * 100) / 100 : ttc,
-    taxe: Math.round((ttc - (taux ? ttc / (1 + taux) : ttc)) * 100) / 100,
-    ttc, mode, jour,
-  };
+  // ⚠ CE QUI EST ARCHIVÉ EST LA DONNÉE BRUTE, PAS UN RENDU. Le serveur ne
+  // formate rien (pas d'euro(), pas de maisonPapier()) : `modeleFacture` /
+  // `dessinerFacture` (public/facture.js) sont les SEULS à savoir composer un
+  // papier, et ils tournent CÔTÉ CLIENT — c'est la séparation déjà en place
+  // pour les trois autres papiers (« cet écran ne dessine aucun document »,
+  // voir devis-flash.js). `document.saisie` porte donc exactement la forme
+  // que `modeleFacture(saisie, entreprise)` attend en entrée ; `document.
+  // entreprise` fige l'identité de l'atelier TELLE QU'ELLE ÉTAIT à l'émission
+  // — un changement plus tard dans Réglages ne doit jamais réécrire une
+  // facture déjà sortie. La relecture (GET ci-dessous) rend cette paire telle
+  // quelle ; c'est `ouvrirFacture` (app.js) qui rappelle `modeleFacture` avec,
+  // exactement comme le fait l'écran de composition pour l'aperçu vivant.
+  const entreprise = await getEntreprise();
 
   const cx = await pool.connect();
   try {
     await cx.query('BEGIN');
     const { numero, rang } = await reserverNumeroFacture(cx, annee);
+    const document = {
+      saisie: {
+        numero,
+        date: jour,
+        projet: borner(b.projet, 160),
+        client,
+        lignes,
+        regime: b.regime === 'revente' || b.regime === 'export' ? b.regime : 'tgca',
+        tauxTgca: Number(b.tauxTgca) || 0,
+        arrondi: ['euro', 'dix'].includes(b.arrondi) ? b.arrondi : 'aucun',
+        ajustement: { unite: ajustementUnite, valeur: ajustementValeur },
+        vedette: b.vedette === 'ht' ? 'ht' : 'ttc',
+        mode,
+      },
+      entreprise,
+    };
     const { rows } = await cx.query(
       `INSERT INTO invoices (numero, annee, rang, dossier_id, client_nom, montant_ttc, emise_par, document)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, numero, document`,
+       RETURNING id, numero, document, montant_ttc`,
       [numero, annee, rang, dossierId, nomClient, ttc, borner(req.headers['x-qui'] ? decodeURIComponent(req.headers['x-qui']) : null, 80), document],
     );
     await cx.query('COMMIT');
-    return res.status(201).json({ id: rows[0].id, numero: rows[0].numero, document: rows[0].document });
+    return res.status(201).json({
+      id: rows[0].id, numero: rows[0].numero, montantTtc: Number(rows[0].montant_ttc), document: rows[0].document,
+    });
   } catch (err) {
     await cx.query('ROLLBACK');
     // UN AUTRE APPEL A GAGNÉ LA COURSE entre notre lecture d'idempotence et
@@ -1055,10 +1091,12 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
     // pas une erreur — c'est le même dossier, la même intention.
     if (err && err.code === '23505') {
       const { rows: apres } = await pool.query(
-        'SELECT id, numero, document FROM invoices WHERE dossier_id = $1', [dossierId],
+        'SELECT id, numero, document, montant_ttc FROM invoices WHERE dossier_id = $1', [dossierId],
       );
       if (apres.length) {
-        return res.status(201).json({ id: apres[0].id, numero: apres[0].numero, document: apres[0].document });
+        return res.status(201).json({
+          id: apres[0].id, numero: apres[0].numero, montantTtc: Number(apres[0].montant_ttc), document: apres[0].document,
+        });
       }
     }
     throw err;
@@ -1068,14 +1106,18 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
 })));
 
 // GET /api/requests/:id/facture → relit la facture d'un dossier, TELLE QUE
-// STOCKÉE. Aucun recalcul, aucune lecture des Réglages : une facture émise ne
-// bouge plus jamais, même si l'identité de l'atelier change ensuite.
+// STOCKÉE. Aucun recalcul, aucune lecture des Réglages courants : `document`
+// porte déjà tout ce qu'il faut (saisie + entreprise figées à l'émission)
+// pour que `modeleFacture`/`dessinerFacture` (côté client) recomposent
+// EXACTEMENT le même papier qu'au premier jour.
 app.get('/api/requests/:id/facture', exige('clients'), asyncH(async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT id, numero, document FROM invoices WHERE dossier_id = $1', [req.params.id],
+    'SELECT id, numero, document, montant_ttc FROM invoices WHERE dossier_id = $1', [req.params.id],
   );
   if (!rows.length) return res.status(404).json({ error: 'Aucune facture pour ce dossier' });
-  res.json({ id: rows[0].id, numero: rows[0].numero, document: rows[0].document });
+  res.json({
+    id: rows[0].id, numero: rows[0].numero, montantTtc: Number(rows[0].montant_ttc), document: rows[0].document,
+  });
 }));
 ```
 
@@ -1093,7 +1135,7 @@ sont écrits en dur, pas recopiés d'un des deux calculs).
 
 - [ ] **Step 4: Lancer le test, vérifier qu'il passe**
 
-Run: `node --test test/factures-api.test.js`
+Run: `node test/factures-api.test.js`
 Expected: PASS.
 
 - [ ] **Step 5: `npm test` complet**
@@ -1723,7 +1765,7 @@ console.log('✓ vente-flash : exports, papier, mode de règlement obligatoire, 
 
 - [ ] **Step 13: Lancer le test**
 
-Run: `node --test test/vente-flash.test.js`
+Run: `node test/vente-flash.test.js`
 Expected: PASS. Si un assert échoue, c'est le signe d'une étape de portage
 (Steps 2-11) incomplète — corriger `public/vente-flash.js`, ne pas affaiblir
 le test.
@@ -1978,9 +2020,18 @@ commentaire `// L'IDENTITÉ DE L'ATELIER`), ajouter :
 // ===========================================================================
 // CONTRAIREMENT AU TICKET ET AU BON DE COMMANDE (qui se recomposent à partir
 // de la ligne courante), la facture ne se reconstruit JAMAIS depuis `fiche` :
-// elle se RELIT depuis `invoices.document`, tel qu'archivé à l'émission — un
-// changement de taux de TGCA ou d'identité de l'atelier depuis ne doit rien
-// changer à une facture déjà sortie.
+// elle se RELIT depuis `invoices.document`.
+//
+// ⚠ CE QUE LE SERVEUR ARCHIVE EST LA DONNÉE BRUTE, PAS UN RENDU (voir Task 5,
+// server.js n'importe pas facture.js — CommonJS contre module ES — et ne
+// formate donc rien lui-même). `document.saisie` porte exactement ce que
+// `modeleFacture` attend en entrée, `document.entreprise` fige l'identité de
+// l'atelier TELLE QU'ELLE ÉTAIT à l'émission. Rouvrir une facture appelle
+// donc `modeleFacture(document.saisie, document.entreprise)` — la MÊME
+// fonction pure que l'écran de composition utilise pour l'aperçu vivant — et
+// c'est CE résultat qui va à `dessinerFacture`. Un changement de taux de
+// TGCA ou d'identité de l'atelier depuis l'émission ne change donc rien :
+// `document.entreprise` est figé, pas relu depuis les Réglages courants.
 let factureOuverte = false;
 async function ouvrirFacture(r) {
   if (factureOuverte) return;
@@ -1993,7 +2044,7 @@ async function ouvrirFacture(r) {
     if (rep.status === 404) throw new Error('Aucune facture pour ce dossier');
     if (!rep.ok) throw new Error(`Erreur ${rep.status}`);
     const data = await rep.json();
-    doc = data.document;
+    doc = mod.modeleFacture(data.document.saisie, data.document.entreprise);
   } catch (err) {
     factureOuverte = false;
     reportError(err);
