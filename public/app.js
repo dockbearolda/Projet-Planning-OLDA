@@ -38,6 +38,12 @@ let bureauMod = null;
 const chargerBureau = () => (bureauMod
   ? Promise.resolve(bureauMod)
   : import('./bureau.js').then((m) => { bureauMod = m; return m; }));
+// LA FACTURE, chargée à la demande comme le bon de commande — un poste qui
+// n'ouvre jamais de facture ne télécharge jamais ce module.
+let factureMod = null;
+const chargerFacture = () => (factureMod
+  ? Promise.resolve(factureMod)
+  : import('./facture.js').then((m) => { factureMod = m; return m; }));
 // « Le patron a mis à jour » : une tablette du comptoir ne se recharge jamais
 // d'elle-même, elle exécute donc encore la version d'avant-hier. On lui propose.
 import { noterVersion, surveillerMaj } from './maj.js';
@@ -3860,6 +3866,7 @@ async function ouvrirBureau(r) {
     // fermer, la retrouver dans la grille et viser l'autre pastille, c'est
     // trois gestes pour une question qu'on se pose ici.
     bouton('Ticket atelier', () => { fermer(); ouvrirTicket(r); }),
+    bouton('Facture', () => { fermer(); ouvrirFacture(r); }),
     // Le document en texte : c'est ce qu'on colle dans un e-mail au bureau.
     bouton('Copier', () => {
       const dit = () => showToast('Bon de commande copié');
@@ -3882,6 +3889,118 @@ async function ouvrirBureau(r) {
   // `.tk-modal` NAÎT À OPACITÉ ZÉRO : c'est la classe `open`, posée au cadre
   // suivant, qui la fait apparaître. Sans elle, le document est bien monté,
   // bien dimensionné, et parfaitement INVISIBLE — le bouton « ne fait rien ».
+  requestAnimationFrame(() => {
+    fond.classList.add('open');
+    const premier = actions.querySelector('button');
+    if (premier) premier.focus();
+  });
+}
+
+// La feuille de la facture est posée dans la page à la PREMIÈRE ouverture —
+// id DISTINCT de `bu-style` (bon de commande) : `poserStyleBureau` a son id
+// fixe en dur, le réutiliser tel quel poserait la CSS de la facture sous le
+// nom `bu-style`, ou sauterait l'insertion si un bon de commande a déjà été
+// ouvert avant dans la session.
+function poserStyleFacturePapier(css) {
+  if (document.getElementById('fa-papier-style')) return;
+  const s = document.createElement('style');
+  s.id = 'fa-papier-style';
+  s.textContent = css;
+  document.head.appendChild(s);
+}
+
+// ===========================================================================
+// LA FACTURE — relecture d'un document déjà émis, jamais recalculé
+// ===========================================================================
+// CONTRAIREMENT AU TICKET ET AU BON DE COMMANDE (qui se recomposent à partir
+// de la ligne courante), la facture ne se reconstruit JAMAIS depuis `fiche` :
+// elle se RELIT depuis `invoices.document`.
+//
+// CE QUE LE SERVEUR ARCHIVE EST LA DONNÉE BRUTE, PAS UN RENDU (voir Task 5,
+// server.js n'importe pas facture.js — CommonJS contre module ES — et ne
+// formate donc rien lui-même). `document.saisie` porte exactement ce que
+// `modeleFacture` attend en entrée, `document.entreprise` fige l'identité de
+// l'atelier TELLE QU'ELLE ÉTAIT à l'émission. Rouvrir une facture appelle
+// donc `modeleFacture(document.saisie, document.entreprise)` — la MÊME
+// fonction pure que l'écran de composition utilise pour l'aperçu vivant — et
+// c'est CE résultat qui va à `dessinerFacture`. Un changement de taux de
+// TGCA ou d'identité de l'atelier depuis l'émission ne change donc rien :
+// `document.entreprise` est figé, pas relu depuis les Réglages courants.
+let factureOuverte = false;
+async function ouvrirFacture(r) {
+  if (factureOuverte) return;
+  factureOuverte = true;
+  let mod;
+  let doc;
+  try {
+    mod = await chargerFacture();
+    const rep = await fetchBorne(`/api/requests/${r.id}/facture`);
+    if (rep.status === 404) throw new Error('Aucune facture pour ce dossier');
+    if (!rep.ok) throw new Error(`Erreur ${rep.status}`);
+    const data = await rep.json();
+    doc = mod.modeleFacture(data.document.saisie, data.document.entreprise);
+  } catch (err) {
+    factureOuverte = false;
+    reportError(err);
+    return;
+  }
+  poserStyleFacturePapier(mod.CSS_FACTURE);
+
+  const focusAvant = document.activeElement;
+  const fond = document.createElement('div');
+  fond.className = 'tk-modal';
+  const carte = document.createElement('div');
+  carte.className = 'tk-modal__card';
+  carte.setAttribute('role', 'dialog');
+  carte.setAttribute('aria-modal', 'true');
+  carte.setAttribute('aria-label', `${doc.titre}${doc.numero ? ` ${doc.numero}` : ''}`);
+
+  const feuille = document.createElement('div');
+  feuille.className = 'tk-modal__paper';
+  feuille.appendChild(mod.dessinerFacture(doc, document));
+
+  const actions = document.createElement('div');
+  actions.className = 'tk-modal__actions';
+  const bouton = (label, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ask__btn';
+    b.textContent = label;
+    b.addEventListener('click', onClick);
+    return b;
+  };
+  const fermer = () => {
+    fond.remove();
+    document.removeEventListener('keydown', auClavier);
+    factureOuverte = false;
+    if (focusAvant && focusAvant.focus) focusAvant.focus();
+  };
+  const auClavier = (e) => { if (e.key === 'Escape') fermer(); };
+  document.addEventListener('keydown', auClavier);
+
+  actions.append(
+    bouton('Fermer', fermer),
+    bouton('Imprimer', () => {
+      const cadre = document.createElement('iframe');
+      cadre.setAttribute('aria-hidden', 'true');
+      cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:0';
+      document.body.appendChild(cadre);
+      const d = cadre.contentDocument;
+      d.title = `${doc.titre} ${doc.numero || ''}`.trim();
+      const style = d.createElement('style');
+      style.textContent = `@page{size:A4 portrait;margin:0}body{margin:0;background:#fff}${mod.CSS_FACTURE}`;
+      d.head.appendChild(style);
+      d.body.appendChild(mod.dessinerFacture(doc, d));
+      cadre.contentWindow.focus();
+      cadre.contentWindow.print();
+      setTimeout(() => cadre.remove(), 1000);
+    }),
+  );
+
+  carte.append(feuille, actions);
+  fond.append(carte);
+  fond.addEventListener('click', (e) => { if (e.target === fond) fermer(); });
+  document.body.append(fond);
   requestAnimationFrame(() => {
     fond.classList.add('open');
     const premier = actions.querySelector('button');
