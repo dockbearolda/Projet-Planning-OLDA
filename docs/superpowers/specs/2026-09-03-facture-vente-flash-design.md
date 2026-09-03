@@ -21,6 +21,15 @@ tient lieu faute de mieux.
 - Le règlement partiel sur une facture (une facture Vente Flash sort toujours
   soldée — voir §4).
 - La conversion d'un devis déjà accepté en facture.
+- **L'extraction du sélecteur d'article catalogue en module partagé.** Décidé le
+  03/09 après mesure : ce bloc de `devis-flash.js` (catalogue, chiffrage V9,
+  chiffrage tasse, rendu de ligne) fait à lui seul environ 1000 lignes, couplées
+  à l'état interne de cet écran — un chantier aussi gros que le reste de la
+  facture, et risqué sur un écran en usage quotidien. `vente-flash.js` porte
+  donc SA PROPRE implémentation du sélecteur d'article en v1, écrite sur le même
+  modèle que `devis-flash.js` (mêmes appels catalogue, même moteur V9) mais sans
+  partage de code. L'extraction en module commun devient un second lot, une fois
+  qu'on a deux usages réels à comparer — plus sûr après qu'avant.
 - Le retrait de `public/comptoir/vente-directe.html` — il continue de tourner tel
   quel, sans y toucher. Vente Flash s'installe À CÔTÉ, exactement le chemin suivi
   par le devis flash avant de remplacer `#devis` (voir mémoire
@@ -168,12 +177,12 @@ d'articles catalogue (produits + textile chiffré au moteur V9), même grammaire
 champ partagée (`.fa`, `.devis-flash` dans `fiche-atelier.css` — voir mémoire
 `fiche-prend-la-grammaire-du-comptoir`).
 
-**Extraction plutôt que troisième copie** : le bloc « choisir un article au
-catalogue » (recherche, ajout, quantité, remise, sous-champs de marquage) existe
-déjà en substance dans `devis-flash.js` et dans le comptoir. L'implémentation
-extrait ce bloc dans un module partagé (nom et découpe précis à trancher au
-moment du plan) importé par `devis-flash.js` ET `vente-flash.js` — pas une
-troisième version qui diverge à la première correction.
+**Sélecteur d'article : implémentation propre à cet écran en v1** — voir §1. Le
+bloc « choisir un article au catalogue » (recherche, ajout, quantité, remise,
+chiffrage V9, chiffrage tasse) est réécrit dans `vente-flash.js` sur le modèle
+de `devis-flash.js` (mêmes endpoints, même moteur textile `TextileEngine` via
+`/comptoir/textile-catalog.js`), sans usine à gaz de partage prématuré. La
+consolidation en module commun est un lot séparé, délibérément après-coup.
 
 **Bouton final « Émettre la facture »** :
 1. `POST /api/comptoir/projet` → `dossierId`.
@@ -231,8 +240,6 @@ tombe, pas dans le cas nominal.
 
 ## 10. Ce qui reste à trancher (au moment du plan)
 
-1. Le nom et la découpe exacts du module extrait pour le choix d'article
-   catalogue.
-2. Le texte exact des mentions légales (Charlie à valider — voir §2).
-3. Où, dans la fiche (modale Ticket/Bon de commande existante), le bouton
+1. Le texte exact des mentions légales (Charlie à valider — voir §2).
+2. Où, dans la fiche (modale Ticket/Bon de commande existante), le bouton
    « Facture » vient se greffer pour rouvrir une facture déjà émise.
