@@ -537,19 +537,51 @@ const jourDecale = (n) => {
     stage: 'production', sub_stage: 'prod_dtf', billing_company: marque('EN PROD'),
     product: 'Casquettes', quantity: 40, deadline: jourDecale(1),
   });
-  // UNE DEMANDE N'EST PAS UN RETRAIT (03/09). Tant qu'un dossier est en
-  // « Demande & chiffrage », RIEN n'a été produit : le client attend un prix,
-  // pas un carton.
-  const aChiffrer = await creer({
-    stage: 'demande_chiffrage', sub_stage: 'a_chiffrer', billing_company: marque('À CHIFFRER'),
-    product: 'Banderole', deadline: jourDecale(0),
+  // ===========================================================================
+  // IL N'Y A PLUS DE « DEMANDE » : IL Y A UN DEVIS, ET IL Y A UNE VENTE
+  // ===========================================================================
+  // Charlie, 03/09 : « faut bien comprendre qu'il n'y a plus de demande, il y a
+  // maintenant devis et vente ». UN DEVIS N'EST PAS UN RETRAIT — tant que le
+  // client n'a pas dit oui, rien n'est produit et personne ne vient rien
+  // chercher. Le mot « demande » ne survit que dans la BASE (`order_kind`, et le
+  // slug `demande_chiffrage`) : ce sont des noms d'avant.
+  const devisEnChiffrage = await creer({
+    stage: 'demande_chiffrage', sub_stage: 'a_chiffrer', billing_company: marque('DEVIS CHIFFRAGE'),
+    product: 'Banderole', deadline: jourDecale(0), order_kind: 'demande',
   });
-  // … et la même sans date : elle ne doit pas non plus gonfler le compteur
-  // « sans date ». Une demande de devis n'A PAS de jour de retrait, c'est
-  // normal, et le compter comme un manque est un faux reproche permanent.
-  const demandeSansDate = await creer({
-    stage: 'demande_chiffrage', sub_stage: 'demande_recue', billing_company: marque('DEMANDE NUE'),
-    product: 'Devis à faire',
+  // LE PIÈGE QUE LA FAMILLE SEULE NE VOIT PAS : depuis le 02/09, « Enregistrer »
+  // sur le devis flash crée la ligne dans « À TRIER » — la même famille que les
+  // ventes du comptoir. Sans la seconde condition, un devis tout juste
+  // enregistré s'affichait comme un retrait.
+  const devisATrier = await creer({
+    stage: 'a_trier', billing_company: marque('DEVIS À TRIER'),
+    product: 'Devis à chiffrer', deadline: jourDecale(1), order_kind: 'demande',
+  });
+  const venteATrier = await creer({
+    stage: 'a_trier', billing_company: marque('VENTE À TRIER'),
+    product: 'Mugs', deadline: jourDecale(1), order_kind: 'commande',
+  });
+  // UN DEVIS ACCEPTÉ DEVIENT UNE VENTE en entrant en préparation / production /
+  // facturation : c'est ce PASSAGE qui le fait entrer à l'agenda, pas un champ
+  // que quelqu'un devrait penser à changer. Dix dossiers sont dans ce cas sur la
+  // base de production ; les écarter aurait vidé l'agenda de ce qu'on fabrique.
+  const devisAccepte = await creer({
+    stage: 'production', sub_stage: 'prod_dtf', billing_company: marque('DEVIS ACCEPTÉ'),
+    product: 'Flyers', deadline: jourDecale(1), order_kind: 'demande',
+  });
+  // Une VIEILLE ligne (25 en production) n'a pas de `order_kind` du tout :
+  // `NULL <> 'demande'` vaut NULL, donc faux — sans le `COALESCE`, elles
+  // auraient toutes disparu d'« À trier », en silence.
+  const vieilleATrier = await creer({
+    stage: 'a_trier', billing_company: marque('VIEILLE LIGNE'),
+    product: 'Objet d’avant', deadline: jourDecale(1),
+  });
+  // Un devis sans date ne doit pas non plus gonfler le compteur « sans date » :
+  // un devis n'A PAS de jour de retrait, c'est normal, et le compter comme un
+  // manque est un faux reproche affiché en permanence.
+  const devisSansDate = await creer({
+    stage: 'demande_chiffrage', sub_stage: 'demande_recue', billing_company: marque('DEVIS NU'),
+    product: 'Devis à faire', order_kind: 'demande',
   });
   const aTrier = await creer({
     stage: 'a_trier', billing_company: marque('À TRIER'),
@@ -586,25 +618,34 @@ const jourDecale = (n) => {
 
   for (const [id, quoi] of [[aPrevenir, 'un dossier prêt à remettre'],
     [enProd, 'un dossier encore en production'],
-    [aTrier, 'un dossier encore à trier']]) {
+    [aTrier, 'un dossier encore à trier'],
+    [venteATrier, 'une VENTE qui attend d’être triée'],
+    [devisAccepte, 'un devis ACCEPTÉ, déjà en production — c’est une vente'],
+    [vieilleATrier, 'une vieille ligne « À trier » sans `order_kind` : on ne la fait pas disparaître']]) {
     assert.ok(ids.has(id), `${quoi} doit figurer à l’agenda`);
   }
   for (const [id, quoi] of [[recuperee, 'une commande déjà récupérée au comptoir'],
     [soldee, 'un dossier parti chez le client (« Paiement & clôture »)'],
     [fiverr, 'de la sous-traitance graphiste — aucun client au comptoir'],
     [archivee, 'un dossier archivé'],
-    [aChiffrer, 'une demande encore à chiffrer — le client attend un PRIX, pas un carton'],
+    [devisEnChiffrage, 'un DEVIS en chiffrage — le client attend un prix, pas un carton'],
+    [devisATrier, 'un DEVIS tout juste enregistré, qui attend « À trier »'],
     [sansDate, 'un dossier sans date de retrait']]) {
     assert.ok(!ids.has(id), `${quoi} n’a rien à faire dans une liste de gens qui vont passer`);
   }
   assert.ok(!AGENDA_FAM.includes('demande_chiffrage'),
-    'la famille « Demande & chiffrage » est hors de l’agenda, côté serveur');
-  // Et elle ne compte pas non plus dans les « sans date » : mesuré sur la base
-  // de PRODUCTION le 03/09, elle en apportait 23 sur 30.
+    'la famille du devis est hors de l’agenda, côté serveur');
+  // IL FAUT LES DEUX CONDITIONS. La famille seule laissait passer les devis
+  // posés « À trier » par le devis flash depuis le 02/09.
+  assert.match(SERVEUR,
+    /AND \(r\.stage <> 'a_trier' OR COALESCE\(r\.order_kind, ''\) <> 'demande'\)/,
+    'un devis qui attend « À trier » est écarté lui aussi — et le COALESCE protège les vieilles lignes');
+  // Un devis ne compte pas non plus dans les « sans date » : mesuré sur la base
+  // de PRODUCTION le 03/09, la famille en apportait 23 sur 30.
   const avant = agenda.sansDate;
-  await call('PATCH', `/api/requests/${demandeSansDate}`, { billing_company: marque('DEMANDE NUE 2') });
+  await call('PATCH', `/api/requests/${devisSansDate}`, { billing_company: marque('DEVIS NU 2') });
   assert.strictEqual((await call('GET', '/api/agenda')).body.sansDate, avant,
-    'une demande sans date de retrait n’est pas un dossier « sans date » : elle n’en a pas besoin');
+    'un devis sans date de retrait n’est pas un dossier « sans date » : il n’en a pas besoin');
 
   assert.ok(agenda.sansDate >= 1,
     'les dossiers sans date sont COMPTÉS : les taire ferait lire l’agenda comme complet');

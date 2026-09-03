@@ -1768,39 +1768,67 @@ app.get('/api/requests/corbeille', asyncH(async (req, res) => {
 //   · « Commande récupérée » — il vient d'être remis, à la main, au comptoir ;
 //   · Fiverr — de la sous-traitance graphiste, aucun client au comptoir ;
 //   · l'archive (`deleted_at`) ;
-//   · « DEMANDE & CHIFFRAGE » — et c'est le correctif du 03/09 au soir.
+//   · TOUS LES DEVIS — et c'est le correctif du 03/09 au soir.
 //
-// UNE DEMANDE N'EST PAS UN RETRAIT. Tant qu'un dossier est dans cette famille,
-// RIEN n'a été produit : le client attend un prix, pas un carton. Il n'a donc
-// aucune raison de figurer dans une liste de gens qui passent au comptoir.
+// ===========================================================================
+// IL N'Y A PLUS DE « DEMANDE » : IL Y A UN DEVIS, ET IL Y A UNE VENTE
+// ===========================================================================
+// Charlie, le 03/09 : « faut bien comprendre qu'il n'y a plus de demande, il y a
+// maintenant devis et vente ».
 //
-// Charlie, le 03/09 : « ce planning depuis plusieurs mois a évolué et on a en
-// ligne des anciennes DEMANDES dont on ne peut pas faire de modification comme
-// la date par exemple, et elles se retrouvent donc toutes en "en retard" ».
-// Mesuré sur la base de PRODUCTION le jour même, sur les 71 dossiers vivants du
-// périmètre :
+// UN DEVIS N'EST PAS UN RETRAIT. Tant que le client n'a pas dit oui, rien n'est
+// produit et personne ne vient rien chercher : un devis n'a pas sa place dans
+// une liste de gens qui poussent la porte du comptoir. Une VENTE, si.
 //
-//                                      avec la famille   sans elle
-//     retraits datés                          41             29
-//     dont EN RETARD                          18             12
-//     dossiers sans date de retrait           30              7
+// LE MOT « demande » SURVIT DANS LA BASE, et seulement là : `order_kind` vaut
+// encore `'demande'` / `'commande'`, et la famille s'appelle encore
+// `demande_chiffrage` (« Demande & chiffrage » à l'écran). Ce sont des noms
+// d'avant ; ce qu'ils désignent aujourd'hui, c'est DEVIS et VENTE. On les lit
+// comme tels, on ne les renomme pas ici — renommer une valeur écrite sur 71
+// dossiers vivants pour du vocabulaire, ce serait une migration pour rien.
 //
-// Les six retards qu'elle apportait avaient 6, 32, 34, 36 et 37 jours, et cinq
-// des six étaient créés en juin ou juillet : personne ne vient les chercher.
-// Et les 23 dossiers sans date qu'elle apportait n'en manquaient pas — une
-// demande de devis n'A PAS de jour de retrait, c'est normal, et les compter
-// comme un manque était un faux reproche affiché en permanence.
+// D'OÙ DEUX CONDITIONS, ET IL EN FAUT DEUX — c'est ce que la première écriture
+// avait manqué :
 //
-// La règle est sur la FAMILLE et non sur `order_kind` : c'est la famille que les
-// écrans tiennent à jour, et un dossier passé en préparation ou en production
-// SE PRODUIT — il repart donc à l'agenda, quelle que soit sa nature d'origine.
+//   1. LA FAMILLE « Demande & chiffrage » NE FIGURE JAMAIS. C'est le pipeline du
+//      devis (reçu, à qualifier, à chiffrer, chiffrage en cours, devis envoyé,
+//      devis validé) : rien n'y est produit.
+//   2. UN DEVIS QUI ATTEND « À TRIER » NON PLUS. Depuis le 02/09, « Enregistrer »
+//      sur le devis flash crée la ligne dans « À trier » — la même famille que
+//      les ventes du comptoir. La famille ne suffit donc plus à distinguer : là,
+//      c'est `order_kind` qui dit lequel des deux on regarde.
+//
+// ET SURTOUT, CE QUE CES DEUX RÈGLES NE FONT PAS : elles n'écartent PAS un
+// dossier `order_kind = 'demande'` posé en préparation, en production ou en
+// facturation. Un devis accepté DEVIENT une vente en entrant dans ces
+// familles-là — c'est ce passage qui le fait entrer à l'agenda, pas un champ que
+// quelqu'un devrait penser à changer. Mesuré sur la base de PRODUCTION le 03/09 :
+// dix dossiers sont dans ce cas (six en préparation, quatre en production), et
+// les écarter aurait vidé l'agenda de dossiers qu'on est en train de fabriquer.
+//
+// LES CHIFFRES, sur les 71 dossiers vivants du périmètre, le 03/09 :
+//
+//                                      avant   après
+//     retraits datés                     41      28
+//     dont EN RETARD                     18      12
+//     dossiers sans date de retrait      30       7
+//
+// Les six retards que « Demande & chiffrage » apportait avaient 6, 32, 34, 36 et
+// 37 jours, et cinq des six étaient créés en juin ou juillet : personne ne vient
+// les chercher. Et les 23 dossiers sans date qu'elle apportait n'en manquaient
+// pas — un devis n'A PAS de jour de retrait, c'est normal, et le compter comme
+// un manque était un faux reproche affiché en permanence.
 //
 // LES DOSSIERS SANS DATE NE SONT PAS DES RETRAITS : ils ne peuvent se ranger
 // sous aucun jour. On ne les renvoie pas — mais on les COMPTE, et l'écran le
 // dit dans son en-tête. Les taire ferait lire l'agenda comme complet.
 const AGENDA_FAMILLES = ['a_trier', 'preparation', 'production', 'facturation'];
 const AGENDA_REMIS = 'commande_recuperee';
+// `COALESCE` et pas `IS DISTINCT FROM` : les vieilles lignes (25 en production)
+// ont un `order_kind` NUL, et `NULL <> 'demande'` vaut NULL — donc faux — ce qui
+// les aurait toutes écartées de « À trier » en silence.
 const AGENDA_FILTRE = `r.stage IN (${AGENDA_FAMILLES.map((s) => `'${s}'`).join(', ')})
+  AND (r.stage <> 'a_trier' OR COALESCE(r.order_kind, '') <> 'demande')
   AND (r.sub_stage IS NULL OR r.sub_stage <> '${AGENDA_REMIS}')
   AND ${VIVANTES}`;
 

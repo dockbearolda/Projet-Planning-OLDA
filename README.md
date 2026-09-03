@@ -254,7 +254,7 @@ personne sur place n'a de raison de deviner qu'il faudrait recharger. Depuis le
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | PATCH | `/api/requests/:id/fiche` | **Corrige la fiche** : le récapitulatif du comptoir par **position** (`{ client: [], details: [] }` — les libellés viennent du parcours et ne se réécrivent pas ; une case non remplie n'est pas touchée, donc deux postes qui corrigent deux articles ne s'effacent pas), l'heure de retrait, le secteur de production, la **consigne pour l'atelier** (`atelier`, 500 caractères) et le **numéro du papier remis au client** (`refTicket`). La ligne est prise `FOR UPDATE` le temps de la relire et de la réécrire. `fiche.ref` n'est **jamais** modifiable par cette porte. |
 | DELETE | `/api/requests/:id` | **Archive** la demande — elle ne s'efface pas. La ligne quitte tous les écrans (`deleted_at`), garde son journal et ses PDF, et se retrouve dans la corbeille des Réglages, d'où elle revient à sa famille et à sa sous-étape. |
-| GET | `/api/agenda` | **L'agenda des retraits** : `{ lignes: [{ id, stage, sub_stage, billing_company, client_type, quantity, product, deadline, flag, flag_reason, heure }], sansDate }`, du plus proche au plus lointain. Ne rend que ce qu'il reste à **remettre au client** — tout sauf « Paiement & clôture » (le dossier est parti), « Commande récupérée » (il vient d'être remis), **« Demande & chiffrage »** (rien n'est produit : le client attend un prix), Fiverr (sous-traitance) et l'archive. L'écran regroupe ensuite par (client, jour) : un ticket à plusieurs articles est plusieurs lignes, mais un seul passage au comptoir. `heure` sort de `fiche.heureSouhaitee` (`retrait_creneau` est mesurée vide sur les 205 dossiers de production). **Aucun prix ne voyage** : l'écran n'en affiche pas, et cette liste repart à chaque évènement temps réel vers chaque poste. Les dossiers sans date ne sont pas rendus — ils ne se rangent sous aucun jour — mais ils sont **comptés** (`sansDate`), parce que les taire ferait lire l'agenda comme complet. |
+| GET | `/api/agenda` | **L'agenda des retraits** : `{ lignes: [{ id, stage, sub_stage, billing_company, client_type, quantity, product, deadline, flag, flag_reason, heure }], sansDate }`, du plus proche au plus lointain. Ne rend que ce qu'il reste à **remettre au client** — tout sauf « Paiement & clôture » (le dossier est parti), « Commande récupérée » (il vient d'être remis), **tous les devis** (la famille « Demande & chiffrage », ET ceux qui attendent « À trier » — un devis n'est pas un retrait), Fiverr (sous-traitance) et l'archive. L'écran regroupe ensuite par (client, jour) : un ticket à plusieurs articles est plusieurs lignes, mais un seul passage au comptoir. `heure` sort de `fiche.heureSouhaitee` (`retrait_creneau` est mesurée vide sur les 205 dossiers de production). **Aucun prix ne voyage** : l'écran n'en affiche pas, et cette liste repart à chaque évènement temps réel vers chaque poste. Les dossiers sans date ne sont pas rendus — ils ne se rangent sous aucun jour — mais ils sont **comptés** (`sansDate`), parce que les taire ferait lire l'agenda comme complet. |
 | GET | `/api/requests/recherche?q=…` | **La recherche globale**, faite par le serveur (une page de résultats, pas tout le planning). Tous les jetons doivent apparaître, sans distinction de casse ni d'accent. Cherche dans le dossier, le référent, la description, les contacts, l'alerte — **et le numéro du ticket** (`fiche.ref`, plus `fiche.refTicket` quand le papier remis au client porte un autre numéro) : c'est le seul repère que le client rapporte au comptoir. |
 | GET | `/api/requests/:id/journal` | Ce qui a changé sur cette commande (étape, état, prix, échéance, priorité, pilote, référent, payé), du plus récent au plus ancien. La `position` en est exclue : un seul glisser en réécrit une dizaine. |
 | GET | `/api/ordre-manuel` | `[<slugÉtape>, ...]` — les étapes rangées à la main. |
@@ -452,32 +452,51 @@ jour). Le groupe prend l'heure **la plus tôt**, **tous** ses articles
 (dédoublonnés), l'état de sa ligne **la moins avancée** — on ne remet pas la
 moitié d'un ticket — et il est **bloqué dès qu'une** de ses lignes l'est.
 
-**Ce qui n'est pas un retrait n'y figure pas** : « Paiement & clôture » (le
-dossier est parti chez le client), « Commande récupérée » (il vient d'être
-remis), Fiverr (sous-traitance), l'archive — et, depuis le 03/09 au soir,
-**« Demande & chiffrage »** : tant qu'un dossier y est, rien n'a été produit, le
-client attend un prix et pas un carton.
+#### Il n'y a plus de « demande » : il y a un devis, et il y a une vente
 
-Charlie : « on a en ligne des anciennes DEMANDES dont on ne peut pas faire de
-modification comme la date par exemple, et elles se retrouvent donc toutes en
-"en retard" ». Mesuré le jour même sur la base de **production**, sur les 71
-dossiers vivants du périmètre :
+Charlie, le 03/09 : « faut bien comprendre qu'il n'y a plus de demande, il y a
+maintenant devis et vente ». **L'agenda ne montre que des ventes à remettre.** Un
+devis n'est pas un retrait : tant que le client n'a pas dit oui, rien n'est
+produit et personne ne vient rien chercher.
 
-| | avec la famille | sans elle |
+Le mot « demande » ne survit que **dans la base** — `order_kind` vaut encore
+`'demande'` / `'commande'`, et la famille garde le slug `demande_chiffrage`. Ce
+sont des noms d'avant ; ce qu'ils désignent aujourd'hui, c'est **devis** et
+**vente**. On les lit comme tels ; les renommer sur 71 dossiers vivants serait
+une migration pour du vocabulaire.
+
+N'y figurent donc pas : « Paiement & clôture » (le dossier est parti chez le
+client), « Commande récupérée » (il vient d'être remis), Fiverr
+(sous-traitance), l'archive — et **tous les devis**, ce qui demande **deux**
+conditions :
+
+1. la famille du devis (« Demande & chiffrage » : reçu, à qualifier, à chiffrer,
+   chiffrage en cours, devis envoyé, devis validé) ne figure **jamais** ;
+2. **un devis qui attend « À trier » non plus.** Depuis le 02/09, « Enregistrer »
+   sur le devis flash crée la ligne dans « À trier » — la même famille que les
+   ventes du comptoir. La famille ne suffit donc plus : là, c'est `order_kind`
+   qui départage.
+
+Ce que ces deux règles **ne font pas** : écarter un dossier `order_kind =
+'demande'` posé en préparation, en production ou en facturation. **Un devis
+accepté devient une vente en entrant dans ces familles** — c'est ce passage qui
+le fait entrer à l'agenda, pas un champ que quelqu'un devrait penser à changer.
+Dix dossiers sont dans ce cas en production ; les écarter aurait vidé l'agenda de
+ce qu'on est en train de fabriquer.
+
+Mesuré le 03/09 sur la base de **production**, sur les 71 dossiers vivants du
+périmètre :
+
+| | avant | après |
 |---|---|---|
-| retraits datés | 41 | 29 |
-| dont **en retard** | 18 | 12 |
-| dossiers **sans date** | 30 | 7 |
+| retraits datés | 41 | **28** |
+| dont **en retard** | 18 | **12** |
+| dossiers **sans date** | 30 | **7** |
 
-Les six retards qu'elle apportait avaient 6, 32, 34, 36 et 37 jours, cinq des six
-créés en juin ou juillet. Et ses 23 dossiers « sans date » n'en manquaient pas :
-une demande de devis **n'a pas** de jour de retrait, et le compter comme un
-manque était un faux reproche affiché en permanence.
-
-La règle porte sur la **famille**, pas sur `order_kind` : c'est la famille que
-les écrans tiennent à jour, et un dossier passé en préparation ou en production
-**se produit** — il revient donc à l'agenda, quelle que soit sa nature
-d'origine.
+Les six retards que la famille du devis apportait avaient 6, 32, 34, 36 et 37
+jours, cinq des six créés en juin ou juillet. Et ses 23 dossiers « sans date »
+n'en manquaient pas : un devis **n'a pas** de jour de retrait, et le compter
+comme un manque était un faux reproche affiché en permanence.
 
 **Deux vues, une seule liste derrière.** La bascule `[Jour] [Mois]` est dans
 l'en-tête de l'écran, et le choix suit l'appareil (`olda.agenda-vue`) : passer

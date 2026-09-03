@@ -29,6 +29,11 @@
 // AUCUN PRIX. Ce n'est pas une omission : l'écran sert à préparer une remise,
 // pas à encaisser (l'argent vit sur la fiche), et le serveur ne l'envoie même
 // pas — voir `GET /api/agenda`.
+//
+// ET AUCUN DEVIS. « Il n'y a plus de demande, il y a maintenant devis et vente »
+// (Charlie, 03/09) : l'agenda ne montre que des VENTES à remettre. Un devis
+// n'est pas un retrait — tant que le client n'a pas dit oui, il n'y a rien à
+// venir chercher. Le tri se fait côté serveur, voir `AGENDA_FILTRE`.
 
 import { fetchBorne } from './reseau.js';
 import { ecranTete } from './ecran-tete.js';
@@ -205,16 +210,16 @@ function enRetraits(lignes) {
 }
 
 // LE RETARD A UN HORIZON (03/09/2026). Charlie : « ce planning depuis plusieurs
-// mois a évolué et on a en ligne des anciennes demandes dont on ne peut pas
-// faire de modification comme la date par exemple, et elles se retrouvent donc
-// toutes en "en retard" ».
+// mois a évolué et on a en ligne des anciens dossiers dont on ne peut pas faire
+// de modification comme la date par exemple, et ils se retrouvent donc tous en
+// "en retard" ».
 //
-// Écarter la famille « Demande & chiffrage » (voir server.js) enlève l'essentiel
-// du bruit — mais il reste, sur la base de production du 03/09, quatre dossiers
-// dont l'échéance a 23, 27, 36 et 38 jours, en production ou en facturation
-// depuis juin-juillet. Personne ne vient les chercher : ce ne sont plus des
-// retards, ce sont des dossiers oubliés, et ils poussaient la journée du jour
-// sous la ligne de flottaison.
+// Écarter les DEVIS (voir `AGENDA_FILTRE` dans server.js — un devis n'est pas
+// un retrait) enlève l'essentiel du bruit ; mais il reste, sur la base de
+// production du 03/09, quatre dossiers dont l'échéance a 23, 27, 36 et 38 jours,
+// en production ou en facturation depuis juin-juillet. Personne ne vient les
+// chercher : ce ne sont plus des retards, ce sont des dossiers oubliés, et ils
+// poussaient la journée du jour sous la ligne de flottaison.
 //
 // TRENTE JOURS. Au-delà, un retrait ne se rattrape plus au comptoir, il se
 // reprend au planning. ON NE LES CACHE PAS POUR AUTANT : le bloc « En retard »

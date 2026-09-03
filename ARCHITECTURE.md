@@ -163,7 +163,7 @@ Statuts : **Actif** (utilisé par un écran ou un outil), **Mort** (aucun écran
 | Nom | Ce que ça fait | Statut | Fichiers concernés |
 |---|---|---|---|
 | Planning (tableau et cartes) | Liste des dossiers par famille et sous-étape ; glisser-déposer, ordre manuel, colonnes au choix, recherche | Actif | `public/app.js`, `public/styles.css`, `public/index.html` |
-| Agenda des retraits | Le planning rangé par JOUR : qui vient chercher quoi aujourd'hui, demain, après. Deux vues sur le même chargement — la liste du jour (heure, client, article, état) et le calendrier du mois (rien que les noms). Onglet collé à celui du Planning, `#agenda`. Regroupe par (client, jour) : un ticket à plusieurs articles est un seul passage | Actif | `public/agenda.js`, `public/agenda.css`, `server.js` (`GET /api/agenda`) |
+| Agenda des retraits | Le planning rangé par JOUR : qui vient chercher quoi aujourd'hui, demain, après. Deux vues sur le même chargement — la liste du jour (heure, client, article, état) et le calendrier du mois (rien que les noms). Onglet collé à celui du Planning, `#agenda`. Ne montre que des VENTES à remettre (un devis n'est pas un retrait), regroupées par (client, jour) : un ticket à plusieurs articles est un seul passage | Actif | `public/agenda.js`, `public/agenda.css`, `server.js` (`GET /api/agenda`) |
 | Fiche atelier (tiroir d'une ligne) | Tout le dossier modifiable, l'argent sur les rails | Actif | `public/fiche-atelier.js`, `public/fiche-atelier.css`, `public/ligne-faits.js` |
 | Recherche globale (palette) | Commandes et clients en une frappe | Actif | `public/app.js`, `server.js:2744` |
 | Point du jour | Console d'atelier : ce qu'il faut faire maintenant | Actif | `public/dashboard.js`, `public/dashboard.css`, `public/priority.js` |
