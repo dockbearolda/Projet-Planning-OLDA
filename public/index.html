@@ -153,6 +153,13 @@
         <a class="nav-switch-btn" id="viewDevisFlash" href="#devis-flash">
           <span class="nav-switch-label">Devis flash</span>
         </a>
+        <!-- LA VENTE FLASH (03/09/2026) : jumeau du devis flash, pour la
+             facture. Elle ne remplace PAS l'onglet « Vente » — celui-là reste
+             l'écran comptoir existant (vente-directe.html), inchangé. Voir
+             docs/superpowers/specs/2026-09-03-facture-vente-flash-design.md. -->
+        <a class="nav-switch-btn" id="viewVenteFlash" href="#vente-flash">
+          <span class="nav-switch-label">Vente flash</span>
+        </a>
         <a class="nav-switch-btn nav-switch-btn--montravail" id="viewMonTravail" href="#mon-travail" hidden>
           <span class="nav-switch-label">Mon travail</span>
         </a>
@@ -438,6 +445,12 @@
              saisie à gauche, feuille A4 vivante à droite, impression et dépôt au
              planning. Rendu par devis-flash.js, chargé au premier affichage. -->
         <section class="devis-flash" id="devis-flash" hidden aria-label="Devis"></section>
+
+        <!-- Onglet Vente flash : la facture qui se compose DEVANT le client —
+             saisie à gauche, feuille A4 vivante à droite, impression et
+             émission immuable. Rendu par vente-flash.js, chargé au premier
+             affichage. -->
+        <section class="devis-flash" id="vente-flash" hidden aria-label="Vente flash"></section>
 
         <!-- Onglet Nouveau Projet : LES DEUX flux du comptoir — vente directe
              et demande de devis. L'aiguillage (nouveau-projet.js, chargé au

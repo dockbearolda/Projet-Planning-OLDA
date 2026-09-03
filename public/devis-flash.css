@@ -248,7 +248,9 @@
      `.dvf-tab__lu` : un nombre calé à droite n'a rien à respirer à sa
      gauche) : 82 px utiles, sans rien prendre de plus à la désignation, qui
      est déjà la piste la plus serrée au petit poste. */
-  --dvf-cols: minmax(0, 1fr) 56px 76px 96px var(--ctrl-h);
+  /* SIX PISTES DEPUIS LE 03/09 : le PU TTC rejoint le PU HT, même largeur —
+     Charlie : « pouvoir modifier l'un ou l'autre mais qu'il reste lié ». */
+  --dvf-cols: minmax(0, 1fr) 56px 76px 76px 96px var(--ctrl-h);
   display: flex;
   flex-direction: column;
   gap: var(--pas-2);
@@ -322,6 +324,35 @@
   font-weight: var(--graisse-texte);
   color: var(--text-2);
 }
+
+/* LES TAILLES LIBRES — « je crée ma bulle » (03/09/2026, Charlie). Conteneur
+   PROPRE À CET ÉCRAN, distinct de `.fa-tailles` (fiche-atelier.css, lue aussi
+   par l'écran de l'atelier) : un nombre variable de bulles ne doit pas
+   déborder une grille qui n'a pas été pensée pour ça. */
+.dvf-libres-cadre { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pas-2); }
+/* `[hidden]` SEUL NE SUFFIT PAS : la règle `display: flex` ci-dessus, posée
+   par l'auteur, bat la règle `display: none` de l'agent utilisateur à
+   spécificité égale — piège déjà payé sur cet écran (`.dvf-tab__tete[hidden]`,
+   plus haut). Sans ce correctif, une tasse (qui n'a pas de tailles) garde son
+   bouton « + Taille » visible, cliquable, sans rien au-dessus. */
+.dvf-libres-cadre[hidden] { display: none; }
+/* MÊME PIÈGE, TROUVÉ EN VÉRIFIANT (03/09/2026) : `.fa-tailles` (fiche-
+   atelier.css) porte elle aussi `display: flex`, sans override `[hidden]` —
+   et `cases.hidden = estTasse` (devis-flash.js, vente-flash.js) ne masquait
+   donc RIEN. Une tasse affichait six cases vides sous chaque ligne, en
+   production, depuis que ce masquage existe (01/09). `fiche-atelier.js` (la
+   vraie fiche de l'atelier) ne masque jamais `.fa-tailles` : la règle reste
+   donc scopée à `.dvf-art`, propre à ces deux écrans, sans toucher
+   fiche-atelier.css ni son usage réel côté atelier. */
+.dvf-art .fa-tailles[hidden] { display: none; }
+.dvf-libres { display: flex; flex-wrap: wrap; gap: var(--pas-2); }
+.dvf-taille-libre { display: flex; align-items: center; gap: var(--pas-1); }
+/* MÊME HAUTEUR QUE LES CASES FIXES : le jeton de hauteur du champ de saisie
+   (fiche-atelier.css) est déjà celui du bouton de suppression
+   (`.reg-tarif-del`, --ctrl-h) — rien à réécrire ici, seule la LARGEUR se
+   pose, à l'échelle d'un mot court. */
+.dvf-taille-libre .fa-in:first-child { width: 88px; }
+.dvf-taille-libre .fa-in:last-of-type { width: 64px; }
 
 /* --- Un article : sa ligne, son détail, ses tailles ------------------------
    Le bloc reprend la zone douce de l'application (`--zone-bg`) : ce n'est pas

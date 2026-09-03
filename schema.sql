@@ -404,3 +404,32 @@ CREATE TABLE IF NOT EXISTS catalogue_produits (
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_catalogue_produits_ordre ON catalogue_produits (position);
+
+-- LA FACTURE — ledger immuable, jamais réécrit après émission (03/09/2026).
+--
+-- Une facture Vente Flash naît TOUJOURS d'un dossier déjà créé par
+-- POST /api/comptoir/projet — d'où `dossier_id NOT NULL UNIQUE` : au plus une
+-- facture par dossier en v1 (les avoirs, hors scope, seront un second lot).
+--
+-- `document` porte le modèle ENTIER tel qu'imprimé (sortie de modeleFacture),
+-- identité de la maison comprise : un changement plus tard dans Réglages ne
+-- doit jamais réécrire une facture déjà sortie. Même principe que
+-- `fiche.devis`, qui fige le prix d'un devis déjà remis au client.
+--
+-- AUCUNE ROUTE D'ÉCRITURE APRÈS CRÉATION, jamais. Une facture émise ne se
+-- corrige pas — elle se conteste par un avoir (hors scope ici).
+-- Down : DROP TABLE invoices; DELETE FROM app_meta WHERE key LIKE 'facture_seq_%';
+CREATE TABLE IF NOT EXISTS invoices (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  numero       text NOT NULL UNIQUE,        -- "FA-2026-0001"
+  annee        int  NOT NULL,               -- retrouver l'année sans parser numero
+  rang         int  NOT NULL,               -- rang dans l'année
+  dossier_id   uuid NOT NULL UNIQUE,        -- pas de REFERENCES : aucune table du dépôt n'en porte
+  client_nom   text NOT NULL,               -- dénormalisé pour lister/chercher, jamais relu pour recalculer
+  montant_ttc  numeric(12,2) NOT NULL,
+  emise_le     timestamptz NOT NULL DEFAULT now(),
+  emise_par    text,                        -- le poste, comme fiche.poste ailleurs
+  document     jsonb NOT NULL,              -- le modèle COMPLET tel qu'imprimé
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invoices_dossier ON invoices (dossier_id);

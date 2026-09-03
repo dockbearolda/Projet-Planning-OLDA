@@ -4759,6 +4759,191 @@ async function reserverNumeroDuJour(serie, body) {
 }
 
 // ---------------------------------------------------------------------------
+// LA FACTURE — numérotation continue, émission immuable (03/09/2026)
+// ---------------------------------------------------------------------------
+// DIFFÉRENCE VOLONTAIRE AVEC LE NUMÉRO DE DEVIS : celui-là se réserve CÔTÉ
+// ÉCRAN, avant même d'enregistrer (voir imprimer(), devis-flash.js) — un
+// devis imprimé puis abandonné laisse un trou, tolérable pour un document
+// sans valeur comptable. Une facture ne peut pas se permettre ce trou : la
+// réservation du numéro et l'insertion de la ligne se font dans LA MÊME
+// transaction. Un rejet (validation, coupure réseau avant écriture) annule
+// les deux ensemble.
+async function reserverNumeroFacture(cx, annee) {
+  const metaKey = `facture_seq_${annee}`;
+  const { rows } = await cx.query(
+    `INSERT INTO app_meta (key, value) VALUES ($1, '1')
+     ON CONFLICT (key) DO UPDATE SET value = ((app_meta.value)::int + 1)::text
+     RETURNING value`,
+    [metaKey],
+  );
+  const rang = Number.parseInt(rows[0].value, 10);
+  return { numero: `FA-${annee}-${String(rang).padStart(4, '0')}`, rang };
+}
+
+// POST /api/factures → émet une facture pour un dossier déjà créé par
+// POST /api/comptoir/projet. IDEMPOTENT sur `dossierId` : une resoumission
+// après perte de réponse réseau (le grand classique du comptoir — voir
+// comptoir-dossiers-perdus-silence) retombe sur la ligne déjà créée au lieu
+// de brûler un second numéro.
+app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossierALaFois(async () => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+
+  const dossierId = trimOrNull(b.dossierId);
+  if (!dossierId) return res.status(400).json({ error: 'dossierId requis' });
+
+  // RETOMBÉE IDEMPOTENTE — AUCUN numéro consommé sur ce chemin.
+  const { rows: existante } = await pool.query(
+    'SELECT id, numero, document, montant_ttc FROM invoices WHERE dossier_id = $1', [dossierId],
+  );
+  if (existante.length) {
+    return res.status(201).json({
+      id: existante[0].id, numero: existante[0].numero, montantTtc: Number(existante[0].montant_ttc), document: existante[0].document,
+    });
+  }
+
+  const cl = b.client && typeof b.client === 'object' ? b.client : {};
+  const nomClient = borner(cl.nom, 120);
+  if (!nomClient) return res.status(400).json({ error: 'le nom du client est requis' });
+  const client = {
+    nom: nomClient,
+    ville: borner(cl.ville, 80),
+    contact: borner(cl.contact, 120),
+    tel: borner(cl.tel, 40),
+    email: borner(cl.email, 160),
+    type: cl.type === 'perso' ? 'perso' : 'pro',
+  };
+
+  const mode = b.mode;
+  if (!PAIEMENT_MODE_SET.has(mode)) return res.status(400).json({ error: `mode de paiement invalide : ${mode}` });
+
+  const lignes = (Array.isArray(b.lignes) ? b.lignes : [])
+    .filter((l) => l && typeof l === 'object' && trimOrNull(l.designation))
+    .slice(0, 60)
+    .map((l) => ({
+      designation: borner(l.designation, 200),
+      reference: borner(l.reference, 60),
+      couleur: borner(l.couleur, 80),
+      tailles: borner(l.tailles, 120),
+      marquage: borner(l.marquage, 120),
+      encre: borner(l.encre, 80),
+      faces: borner(l.faces, 160),
+      note: borner(l.note, 400),
+      quantite: Math.max(0, Math.round(Number(l.quantite) || 0)),
+      unitaireHt: Math.max(0, Math.round((Number(l.unitaireHt) || 0) * 100) / 100),
+    }));
+  if (!lignes.length) return res.status(400).json({ error: 'une facture sans article ne s’émet pas' });
+  // UNE FACTURE NE PORTE JAMAIS DE LIGNE SANS PRIX : contrairement au devis,
+  // une vente déjà réglée connaît tous ses prix. Un zéro ici est un article
+  // OFFERT (voulu), pas une case oubliée.
+  if (lignes.some((l) => l.unitaireHt == null)) {
+    return res.status(400).json({ error: 'toutes les lignes doivent porter un prix' });
+  }
+
+  const jour = isDay(b.jour) ? b.jour : todayPlus(0);
+  const annee = Number(jour.slice(0, 4));
+
+  // L'ADDITION EST REJOUÉE ICI, PAS IMPORTÉE. `calculerDevis` vit dans
+  // public/devis.js — un module ES pensé pour le navigateur (`import`/
+  // `export`) que `server.js` (CommonJS) n'exécute pas. Le serveur est
+  // pourtant la SEULE autorité sur le total archivé : il ne fait pas
+  // confiance à un TTC calculé côté client et simplement recopié. Même
+  // arithmétique que `calculerDevis` (arrondi TTC, puis HT au centime, la
+  // taxe est ce qui reste) — voir devis.js si les deux doivent un jour être
+  // unifiées (hors scope de ce lot).
+  const sousTotalHt = Math.round(lignes.reduce((t, l) => t + l.quantite * l.unitaireHt, 0) * 100) / 100;
+  const ajustementUnite = b.ajustement && b.ajustement.unite === 'pct' ? 'pct' : 'eur';
+  const ajustementValeur = Number(b.ajustement && b.ajustement.valeur) || 0;
+  const ajustementMontant = Math.round((ajustementUnite === 'pct'
+    ? sousTotalHt * (ajustementValeur / 100) : ajustementValeur) * 100) / 100;
+  const sousTotalAjuste = Math.round((sousTotalHt + ajustementMontant) * 100) / 100;
+  const taux = b.regime === 'tgca' ? Math.max(0, Number(b.tauxTgca) || 0) : 0;
+  const vise = Math.round(sousTotalAjuste * (1 + taux) * 100) / 100;
+  let ttc = vise;
+  if (b.arrondi === 'euro') ttc = Math.floor(vise + 1e-9);
+  else if (b.arrondi === 'dix') ttc = Math.floor(vise * 10 + 1e-9) / 10;
+  ttc = Math.round(ttc * 100) / 100;
+
+  // ⚠ CE QUI EST ARCHIVÉ EST LA DONNÉE BRUTE, PAS UN RENDU. Le serveur ne
+  // formate rien (pas d'euro(), pas de maisonPapier()) : `modeleFacture` /
+  // `dessinerFacture` (public/facture.js) sont les SEULS à savoir composer un
+  // papier, et ils tournent CÔTÉ CLIENT — c'est la séparation déjà en place
+  // pour les trois autres papiers (« cet écran ne dessine aucun document »,
+  // voir devis-flash.js). `document.saisie` porte donc exactement la forme
+  // que `modeleFacture(saisie, entreprise)` attend en entrée ; `document.
+  // entreprise` fige l'identité de l'atelier TELLE QU'ELLE ÉTAIT à l'émission
+  // — un changement plus tard dans Réglages ne doit jamais réécrire une
+  // facture déjà sortie. La relecture (GET ci-dessous) rend cette paire telle
+  // quelle ; c'est `ouvrirFacture` (app.js) qui rappelle `modeleFacture` avec,
+  // exactement comme le fait l'écran de composition pour l'aperçu vivant.
+  const entreprise = await getEntreprise();
+
+  const cx = await pool.connect();
+  try {
+    await cx.query('BEGIN');
+    const { numero, rang } = await reserverNumeroFacture(cx, annee);
+    const document = {
+      saisie: {
+        numero,
+        date: jour,
+        projet: borner(b.projet, 160),
+        client,
+        lignes,
+        regime: b.regime === 'revente' || b.regime === 'export' ? b.regime : 'tgca',
+        tauxTgca: Number(b.tauxTgca) || 0,
+        arrondi: ['euro', 'dix'].includes(b.arrondi) ? b.arrondi : 'aucun',
+        ajustement: { unite: ajustementUnite, valeur: ajustementValeur },
+        vedette: b.vedette === 'ht' ? 'ht' : 'ttc',
+        mode,
+      },
+      entreprise,
+    };
+    const { rows } = await cx.query(
+      `INSERT INTO invoices (numero, annee, rang, dossier_id, client_nom, montant_ttc, emise_par, document)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, numero, document, montant_ttc`,
+      [numero, annee, rang, dossierId, nomClient, ttc, borner(req.headers['x-qui'] ? decodeURIComponent(req.headers['x-qui']) : null, 80), document],
+    );
+    await cx.query('COMMIT');
+    return res.status(201).json({
+      id: rows[0].id, numero: rows[0].numero, montantTtc: Number(rows[0].montant_ttc), document: rows[0].document,
+    });
+  } catch (err) {
+    await cx.query('ROLLBACK');
+    // UN AUTRE APPEL A GAGNÉ LA COURSE entre notre lecture d'idempotence et
+    // notre écriture (contrainte UNIQUE(dossier_id)) : on rend SA facture,
+    // pas une erreur — c'est le même dossier, la même intention.
+    if (err && err.code === '23505') {
+      const { rows: apres } = await pool.query(
+        'SELECT id, numero, document, montant_ttc FROM invoices WHERE dossier_id = $1', [dossierId],
+      );
+      if (apres.length) {
+        return res.status(201).json({
+          id: apres[0].id, numero: apres[0].numero, montantTtc: Number(apres[0].montant_ttc), document: apres[0].document,
+        });
+      }
+    }
+    throw err;
+  } finally {
+    cx.release();
+  }
+})));
+
+// GET /api/requests/:id/facture → relit la facture d'un dossier, TELLE QUE
+// STOCKÉE. Aucun recalcul, aucune lecture des Réglages courants : `document`
+// porte déjà tout ce qu'il faut (saisie + entreprise figées à l'émission)
+// pour que `modeleFacture`/`dessinerFacture` (côté client) recomposent
+// EXACTEMENT le même papier qu'au premier jour.
+app.get('/api/requests/:id/facture', exige('clients'), asyncH(async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT id, numero, document, montant_ttc FROM invoices WHERE dossier_id = $1', [req.params.id],
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Aucune facture pour ce dossier' });
+  res.json({
+    id: rows[0].id, numero: rows[0].numero, montantTtc: Number(rows[0].montant_ttc), document: rows[0].document,
+  });
+}));
+
+// ---------------------------------------------------------------------------
 // Statique + SPA
 // ---------------------------------------------------------------------------
 // L'application n'a AUCUN build : les fichiers gardent le même nom d'un

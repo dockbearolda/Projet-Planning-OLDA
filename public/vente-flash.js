@@ -1,41 +1,47 @@
 // ===========================================================================
-// L'ÉCRAN DU DEVIS — on saisit à gauche, le papier se fait à droite
+// L'ÉCRAN DE VENTE FLASH — la facture qui se compose DEVANT le client
 // ===========================================================================
-// C'EST L'ÉCRAN DU PATRON, RENTRÉ DANS LE CRM (01/09/2026). Il l'avait écrit
-// d'un bloc, avec sa propre échelle, ses propres boîtes, sa propre base
-// clients (trois noms en dur) et son propre document. Ce qui est repris, c'est
-// ce qui lui appartient — le PARCOURS (client, projet, délai, articles,
-// fiscalité), la coupe en deux moitiés, et les textes commerciaux du délai et
-// du BAT, mot pour mot. Ce qui tombe, c'est tout ce que l'application faisait
-// déjà :
+// JUMEAU DU DEVIS FLASH (public/devis-flash.js), dont ce fichier est une
+// copie modifiée — décision du 03/09/2026 : le bloc catalogue/chiffrage V9/
+// chiffrage tasse fait ~1000 lignes couplées à l'état interne de l'écran, un
+// chantier aussi gros que le reste de la facture à lui seul. Pas d'extraction
+// en module partagé dans ce lot — deux implémentations qui se ressemblent, le
+// temps de voir Vente Flash tourner. Voir
+// docs/superpowers/specs/2026-09-03-facture-vente-flash-design.md §1.
 //
-//   · les CLIENTS viennent de la base (`/api/clients`), pas d'un tableau ;
-//   · les ARTICLES se piochent dans le catalogue produits, qui vit en base
-//     depuis le 01/09 et se tarife par import ;
-//   · l'IDENTITÉ DE LA MAISON et les coordonnées bancaires sont un RÉGLAGE :
-//     un déménagement ne demande pas un déploiement ;
-//   · le TAUX DE TGCA est celui des Réglages, pas un 0,04 recopié ;
-//   · le TARIF DE TRANSPORT est celui des Réglages ;
-//   · le NUMÉRO vient du compteur du serveur — deux postes qui impriment en
-//     même temps ne peuvent pas remettre le même numéro à deux clients ;
-//   · le DEVIS S'ENREGISTRE AU PLANNING, à « Tarif / Devis envoyé — Attente
-//     client » : sans ça, un devis imprimé n'existe nulle part et personne ne
-//     le relance.
+// CE QUI CHANGE PAR RAPPORT AU DEVIS :
+//   · Le papier est la FACTURE (facture.js), pas le devis : voir ce fichier
+//     pour ce qui distingue les deux documents.
+//   · PAS DE REPRISE / VERSION : une facture émise est immuable, il n'existe
+//     pas de « V2 » — une nouvelle vente est un nouveau dossier.
+//   · PAS D'ACOMPTE : le mode de règlement est obligatoire, le montant réglé
+//     est TOUJOURS le TTC (§4 du spec).
+//   · L'ÉMISSION APPELLE DEUX ROUTES EN SÉQUENCE : POST /api/comptoir/projet
+//     (créer le dossier — INCHANGÉ, c'est la route de vente-directe.html)
+//     PUIS POST /api/factures (émettre le document, immuable).
 //
-// LE PAPIER EST DANS `devis.js`, avec les deux autres. Cet écran ne dessine
-// aucun document : il appelle `dessinerDevis`, exactement comme le fera le
-// cadre d'impression. L'aperçu ne peut donc pas dériver de ce qui sort.
+// LA FEUILLE DE STYLE EST PARTAGÉE avec le devis flash (`devis-flash.css`,
+// posée via poserFeuille dans app.js) : c'est la MÊME grammaire — coupe en
+// deux moitiés, rangée d'un article — et les deux écrans doivent rester
+// visuellement cohérents (RÈGLE : tout ce qui peut être à la même hauteur
+// l'est). Les classes internes gardent donc leur préfixe `dvf-` d'origine :
+// ce n'est pas un oubli, c'est documenté ici pour que ça ne surprenne pas à
+// la relecture. SEULS les identifiants DOM lus par `document.getElementById`
+// (portée GLOBALE, pas celle de `ROOT`) ont été renommés pour ne jamais
+// collisionner avec le devis flash si les deux écrans sont montés dans la
+// même page.
 //
-// AUCUN COMPOSANT NEUF. La carte et le bouton viennent de `reglages.css`, le
-// champ de `fiche-atelier.css` (`.fa-case` / `.fa-lab` / `.fa-in`, la grammaire
-// du comptoir), l'en-tête et la pilule de recherche de `charte.css`. Ce qui
-// reste dans `devis-flash.css`, c'est la coupe en deux et la rangée d'article.
+// AUCUN COMPOSANT NEUF : mêmes cartes que le devis flash (reglages.css,
+// fiche-atelier.css, charte.css), sauf « Fiscalité et règlement » qui perd
+// son champ Acompte au profit d'un menu Mode de règlement obligatoire.
 
 import {
-  APPROS, APPRO_DEFAUT, ARRONDIS, REGIMES, AJUSTEMENT_UNITES, VEDETTES,
-  calculerDevis, modeleDevis, dessinerDevis, CSS_DEVIS, jourAtelier, jourPlus,
-  SANS_PRIX,
+  ARRONDIS, REGIMES, AJUSTEMENT_UNITES, VEDETTES,
+  calculerDevis, jourAtelier, SANS_PRIX,
 } from './devis.js';
+import {
+  MODES_PAIEMENT, modeleFacture, dessinerFacture, CSS_FACTURE,
+} from './facture.js';
 // LE MENU DÉROULANT AVEC RECHERCHE, celui des deux écrans du comptoir. Charlie,
 // 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
 // TOUS LES INPUTS avec un menu déroulant ». Il a déménagé de `pont.js` pour
@@ -70,14 +76,12 @@ const euro = (n) => EURO.format(Number(n) || 0);
 // UNE SEULE SOURCE, ET ELLE EST PLATE. Le formulaire écrit dedans, le calcul le
 // lit, le papier le lit. Rien n'est recopié d'une moitié à l'autre : c'est ce
 // qui garantit que la feuille dit exactement ce que l'écran affiche.
-const VALIDITE_JOURS = 30;
 
 function saisieNeuve() {
   const jour = jourAtelier();
   return {
     numero: '',
     date: jour,
-    validite: jourPlus(jour, VALIDITE_JOURS),
     projet: '',
     dueDate: '',
     // L'HEURE SOUHAITÉE (02/09). Une date sans heure, sur une commande qu'on
@@ -99,11 +103,14 @@ function saisieNeuve() {
       // relance : le planning en fait une pastille cliquable (`whatsapp.js`).
       whatsapp: '',
     },
-    appro: APPRO_DEFAUT,
     lignes: [],
     regime: 'tgca',
     tauxTgca: 0.04,
-    acompte: 50,
+    // LE MODE DE RÈGLEMENT, OBLIGATOIRE : vide par défaut, une facture ne
+    // s'émet pas sans lui (voir emettreFacture). Contrairement à l'acompte
+    // du devis, il n'y a pas de solde — une facture Vente Flash sort
+    // toujours soldée (§4 du spec).
+    mode: '',
     arrondi: 'euro',
     // L'AJUSTEMENT GLOBAL (03/09/2026) — une remise ou une majoration
     // négociée sur l'ensemble du devis, en plus des remises par article.
@@ -125,9 +132,10 @@ function saisieNeuve() {
 // coefficient est dégressif sur la quantité, pas sur la répartition (voir
 // `chiffrerTextile`, qui lui passe `{ other: quantité }`). Un XS de plus ici ne
 // change donc rien au prix, et n'oblige à toucher à rien là-bas.
+//
 // ⚠ « AUTRES » A DISPARU (03/09/2026). C'était un bac générique — un 3XL, un
 // enfant, une coupe femme comptaient tous pareil, sous le même mot, et le
-// devis ne disait plus lequel. Remplacé par les TAILLES LIBRES ci-dessous :
+// papier ne disait plus lequel. Remplacé par les TAILLES LIBRES ci-dessous :
 // Charlie voulait pouvoir « créer sa bulle » et lui donner un nom (« 4XL »),
 // autant de fois que nécessaire sur une même ligne.
 const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
@@ -138,10 +146,10 @@ const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
 // il n'y a qu'une source, et une répartition corrigée à l'écran ne peut pas
 // laisser sur le papier celle d'avant.
 //
-// `taillesLibres` : `[{ nom, qte }, …]` — les bulles créées à la main sur
-// CETTE ligne. Un nom vide ou une quantité à zéro ne compte pas : une bulle
-// qu'on vient d'ouvrir et qu'on n'a pas encore remplie ne doit ni s'imprimer
-// ni peser dans le total.
+// `taillesLibres` : `[{ nom, qte }, …]` — les bulles que la vendeuse a créées
+// à la main sur CETTE ligne. Un nom vide ou une quantité à zéro ne compte pas
+// : une bulle qu'on vient d'ouvrir et qu'on n'a pas encore remplie ne doit ni
+// s'imprimer ni peser dans le total.
 function texteTailles(parTaille, taillesLibres) {
   const fixes = TAILLES
     .filter((t) => Number((parTaille || {})[t]) > 0)
@@ -183,22 +191,22 @@ let clients = [];
 let catalogue = [];
 let entreprise = {};
 let transports = {};
-// Un devis DÉJÀ enregistré ne se réenregistre pas en double : on garde son id.
+// Une facture émise ne se réémet pas en double : on garde son id (voir
+// emettreFacture). PAS DE REPRISE/VERSION ICI, contrairement au devis flash —
+// une facture est immuable, une nouvelle vente est un nouveau dossier.
 let dossierId = null;
-// LA REPRISE D'UN DEVIS EXISTANT (02/09). Charlie : « ce devis pourra être
-// modifié directement depuis la ligne pour créer la v2, 3, 4… dans le cas où le
-// client souhaite une modification ». `repriseDe` porte l'id du dossier tant que
-// la nouvelle version n'est pas enregistrée ; `version` dit à l'écran laquelle
-// on est en train d'écrire.
-let repriseDe = null;
-let version = 1;
 
-// LE BROUILLON EST PAR APPAREIL. Un devis se compose devant le client, en
+// LE BROUILLON EST PAR APPAREIL. Une vente se compose devant le client, en
 // quelques minutes, et un poste qui se ferme au milieu ne doit pas faire tout
-// retaper. Il ne remplace pas l'enregistrement : tant qu'on n'a pas cliqué
-// « Enregistrer au planning », ce devis n'existe que sur cette machine, et
+// retaper. Il ne remplace pas l'émission : tant qu'on n'a pas cliqué
+// « Émettre la facture », cette vente n'existe que sur cette machine, et
 // l'écran le DIT.
-const CLE_BROUILLON = 'olda.devis.brouillon';
+// ⚠ CLÉ DISTINCTE DE CELLE DU DEVIS FLASH (`olda.devis.brouillon`) — trouvé
+// en vérifiant au navigateur (03/09/2026) : les deux écrans partageant la
+// même clé, Vente Flash ouvrait avec le brouillon EN COURS du devis flash
+// (client, articles, mais aucun `mode` — un champ qui n'existe pas côté
+// devis), et l'inverse au retour. Deux écrans, deux brouillons.
+const CLE_BROUILLON = 'olda.vente.brouillon';
 function garderBrouillon() {
   try { localStorage.setItem(CLE_BROUILLON, JSON.stringify({ saisie, dossierId, replis })); } catch (_) { /* plein ou refusé */ }
 }
@@ -374,9 +382,9 @@ function segmente(id, options, valeur, onChange) {
   });
   return n;
 }
-// LE SEGMENTÉ REPREND UNE VALEUR POSÉE PAR PROGRAMME (reprise d'un devis,
-// devis vierge) — les boutons ne le voient pas tout seuls, contrairement à un
-// `<select>` dont `remettreChamps()` pose `.value`.
+// LE SEGMENTÉ REPREND UNE VALEUR POSÉE PAR PROGRAMME (vente vierge) — les
+// boutons ne le voient pas tout seuls, contrairement à un `<select>` dont
+// `repartirDeZero()` pose `.value`.
 function segmenteRegle(n, valeur) {
   if (!n) return;
   for (const b of n.querySelectorAll('.segmente__btn')) {
@@ -389,158 +397,33 @@ function segmenteRegle(n, valeur) {
 // ===========================================================================
 // LE MONTAGE
 // ===========================================================================
-export async function initDevisFlash(root) {
+export async function initVenteFlash(root) {
   ROOT = root;
-  root.classList.add('devis-flash');
-  poserStyleDevis();
+  root.classList.add('devis-flash');   // même classe : c'est la même feuille de style (devis-flash.css)
+  poserStyleFacture();
   // La feuille du composant de menu part avec lui, et une seule fois.
   poserStyleMenu();
   relireBrouillon();
   batir();
-  // Les quatre réglages que l'écran lit. Aucun n'est bloquant : un devis se
-  // compose même si le catalogue tarde, il porte seulement moins de raccourcis.
+  // Les quatre réglages que l'écran lit. Aucun n'est bloquant : une vente se
+  // compose même si le catalogue tarde, elle porte seulement moins de raccourcis.
   await rechargerReglages();
   poserLignes();
   redessiner();
 }
 
-export async function refreshDevisFlash() {
+export async function refreshVenteFlash() {
   if (!ROOT) return;
   await rechargerReglages();
   redessiner();
 }
 
-// ===========================================================================
-// REPRENDRE UN DEVIS — la V2, la V3 (02/09/2026)
-// ===========================================================================
-// « Ce devis pourra être modifié directement depuis la ligne pour créer la v2,
-// 3, 4… dans le cas où le client souhaite une modification » (Charlie).
-//
-// ON RELIT L'ARCHIVE, PAS UN RÉSUMÉ. `fiche.devis` porte le devis TEL QU'IL A
-// ÉTÉ IMPRIMÉ — ses lignes, ses prix, son régime, son acompte. C'est ce qu'il
-// faut pour repartir de ce que le client a en main : une V2 qui ne reprendrait
-// que le client et le projet obligerait à retaper les articles, et c'est
-// exactement là qu'on se trompe d'un chiffre.
-//
-// ⚠ ELLE N'ÉCRASE PAS UN BROUILLON SANS LE DIRE. Le poste peut être en train de
-// composer un autre devis : on demande.
-export async function reprendreDevis(id) {
-  if (!ROOT || !id) return false;
-  let ligne;
-  try { ligne = await api('GET', `/api/requests/${id}`); } catch (err) {
-    dire(err.message || 'Dossier illisible', 'is-ko');
-    return false;
-  }
-  const fiche = ligne && ligne.fiche && typeof ligne.fiche === 'object' ? ligne.fiche : null;
-  const dv = fiche && fiche.devis && typeof fiche.devis === 'object' ? fiche.devis : null;
-  if (!dv) {
-    dire('Ce dossier ne porte pas de devis à reprendre', 'is-ko');
-    return false;
-  }
-  if (!dossierId && saisie.lignes.length && repriseDe !== id
-    && !window.confirm('Un devis est en cours sur ce poste. Le remplacer par la reprise de celui-ci ?')) {
-    return false;
-  }
 
-  const neuve = saisieNeuve();
-  saisie = {
-    ...neuve,
-    // LE NUMÉRO NE SE REPREND PAS : le serveur en pose un neuf, « …-V2 ». Garder
-    // celui de la V1 ferait deux feuilles au même numéro pour deux montants.
-    numero: '',
-    date: neuve.date,
-    validite: dv.validite || neuve.validite,
-    projet: dv.projet || '',
-    dueDate: ligne.deadline ? String(ligne.deadline).slice(0, 10) : '',
-    dueHeure: fiche.dueHeure || '',
-    maquette: fiche.maquette === true,
-    noteInterne: fiche.noteInterne || '',
-    appro: dv.appro || neuve.appro,
-    regime: dv.regime || neuve.regime,
-    tauxTgca: Number(dv.tauxTgca) || neuve.tauxTgca,
-    arrondi: dv.arrondi || neuve.arrondi,
-    acompte: dv.acompte && dv.acompte.pourcent != null ? Number(dv.acompte.pourcent) : neuve.acompte,
-    ajustement: dv.ajustement && typeof dv.ajustement === 'object'
-      ? { unite: dv.ajustement.unite === 'pct' ? 'pct' : 'eur', valeur: Number(dv.ajustement.valeur) || 0 }
-      : neuve.ajustement,
-    vedette: dv.vedette === 'ht' ? 'ht' : neuve.vedette,
-    client: {
-      ...neuve.client,
-      nom: ligne.billing_company || '',
-      code: valeurClient(fiche, 'Code client'),
-      ville: valeurClient(fiche, 'Ville'),
-      contact: ligne.contact_referent || '',
-      tel: ligne.contact_phone || '',
-      whatsapp: valeurClient(fiche, 'WhatsApp') || ligne.contact_phone || '',
-      email: ligne.contact_email || '',
-      type: ligne.client_type === 'perso' ? 'perso' : 'pro',
-    },
-    lignes: (Array.isArray(dv.lignes) ? dv.lignes : []).map((l) => ({
-      designation: l.designation || '', reference: l.reference || '', couleur: l.couleur || '',
-      tailles: l.tailles || '', marquage: l.marquage || '', encre: l.encre || '',
-      faces: l.faces || '', note: l.note || '',
-      parTaille: lireTailles(l.tailles),
-      remise: Number(l.remise) || 0,
-      quantite: Number(l.quantite) || 0,
-      // UNE V2 REPART DES PRIX DE LA V1 — y compris de ce qui n'en avait pas.
-      // Un article resté « à chiffrer » ne doit pas devenir zéro en changeant
-      // de version : ce serait la promesse de le donner.
-      unitaireHt: l.sansPrix || l.unitaireHt == null || l.unitaireHt === ''
-        ? null : (Number(l.unitaireHt) || 0),
-      // ⚠ LE PRIX REPRIS EST TENU POUR MANUEL. Il a été remis au client sur une
-      // feuille : le moteur ne doit pas le refaire tout seul parce qu'un tarif a
-      // bougé depuis. « Recalculer » le rend, article par article, quand on veut.
-      puManuel: true,
-      textile: null, tasse: null, libre: null, simple: false,
-    })),
-  };
-  repriseDe = id;
-  version = Math.max(1, Math.round(Number(fiche.version) || 1));
-  dossierId = null;
-  remettreChamps();
-  poserLignes();
-  redessiner();
-  dire(`Devis ${dv.numero || ''} repris — vous écrivez la version ${version + 1}`.trim(), 'is-ok');
-  return true;
-}
-
-// Le client d'une fiche est une liste de paires : c'est le format d'archive, et
-// il n'y a pas de raison de le changer pour une lecture.
-function valeurClient(fiche, cle) {
-  const l = Array.isArray(fiche.client) ? fiche.client : [];
-  const p = l.find((x) => x && x.k === cle);
-  return p ? String(p.v || '') : '';
-}
-
-// LES CHAMPS SE REMPLISSENT DEPUIS LA SAISIE. Le squelette est posé une fois et
-// ne se reconstruit pas (il reprendrait le curseur) : quand la saisie change en
-// bloc — une reprise, un devis vierge — c'est à l'écran de redescendre dedans.
-function remettreChamps() {
-  for (const [id, v] of [
-    ['#dvf-cl-nom', saisie.client.nom], ['#dvf-cl-code', saisie.client.code],
-    ['#dvf-cl-ville', saisie.client.ville], ['#dvf-cl-email', saisie.client.email],
-    ['#dvf-cl-contact', saisie.client.contact], ['#dvf-cl-tel', saisie.client.tel],
-    ['#dvf-cl-wa', saisie.client.whatsapp], ['#dvf-cherche', saisie.client.nom],
-    ['#dvf-projet', saisie.projet], ['#dvf-due', saisie.dueDate],
-    ['#dvf-heure', saisie.dueHeure], ['#dvf-validite', saisie.validite],
-    ['#dvf-note-interne', saisie.noteInterne], ['#dvf-appro', saisie.appro],
-    ['#dvf-regime', saisie.regime], ['#dvf-arrondi', saisie.arrondi],
-    ['#dvf-acompte', String(saisie.acompte)],
-    ['#dvf-ajustement-unite', saisie.ajustement.unite],
-    ['#dvf-ajustement-valeur', saisie.ajustement.valeur ? String(saisie.ajustement.valeur) : ''],
-    ['#dvf-maquette', saisie.maquette ? 'oui' : 'non'],
-  ]) {
-    const n = $(id);
-    if (n) n.value = v == null ? '' : v;
-  }
-  // Les menus déjà habillés ne voient pas une valeur posée par programme.
-  for (const id of ['#dvf-appro', '#dvf-regime', '#dvf-arrondi', '#dvf-ajustement-unite', '#dvf-maquette']) {
-    const n = $(id);
-    if (n) menuRafraichir(n);
-  }
-  // LE SEGMENTÉ N'A PAS DE `.value` : ses boutons se règlent à part.
-  segmenteRegle($('#dvf-vedette'), saisie.vedette);
-}
+// SUPPRIMÉ ICI (vs devis-flash.js) : `remettreChamps()` ne servait qu'à la
+// reprise d'un devis existant (V2, V3…), un concept qui n'a pas d'équivalent
+// sur une facture immuable — voir l'en-tête de ce fichier. `repartirDeZero()`
+// garde son propre remplissage inline pour le seul cas qui reste : une vente
+// vierge après confirmation.
 
 async function rechargerReglages() {
   const [cl, cat, ent, par, tr, tex, logos, grilleTasse] = await Promise.all([
@@ -593,22 +476,19 @@ function batir() {
   const tete = el('header', 'ecran-tete');
   const g = el('div', 'ecran-tete__gauche');
   const titres = el('div', 'ecran-tete__titres');
-  titres.append(el('h1', 'ecran-tete__titre', 'Devis'));
+  titres.append(el('h1', 'ecran-tete__titre', 'Vente flash'));
   g.append(titres);
   const compte = el('span', 'ecran-tete__compte');
   compte.id = 'dvf-compte';
   g.append(compte);
   const d = el('div', 'ecran-tete__droite');
-  const bNeuf = el('button', 'reg-btn', 'Nouveau devis');
+  const bNeuf = el('button', 'reg-btn', 'Nouvelle vente');
   bNeuf.type = 'button';
   bNeuf.id = 'dvf-neuf';
-  const bImp = el('button', 'reg-btn', 'Imprimer / PDF');
-  bImp.type = 'button';
-  bImp.id = 'dvf-imprimer';
-  const bSave = el('button', 'reg-btn reg-btn--primary', 'Enregistrer au planning');
+  const bSave = el('button', 'reg-btn reg-btn--primary', 'Émettre la facture');
   bSave.type = 'button';
   bSave.id = 'dvf-enregistrer';
-  d.append(bNeuf, bImp, bSave);
+  d.append(bNeuf, bSave);
   tete.append(g, d);
   ROOT.append(tete);
 
@@ -628,8 +508,7 @@ function batir() {
   apercu.append(cadre);
 
   bNeuf.addEventListener('click', repartirDeZero);
-  bImp.addEventListener('click', imprimer);
-  bSave.addEventListener('click', enregistrer);
+  bSave.addEventListener('click', emettreFacture);
 
   // LA FEUILLE GARDE SES PROPORTIONS quelle que soit la largeur de sa moitié :
   // on la met à l'échelle plutôt que de la rogner — rogner montrerait autre
@@ -647,10 +526,11 @@ function batir() {
 // regarde, lui, change avec le devis — une désignation longue veut de la
 // saisie, une relecture avant impression veut du papier.
 //
-// LA PART EST RETENUE PAR LE POSTE, pas par le devis : c'est un réglage
-// d'écran, pas une donnée. Elle ne part donc PAS dans le brouillon — un devis
-// repris sur une autre machine ne doit pas y déplacer la coupe.
-const CLE_PART = 'olda.devis.part';
+// LA PART EST RETENUE PAR LE POSTE, pas par la vente : c'est un réglage
+// d'écran, pas une donnée. Elle ne part donc PAS dans le brouillon. Clé
+// distincte de celle du devis flash — chaque écran garde son propre réglage
+// de coupe, même principe que CLE_BROUILLON ci-dessus.
+const CLE_PART = 'olda.vente.part';
 // Les bornes : en deçà, la saisie ne montre plus une rangée d'article entière ;
 // au-delà, la feuille n'est plus lisible à deux. Ce sont des pourcentages,
 // parce que c'est ce que la grille attend.
@@ -746,17 +626,17 @@ function poignee(deux) {
 // qui sort de l'imprimante — et on ne s'en apercevrait qu'une fois le papier
 // remis au client. Elle n'est pas dans une feuille non plus parce qu'elle ne
 // doit PAS lire la charte : le cadre d'impression ne la charge pas.
-function poserStyleDevis() {
-  if (document.getElementById('dv-style')) return;
+function poserStyleFacture() {
+  if (document.getElementById('fa-style')) return;
   const s = document.createElement('style');
-  s.id = 'dv-style';
-  s.textContent = CSS_DEVIS;
+  s.id = 'fa-style';
+  s.textContent = CSS_FACTURE;
   document.head.appendChild(s);
 }
 
 // 210 mm à 96 points par pouce. C'est la largeur que la feuille fait par
-// construction (voir CSS_DEVIS) : le facteur d'échelle en sort, il ne se règle
-// pas à la main.
+// construction (voir CSS_FACTURE) : le facteur d'échelle en sort, il ne se
+// règle pas à la main.
 const LARGEUR_A4 = 794;
 function mettreALEchelle() {
   const cadre = $('.dvf-cadre');
@@ -766,6 +646,14 @@ function mettreALEchelle() {
   if (!dispo) return;
   const k = Math.min(1, dispo / LARGEUR_A4);
   feuille.style.setProperty('--dvf-echelle', String(k));
+  // ⚠ LARGEUR EXPLICITE, DÉCOUVERTE EN VÉRIFIANT (03/09/2026) : sur cet écran,
+  // le calcul flex « shrink-to-fit » de `.dvf-feuille` (devis-flash.css)
+  // retombait à 0 pour la facture alors qu'il vaut 794px pour le devis — même
+  // CSS partagée, même structure, cause exacte non identifiée dans le temps
+  // imparti. Fixer la largeur ici court-circuite le calcul implicite plutôt
+  // que d'en dépendre : la feuille reprend sa taille réelle (voir LARGEUR_A4),
+  // centrée par `.dvf-cadre` (justify-content: center) comme prévu.
+  feuille.style.width = `${LARGEUR_A4}px`;
   // `transform` ne réserve aucune place : sans cette hauteur rendue au
   // conteneur, la moitié droite ne défilerait pas jusqu'au bas de la feuille.
   const h = feuille.firstElementChild ? feuille.firstElementChild.offsetHeight : 0;
@@ -799,7 +687,18 @@ function carteClient() {
   corps.append(cherche);
 
   const nom = entree('dvf-cl-nom', { valeur: saisie.client.nom, exemple: 'Nom ou société' });
-  const code = entree('dvf-cl-code', { valeur: saisie.client.code, exemple: 'ALO' });
+  // ⚠ LECTURE SEULE (03/09/2026, trouvé en vérifiant avec Charlie). Le code
+  // client est attribué par le SERVEUR (nextClientCode, db.js), à la
+  // première commande de ce client — automatiquement, en permanence, jamais
+  // réécrit ensuite (le champ `code` n'est même pas dans CLIENT_FIELDS,
+  // aucun PATCH ne peut l'atteindre). Un champ TAPABLE ici laissait croire
+  // qu'il fallait le remplir à la main ; ce qu'on y tape n'est d'ailleurs
+  // jamais envoyé à /api/comptoir/projet. Pour un client déjà connu,
+  // `prendreClient` le remplit avec le VRAI code ci-dessous ; pour un client
+  // neuf, il reste vide jusqu'à l'émission — le serveur en attribue un à ce
+  // moment-là, qu'on ne peut pas deviner avant.
+  const code = entree('dvf-cl-code', { valeur: saisie.client.code, exemple: 'attribué automatiquement' });
+  code.readOnly = true;
   const ville = entree('dvf-cl-ville', { valeur: saisie.client.ville, exemple: '97150 Saint-Martin' });
   const email = entree('dvf-cl-email', { type: 'email', valeur: saisie.client.email, exemple: 'facultatif' });
   const contact = entree('dvf-cl-contact', { valeur: saisie.client.contact, exemple: 'facultatif' });
@@ -817,7 +716,8 @@ function carteClient() {
     rang('WhatsApp', wa),
   ));
 
-  for (const [n, cle] of [[nom, 'nom'], [code, 'code'], [ville, 'ville'],
+  // `code` N'EST PAS DANS CETTE LISTE : lecture seule, rien à écouter.
+  for (const [n, cle] of [[nom, 'nom'], [ville, 'ville'],
     [email, 'email'], [contact, 'contact'], [tel, 'tel'], [wa, 'whatsapp']]) {
     n.addEventListener('input', () => { saisie.client[cle] = n.value; redessiner(); });
   }
@@ -894,30 +794,22 @@ function prendreClient(cl) {
 // CARTE 2 — LE PROJET ET CE QU'ON PEUT PROMETTRE
 // ===========================================================================
 function carteProjet() {
-  const [c, corps] = carte('event', 'Projet et délai', 'projet');
+  const [c, corps] = carte('event', 'Projet et retrait', 'projet');
 
   const projet = entree('dvf-projet', { valeur: saisie.projet, exemple: 'STAFF, Terrasse, Rentrée…' });
-  const appro = menu('dvf-appro', APPROS, saisie.appro);
   const due = entree('dvf-due', { type: 'date', valeur: saisie.dueDate });
   const heure = entree('dvf-heure', { type: 'time', valeur: saisie.dueHeure });
-  const val = entree('dvf-validite', { type: 'date', valeur: saisie.validite });
   const maq = menu('dvf-maquette', [
     { id: 'non', label: 'Non — le client fournit son visuel' },
     { id: 'oui', label: 'Oui — maquette à créer' },
   ], saisie.maquette ? 'oui' : 'non');
-  const interne = entree('dvf-note-interne', { valeur: saisie.noteInterne, exemple: 'Ne figure pas sur le devis' });
+  const interne = entree('dvf-note-interne', { valeur: saisie.noteInterne, exemple: 'Ne figure pas sur la facture' });
   corps.append(feuille(
-    rang('Nom du projet', projet), rang('Approvisionnement', appro),
-    rang('Date souhaitée client', due), rang('Heure souhaitée', heure),
-    rang('Validité du devis', val),
+    rang('Nom du projet', projet),
+    rang('Date de retrait', due), rang('Heure souhaitée', heure),
     rang('Maquette à faire', maq),
     rang('Note interne', interne),
   ));
-
-  // ⚠ L'ÉTAT DU DÉLAI EST RETIRÉ (02/09, Charlie : « on s'en fout »). Une bande
-  // colorée redisait, sous le menu, ce que le menu venait de dire — « Commande
-  // groupée » → « Dépend de la prochaine commande groupée ». Le texte
-  // commercial du délai, lui, reste : il est SUR LE DEVIS, où il sert.
 
   projet.addEventListener('input', () => { saisie.projet = projet.value; redessiner(); });
   due.addEventListener('change', () => { saisie.dueDate = due.value; redessiner(); });
@@ -926,8 +818,6 @@ function carteProjet() {
   // LA NOTE INTERNE NE REDESSINE PAS LA FEUILLE : elle n'y figure pas. Elle
   // n'écrit que dans la saisie — et le brouillon la garde.
   interne.addEventListener('input', () => { saisie.noteInterne = interne.value; garderBrouillon(); });
-  val.addEventListener('change', () => { saisie.validite = val.value; redessiner(); });
-  appro.addEventListener('change', () => { saisie.appro = appro.value; redessiner(); });
   return c;
 }
 
@@ -1059,7 +949,7 @@ const FAMILLE_TEXTILE = 'Textile';
 // — du nom écrit dans la ligne au produit du catalogue. C'est ce qui permet à
 // une désignation TAPÉE à la main de valoir un choix : si elle tombe juste, la
 // ligne gagne sa référence et son prix.
-const ID_PRODUITS = 'dvf-produits';
+const ID_PRODUITS = 'vf-produits';
 const parNom = new Map();
 const CHEMIN_MOTEUR = '/comptoir/textile-catalog.js';
 let moteurEnRoute = null;
@@ -1118,14 +1008,14 @@ const TRANSPORT_MOTEUR = 'Maritime';
 // à la même place, avec la même valeur : le composant l'HABILLE, il ne le
 // remplace pas. Rien ne bouge sous les doigts (loi 9) — et une ligne qui n'est
 // pas un textile garde un champ de texte ordinaire, sans menu vide à ouvrir.
-const ID_MARQUAGES = 'dvf-marquages';
+const ID_MARQUAGES = 'vf-marquages';
 // LES COULEURS D'ENCRE ET LES FACES — deux listes posées UNE fois pour tout
 // l'écran, comme celle des produits. Les encres viennent du moteur (elles
 // décident du rendu, pas du prix), les faces du tableau des tailles de logo,
 // qui les déclare par famille : c'est la source de la fiche de l'atelier et du
 // ticket, pas une liste réécrite ici.
-const ID_ENCRES = 'dvf-encres';
-const ID_FACES = 'dvf-faces';
+const ID_ENCRES = 'vf-encres';
+const ID_FACES = 'vf-faces';
 function poserListe(id, valeurs) {
   if (!valeurs.length) return false;
   let liste = document.getElementById(id);
@@ -1803,7 +1693,7 @@ function rangeeArticle(ligne) {
   const cadreLibres = el('div', 'dvf-libres-cadre');
   cadreLibres.append(libres, ajouterTaille);
 
-  const note = entree(`dvf-a-${n}-n`, { valeur: ligne.note, exemple: 'Précision qui figurera sur le devis' });
+  const note = entree(`dvf-a-${n}-n`, { valeur: ligne.note, exemple: 'Précision qui figurera sur la facture' });
   // « Recalculer » ne s'affiche QUE si le prix a été repris à la main : le reste
   // du temps il n'y a rien à reprendre, le moteur suit déjà la quantité et le
   // marquage. C'est le composant de la charte, celui de « Renommer » et de
@@ -1814,7 +1704,7 @@ function rangeeArticle(ligne) {
   const reprendre = el('button', 'action-ligne', 'Recalculer');
   reprendre.type = 'button';
   reprendre.hidden = true;
-  const caseNote = champ('Note du devis', note);
+  const caseNote = champ('Note de la facture', note);
   // Le bouton vit DANS la boîte de la note, à sa droite : c'est la case qui a
   // de la place à revendre, et il tombe sur le rail des champs plutôt que sur
   // une rangée à lui.
@@ -2127,11 +2017,12 @@ function carteArgent() {
   // Elle ne change aucun montant, juste ce qui est mis en avant.
   const vedette = segmente('dvf-vedette', VEDETTES, saisie.vedette, (v) => { saisie.vedette = v; redessiner(); });
   const regime = menu('dvf-regime', REGIMES, saisie.regime);
-  // L'ACOMPTE EST UN POURCENTAGE LIBRE (03/09/2026) — plus un menu figé à
-  // 0/30/50/100 %. Le patron tape ce qu'il négocie.
-  const acompte = entree('dvf-acompte', { type: 'number', valeur: saisie.acompte, classe: 'dvf-nb' });
-  acompte.max = '100';
-  acompte.placeholder = '0';
+  // LE MODE DE RÈGLEMENT, OBLIGATOIRE : une facture Vente Flash sort toujours
+  // soldée (§4 du spec) — pas d'acompte, pas de solde, contrairement au devis.
+  // Un choix placeholder en tête : `menu()` pose `.value` sans option vide,
+  // donc SANS lui le premier mode de la liste s'afficherait choisi alors que
+  // `saisie.mode` vaut encore '' — le champ aurait l'air rempli sans l'être.
+  const mode = menu('vf-mode', [{ id: '', label: '— Choisir —' }, ...MODES_PAIEMENT], saisie.mode);
   const arrondi = menu('dvf-arrondi', ARRONDIS, saisie.arrondi);
   // L'AJUSTEMENT GLOBAL (03/09/2026) : une remise (négatif) ou une majoration
   // (positif) sur l'ensemble, en euros ou en pourcentage du sous-total HT.
@@ -2150,7 +2041,7 @@ function carteArgent() {
     rang('Régime TGCA', regime),
     rang('Ajustement', ajustementWrap),
     rang('Arrondi commercial', arrondi),
-    rang('Acompte %', acompte),
+    rang('Mode de règlement', mode),
   ));
 
   const totaux = el('div', 'dvf-totaux');
@@ -2158,10 +2049,7 @@ function carteArgent() {
   corps.append(totaux);
 
   regime.addEventListener('change', () => { saisie.regime = regime.value; redessiner(); });
-  acompte.addEventListener('input', () => {
-    saisie.acompte = Math.min(100, Math.max(0, Number(acompte.value) || 0));
-    redessiner();
-  });
+  mode.addEventListener('change', () => { saisie.mode = mode.value; redessiner(); });
   arrondi.addEventListener('change', () => { saisie.arrondi = arrondi.value; redessiner(); });
   ajustementUnite.addEventListener('change', () => {
     saisie.ajustement.unite = ajustementUnite.value;
@@ -2218,197 +2106,198 @@ function peindre() {
     grand.append(el('span', null, compte.vedette === 'ht' ? 'TOTAL HT' : 'TOTAL À PAYER'),
       el('b', null, euro(compte.vedette === 'ht' ? compte.totalHt : compte.ttc)));
     totaux.append(grand);
-    if (compte.acompte.pourcent) {
-      const a = el('div', 'dvf-tot');
-      a.append(el('span', null, `Acompte ${compte.acompte.pourcent} % à verser`),
-        el('b', null, euro(compte.acompte.montant)));
-      totaux.append(a);
-    }
+    // PAS DE LIGNE ACOMPTE : une facture Vente Flash sort toujours soldée
+    // (§4 du spec), contrairement au devis. `compte.acompte.pourcent` vaut
+    // toujours 0 ici (la saisie ne porte plus ce champ) — rien à afficher.
   }
 
-  // CE QUE L'EN-TÊTE DIT : où en est ce devis. « Brouillon » n'est pas une
-  // décoration — tant qu'il n'est pas au planning, personne ne le relancera.
+  // CE QUE L'EN-TÊTE DIT : où en est cette vente. « Brouillon » n'est pas une
+  // décoration — tant qu'elle n'est pas émise, personne ne peut la relire.
   const compteur = $('#dvf-compte');
   if (compteur) {
     const n = saisie.lignes.length;
-    const etatDevis = repriseDe ? `reprise du dossier — version ${version + 1}`
-      : (dossierId ? 'au planning' : 'brouillon local');
-    // CE QUI MANQUE SE COMPTE ICI, une fois pour tout le devis. Une ligne « à
-    // chiffrer » se voit dans le tableau — mais le tableau se replie, et c'est
-    // justement replié qu'on clique « Imprimer ». Le compte, lui, est toujours
-    // sous les yeux.
+    const etatDevis = dossierId ? 'facture émise' : 'brouillon local';
+    // CE QUI MANQUE SE COMPTE ICI, une fois pour toute la vente. Une ligne « à
+    // chiffrer » se voit dans le tableau — mais le tableau se replie, et
+    // c'est justement replié qu'on clique « Émettre ». Le compte, lui, est
+    // toujours sous les yeux.
     const manquants = compte.lignes.filter((l) => l.sansPrix).length;
     const reste = manquants ? ` · ${manquants} à chiffrer` : '';
     // ET LE COMPTEUR NE PORTE UN MONTANT QUE S'IL EN EXISTE UN : « 0 article ·
-    // 0,00 € · brouillon local » annonçait un devis à zéro euro dès l'ouverture.
+    // 0,00 € · brouillon local » annoncerait une vente à zéro euro dès l'ouverture.
     const montant = compte.aucunPrix ? '' : ` · ${euro(compte.ttc)}`;
     compteur.textContent = `${n} article${n > 1 ? 's' : ''}${montant}${reste} · ${etatDevis}`;
   }
   const bSave = $('#dvf-enregistrer');
   if (bSave) {
-    bSave.disabled = (!!dossierId && !repriseDe) || !saisie.lignes.length
-      || !String(saisie.client.nom || '').trim();
-    // LE BOUTON DIT CE QU'IL FERA, pas ce qu'il est. « Enregistrer » sur une
-    // reprise laisserait croire qu'on ouvre un second dossier.
-    // ⚠ COURT. « Enregistrer dans « À trier » » faisait 267 px à lui seul et
-    // poussait la rangée des trois boutons sous le titre — mesuré au rendu :
-    // 902 px de contenu dans 918 de barre, l'écart de la gouttière suffisait à
-    // la faire s'enrouler, et l'en-tête passait de 82 à 122 px. Où va le devis,
-    // le message le dit après le clic ; le bouton n'a qu'à dire ce qu'il fait.
-    bSave.textContent = repriseDe ? `Enregistrer la version ${version + 1}`
-      : (dossierId ? 'Enregistré' : 'Enregistrer');
+    // ⚠ DEUX CONDITIONS DE PLUS QUE LE DEVIS : un mode de règlement choisi,
+    // et AUCUNE ligne sans prix — une facture émise connaît tous ses prix
+    // (§4 du spec), là où un devis peut sortir avec des lignes « à chiffrer ».
+    bSave.disabled = !!dossierId || !saisie.lignes.length
+      || !String(saisie.client.nom || '').trim()
+      || !saisie.mode
+      || compte.lignes.some((l) => l.sansPrix);
+    bSave.textContent = dossierId ? 'Facture émise' : 'Émettre la facture';
   }
 
   const feuille = $('#dvf-feuille');
   if (feuille) {
-    feuille.replaceChildren(dessinerDevis(modeleDevis(saisie, entreprise), document));
+    feuille.replaceChildren(dessinerFacture(modeleFacture(saisie, entreprise), document));
     mettreALEchelle();
   }
   garderBrouillon();
 }
 
 // ===========================================================================
-// IMPRIMER
+// ÉMETTRE LA FACTURE
 // ===========================================================================
-// LE NUMÉRO SE RÉSERVE AU PREMIER PAPIER, pas à l'ouverture de l'écran : un
-// poste qu'on ouvre le matin et qu'on laisse là brûlerait un numéro par jour, et
-// la série aurait des trous que personne ne saurait expliquer. Deux impressions
-// du même devis gardent donc le même numéro.
-//
-// ON N'IMPRIME PAS L'APPLICATION : on compose une page propre dans un cadre hors
-// écran, on l'imprime, on le retire. Un cadre plutôt qu'une fenêtre — aucun
-// bloqueur de fenêtres ne peut l'empêcher. Et c'est la MÊME chaîne de style que
-// l'aperçu, donc l'aperçu ne peut pas dériver de ce qui sort.
-let impressionEnCours = false;
-async function imprimer() {
-  if (impressionEnCours) return;
-  impressionEnCours = true;
-  const bouton = $('#dvf-imprimer');
-  if (bouton) bouton.disabled = true;
-  try {
-    if (!saisie.numero) {
-      const r = await api('POST', '/api/devis/numero', { jour: jourAtelier() });
-      saisie.numero = (r && r.numero) || '';
-      peindre();
-    }
-    const t = modeleDevis(saisie, entreprise);
-    const cadre = document.createElement('iframe');
-    cadre.setAttribute('aria-hidden', 'true');
-    // Assez large pour une feuille de 210 mm : dans un cadre trop étroit, les
-    // colonnes du détail se calculent sur la mauvaise largeur.
-    cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:0';
-    document.body.appendChild(cadre);
-    const d = cadre.contentDocument;
-    d.title = `Devis ${t.numero || ''}`.trim();
-    const style = d.createElement('style');
-    style.textContent = `@page{size:A4 portrait;margin:0}body{margin:0;background:#fff}${CSS_DEVIS}`;
-    d.head.appendChild(style);
-    d.body.appendChild(dessinerDevis(t, d));
-    cadre.contentWindow.focus();
-    cadre.contentWindow.print();
-    setTimeout(() => cadre.remove(), 1000);
-  } catch (err) {
-    dire(err.message || 'Impression impossible', 'is-ko');
-  } finally {
-    impressionEnCours = false;
-    if (bouton) bouton.disabled = false;
-  }
-}
-
-// ===========================================================================
-// ENREGISTRER AU PLANNING
-// ===========================================================================
-// UN DEVIS IMPRIMÉ QUI N'EST NULLE PART N'EXISTE PAS : personne ne le relance,
-// et c'est exactement l'étape que le pipeline appelle « Tarif / Devis envoyé —
-// Attente client ». Le prix part avec — l'étape dit qu'on a chiffré, une
-// colonne Prix vide la contredirait.
-let envoiEnCours = false;
-async function enregistrer() {
-  if (envoiEnCours || dossierId) return;
+// DEUX APPELS EN SÉQUENCE, JAMAIS UN SEUL :
+//   1. POST /api/comptoir/projet crée le DOSSIER — route INCHANGÉE, c'est
+//      celle de vente-directe.html/pont.js : idempotence par empreinte,
+//      découpe en lot, routage production (textile V9, gravure) préservés
+//      sans y toucher.
+//   2. POST /api/factures émet le DOCUMENT, une fois le dossier créé —
+//      idempotent sur son id (voir server.js) : une resoumission après perte
+//      de réponse réseau ne double jamais la facture.
+// Puis IMPRESSION AUTOMATIQUE, dans un cadre hors écran — même mécanique que
+// `imprimer()` sur le devis, mais un seul clic fait tout : composer un devis
+// se discute avec le client avant d'imprimer ; une vente flash conclut une
+// vente déjà décidée.
+let emissionEnCours = false;
+async function emettreFacture() {
+  if (emissionEnCours || dossierId) return;
   const nom = String(saisie.client.nom || '').trim();
   if (!nom) return dire('Le nom du client est requis', 'is-ko');
-  if (!saisie.lignes.length) return dire('Un devis sans article ne s’enregistre pas', 'is-ko');
-  envoiEnCours = true;
+  if (!saisie.lignes.length) return dire('Une vente sans article ne s’émet pas', 'is-ko');
+  if (!saisie.mode) return dire('Le mode de règlement est requis', 'is-ko');
+  const compte = calculerDevis(saisie);
+  if (compte.lignes.some((l) => l.sansPrix)) return dire('Chaque article doit porter un prix', 'is-ko');
+
+  emissionEnCours = true;
   const bouton = $('#dvf-enregistrer');
   if (bouton) bouton.disabled = true;
   try {
-    const compte = calculerDevis(saisie);
-    const r = await api('POST', '/api/devis', {
-      // LA REPRISE. Présent, le serveur écrit sur CE dossier et range la version
-      // d'avant ; absent, il en ouvre un neuf.
-      dossierId: repriseDe,
-      numero: saisie.numero,
-      jour: jourAtelier(),
-      date: saisie.date,
-      validite: saisie.validite,
-      projet: saisie.projet,
-      dueDate: saisie.dueDate,
-      // CE QUI SUIT LE DOSSIER MAIS PAS LE PAPIER (02/09) : l'heure de retrait,
-      // le travail de maquette à prévoir, et ce qu'on se dit entre nous. Un
-      // serveur d'une version antérieure les ignore — ils n'empêchent rien.
-      dueHeure: saisie.dueHeure,
-      maquette: saisie.maquette,
-      noteInterne: saisie.noteInterne,
+    // --- 1. Le dossier, par la route du comptoir --------------------------
+    // TOUT EST EN TTC ICI, PAS EN HT. `partsDuTicket` (server.js) compare la
+    // somme des `amount` d'articles au montant TTC du dossier (voir
+    // `rDossier` plus bas, `amount: compte.ttc`) — un article envoyé en HT
+    // ferait un écart de la taxe entière, absorbé dans le premier article. Le
+    // taux effectif vient de `compte.tauxTgca` (déjà résolu par
+    // `calculerDevis` selon le régime — 0 sur Revente/Export), jamais de
+    // `saisie.tauxTgca` brut qui ignorerait le régime.
+    const articles = compte.lignes.map((l) => ({
+      label: l.designation,
+      qty: l.quantite,
+      amount: Math.round(l.totalHt * (1 + compte.tauxTgca) * 100) / 100,
+      prod: { ref: l.reference, couleur: l.couleur, marquage: l.marquage, encre: l.encre },
+      // MOTEUR « UNITAIRE » : le prix est déjà tranché à l'émission (par le
+      // moteur V9 ou le catalogue), on l'archive tel quel plutôt que de
+      // rejouer une chiffrage textile complexe server-side pour ce lot. Une
+      // correction de quantité plus tard au planning recalcule linéairement
+      // sur ce prix — pas le dégressif V9 d'origine. Limite connue, acceptée
+      // pour ce lot (voir spec).
+      chiffrage: {
+        moteur: 'unitaire',
+        unitTTC: Math.round(l.unitaireHt * (1 + compte.tauxTgca) * 100) / 100,
+        rate: 0,
+      },
+      detail: l.note || null,
+    }));
+    const rDossier = await api('POST', '/api/comptoir/projet', {
+      source: 'Vente directe',
+      clientObj: {
+        name: saisie.client.nom, company: saisie.client.nom, type: saisie.client.type,
+      },
+      amount: compte.ttc,
+      // `name`/`quantity` NE SERVENT QUE SUR UN PANIER D'UN SEUL ARTICLE :
+      // server.js (POST /api/comptoir/projet) ne construit un « lot » multi-
+      // lignes qu'à partir de deux articles ou plus — sur un seul, il retombe
+      // sur CES DEUX CHAMPS RACINE pour la désignation et la quantité, et
+      // ignore `articles[0].label`/`articles[0].qty` pour ça (seuls
+      // `articles[0].prod`/`articles[0].chiffrage` sont repris dans ce cas).
+      // Les poser inconditionnellement est sans effet quand il y a plusieurs
+      // articles (le serveur les ignore alors).
+      name: articles.length === 1 ? articles[0].label : `${articles.length} articles`,
+      quantity: articles.length === 1 ? articles[0].qty : undefined,
+      articles,
+      paiement: { mode: saisie.mode },
+      dueDate: saisie.dueDate, dueTime: saisie.dueHeure,
+      comment: saisie.noteInterne,
+      client_info: [
+        ['Client', saisie.client.nom], ['Type de client', saisie.client.type === 'perso' ? 'Particulier' : 'Professionnel'],
+        ['Ville', saisie.client.ville], ['Téléphone', saisie.client.tel], ['E-mail', saisie.client.email],
+      ].filter(([, v]) => v),
+      details: articles.flatMap((a, i) => [
+        [`Article ${i + 1} — Désignation`, a.label],
+        a.prod.couleur ? [`Article ${i + 1} — Couleur`, a.prod.couleur] : null,
+        a.prod.marquage ? [`Article ${i + 1} — Marquage`, a.prod.marquage] : null,
+      ].filter(Boolean)),
+    });
+    dossierId = rDossier && rDossier.id ? rDossier.id : null;
+    if (!dossierId) throw new Error('Le dossier n’a pas pu être créé');
+
+    // --- 2. La facture, immuable --------------------------------------------
+    const rFacture = await api('POST', '/api/factures', {
+      dossierId,
       client: saisie.client,
-      appro: saisie.appro,
+      projet: saisie.projet,
+      mode: saisie.mode,
       regime: saisie.regime,
       tauxTgca: saisie.tauxTgca,
       arrondi: saisie.arrondi,
       vedette: saisie.vedette,
-      ajustementUnite: compte.ajustement.unite,
-      ajustementValeur: compte.ajustement.valeur,
-      ajustementMontant: compte.ajustement.montant,
+      ajustement: { unite: compte.ajustement.unite, valeur: compte.ajustement.valeur },
       lignes: compte.lignes,
-      sousTotalHt: compte.sousTotalHt,
-      totalHt: compte.totalHt,
-      taxe: compte.taxe,
-      ttc: compte.ttc,
-      acomptePourcent: compte.acompte.pourcent,
-      acompteMontant: compte.acompte.montant,
+      jour: jourAtelier(),
     });
-    dossierId = r && r.id ? r.id : null;
-    if (r && r.numero) saisie.numero = r.numero;
-    if (r && r.version) version = r.version;
-    // La reprise est FAITE : un second clic ne doit pas fabriquer une V3 de la
-    // même modification.
-    repriseDe = null;
-    dire(r && r.reprise
-      ? `Version ${r.version} enregistrée sur le dossier`
-      : (r && r.dejaEnregistre ? 'Ce devis était déjà au planning' : 'Devis enregistré — dans « À trier »'),
-    'is-ok');
+    saisie.numero = (rFacture && rFacture.numero) || '';
+
+    // --- 3. Impression automatique -------------------------------------------
+    const t = modeleFacture(saisie, entreprise);
+    const cadre = document.createElement('iframe');
+    cadre.setAttribute('aria-hidden', 'true');
+    cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:0';
+    document.body.appendChild(cadre);
+    const d = cadre.contentDocument;
+    d.title = `Facture ${t.numero || ''}`.trim();
+    const style = d.createElement('style');
+    style.textContent = `@page{size:A4 portrait;margin:0}body{margin:0;background:#fff}${CSS_FACTURE}`;
+    d.head.appendChild(style);
+    d.body.appendChild(dessinerFacture(t, d));
+    cadre.contentWindow.focus();
+    cadre.contentWindow.print();
+    setTimeout(() => cadre.remove(), 1000);
+
+    dire(`Facture ${t.numero} émise`, 'is-ok');
     peindre();
   } catch (err) {
-    dire(err.message || 'Enregistrement impossible', 'is-ko');
+    dire(err.message || 'Émission impossible', 'is-ko');
   } finally {
-    envoiEnCours = false;
+    emissionEnCours = false;
     peindre();
   }
 }
-
 function repartirDeZero() {
-  // ON NE VIDE PAS UN DEVIS QU'ON N'A PAS ENREGISTRÉ SANS LE DIRE. Un
-  // brouillon perdu, c'est un client qu'on fait attendre pendant qu'on retape.
+  // ON NE VIDE PAS UNE VENTE QU'ON N'A PAS ÉMISE SANS LE DIRE. Un brouillon
+  // perdu, c'est un client qu'on fait attendre pendant qu'on retape.
   if (!dossierId && saisie.lignes.length
-    && !window.confirm('Ce devis n’est pas au planning. Le remplacer par un devis vierge ?')) return;
+    && !window.confirm('Cette vente n’a pas été facturée. La remplacer par une vente vierge ?')) return;
   saisie = saisieNeuve();
   dossierId = null;
   for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-ville', ''],
     ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cl-wa', ''],
     ['#dvf-cherche', ''],
     ['#dvf-projet', ''], ['#dvf-due', ''], ['#dvf-heure', ''], ['#dvf-note-interne', ''],
-    ['#dvf-validite', saisie.validite],
     // LA CARTE FISCALITÉ REPART À ZÉRO ELLE AUSSI : `saisie` retrouve ses
-    // valeurs neuves, les champs à l'écran doivent les suivre — sinon le
-    // devis vierge calcule sur des réglages neufs pendant que l'écran affiche
-    // encore ceux du devis précédent.
+    // valeurs neuves, les champs à l'écran doivent les suivre — sinon la
+    // vente vierge calcule sur des réglages neufs pendant que l'écran affiche
+    // encore ceux de la vente précédente.
     ['#dvf-regime', saisie.regime], ['#dvf-arrondi', saisie.arrondi],
-    ['#dvf-acompte', String(saisie.acompte)],
+    ['#vf-mode', saisie.mode],
     ['#dvf-ajustement-unite', saisie.ajustement.unite], ['#dvf-ajustement-valeur', '']]) {
     const n = $(id);
     if (n) n.value = v;
   }
-  const appro = $('#dvf-appro');
-  if (appro) appro.value = saisie.appro;
   const maquette = $('#dvf-maquette');
   if (maquette) maquette.value = 'non';
   segmenteRegle($('#dvf-vedette'), saisie.vedette);
@@ -2437,14 +2326,14 @@ let minuteurMsg = 0;
 function dire(texte, cls) {
   const hote = $('.ecran-tete__droite') || ROOT;
   if (!hote) return;
-  let msg = document.getElementById('dvf-msg');
+  let msg = document.getElementById('vf-msg');
   // `batir()` remplace tout le contenu de l'écran : un message gardé d'un
   // montage précédent n'est plus dans la page, et le réutiliser reviendrait à
   // écrire dans le vide.
   if (!msg || msg.parentElement !== hote) {
     if (msg) msg.remove();
     msg = el('div', 'msg-flottant');
-    msg.id = 'dvf-msg';
+    msg.id = 'vf-msg';
     msg.setAttribute('role', 'status');
     hote.appendChild(msg);
   }

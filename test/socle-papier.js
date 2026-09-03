@@ -35,11 +35,16 @@ const nu = (src) => src
 // `fichier` : « ticket.js » ou « bureau.js ». `noms` : ce qu'on veut ressortir.
 // `transformer` sert au test du dépouillage, qui doit évaluer les deux moitiés
 // avec le même traitement — sinon la comparaison ne prouve rien.
-function chargerPapier(fichier, noms, transformer) {
+// `socleExtra` : d'autres fichiers de `public/` à évaluer AVANT `fichier`,
+// dans l'ordre donné — pour un papier qui importe autre chose que le socle
+// commun (`facture.js` importe `calculerDevis` de `devis.js`, par exemple).
+// Optionnel et rétrocompatible : aucun appelant existant n'en avait besoin.
+function chargerPapier(fichier, noms, transformer, socleExtra) {
   const passe = typeof transformer === 'function' ? transformer : (x) => x;
   const bac = {};
   vm.createContext(bac);
-  const socle = ['papier.js', 'nom-client.js']
+  const fichiersSocle = ['papier.js', 'nom-client.js', ...(Array.isArray(socleExtra) ? socleExtra : [])];
+  const socle = fichiersSocle
     .map((f) => nu(passe(fs.readFileSync(path.join(PUBLIC, f), 'utf8'))))
     .join('\n');
   const corps = nu(passe(fs.readFileSync(path.join(PUBLIC, fichier), 'utf8')));

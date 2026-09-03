@@ -87,6 +87,9 @@ const FABRIQUES = [
   // `public/tailles-logos.js` est sorti de cette liste le 30/08 : sa seule
   // icone etait celle de son en-tete maison, et l'en-tete de la charte n'en
   // porte pas — la barre du haut dit deja sur quel ecran on est.
+  // LA VENTE FLASH (03/09) : copie modifiee de l'ecran du devis, elle garde
+  // la meme fabrique `ic()`.
+  'public/vente-flash.js',
 ];
 
 const balaye = (dir) => fs.readdirSync(path.join(RACINE, dir), { withFileTypes: true })
