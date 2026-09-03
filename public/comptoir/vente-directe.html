@@ -129,122 +129,113 @@ try {
   <details class="card volet-plus volet-carte">
     <summary><h2>1. Ajouter un article</h2></summary>
     <div class="vd-corps">
-    <div class="bloc"><div class="grid">
-      <div class="field">
-        <label for="productName">Article *</label>
-        <input id="productName" list="productsList" placeholder="Ex. Tee-shirt personnalisé">
-        <datalist id="productsList">
-          <option value="Tee-shirt personnalisé">
-          <option value="Sweat personnalisé">
-          <option value="Casquette personnalisée">
-          <option value="Tasse personnalisée">
-          <option value="Gourde personnalisée">
-          <option value="Porte-clés personnalisé">
-          <option value="Plaque gravée">
-        </datalist>
-      </div>
-      <div class="field">
-        <label for="quantity">Quantité *</label>
-        <input id="quantity" type="number" min="1" step="1" placeholder="Ex. 10">
-      </div>
-    </div>
+    <!-- LA SAISIE EST UNE FEUILLE DE CALCUL (02/09/2026). Charlie : « normalise
+         en ligne exactement comme dans flash devis ; les lignes, la façon dont
+         on écrit les prix, doivent être les mêmes ». L'intitulé passe à GAUCHE
+         et la case à droite (`.rangs` / `.rang`, charte.css) : le regard
+         descend UNE colonne de cases au lieu de sauter d'un intitulé à sa
+         boîte, deux fois par rangée. C'est le composant du devis flash, monté
+         dans la charte le 02/09 — pas une grille réécrite ici.
 
-    <!-- L'ASTÉRISQUE PORTAIT SUR CHAQUE CHAMP, alors que l'une des deux parts
-         peut rester vide : le client qui apporte son propre t-shirt ne paie
-         que la personnalisation, l'article revendu tel quel n'en porte aucune.
-         C'est le TOTAL qui est exigé — l'écran le dit maintenant tel quel. -->
-    <div class="grid">
-      <div class="field">
-        <label for="articlePrice">Prix article</label>
-        <input id="articlePrice" type="number" min="0" step="0.01" placeholder="0,00">
-      </div>
-      <div class="field">
-        <label for="customPrice">Prix personnalisation</label>
-        <input id="customPrice" type="number" min="0" step="0.01" placeholder="0,00">
-      </div>
-    </div>
-    <!-- `margin` explicite : la ligne d'aide s'intercale entre deux blocs, et
-         sans marge basse elle venait coller l'intitulé du champ suivant. -->
-    <div class="help" style="margin:0 0 14px">Prix obligatoire * — l’un des deux, ou les deux. Le client paie la somme.</div>
+         LES DEUX GROUPES N'EN FONT PLUS QU'UN. Ils séparaient l'article de sa
+         date par un cadre ; les traits de la feuille le font déjà, rangée par
+         rangée, et un cadre de plus dans une carte-volet faisait un niveau de
+         plus. Ce qui n'est pas une rangée — les raccourcis de délai et l'avis
+         de supplément — se pose SOUS la feuille, sur toute la largeur. -->
+    <!-- LA DATE DE COMMANDE NE S'AFFICHE PAS : c'est TOUJOURS celle du jour,
+         personne ne la saisit. Elle reste dans la page, et gardée — huit
+         endroits s'en servent : le palier de délai, l'enregistrement de
+         l'article, la réouverture d'une commande, le contrôle des champs
+         obligatoires et le ticket, qui l'imprime.
+         `isoDate()` rend la date CIVILE LOCALE (il retire le décalage avant de
+         formater) : à Saint-Martin, un `toISOString()` nu daterait du lendemain
+         dès 20 h. -->
+    <input id="orderDate" type="date" class="hidden">
 
-    <div class="field">
-      <label for="productDescription">Description de production *</label>
-      <textarea id="productDescription" placeholder="Ex. Logo cœur, logo dos 30 cm, tailles S x2 / M x5, impression DTF..."></textarea>
-    </div>
-
-    </div><div class="bloc">
-      <!-- TROIS DATES, TROIS CELLULES ÉGALES. « Date souhaitée » portait à elle
-           seule HUIT éléments et DEUX intitulés : sa date, les trois raccourcis
-           de délai, l'avis de supplément, le barème dépliable, puis l'heure
-           souhaitée avec son propre intitulé. Mesuré : 8 enfants et 276 px de
-           haut à droite, 2 enfants à gauche étirés à la même hauteur — 215 px
-           de vide en face d'un empilement. Tout ce qui n'est pas une date
-           descend SOUS la rangée, sur toute la largeur.
-           En perdant son second intitulé, cette rangée cesse d'être
-           l'exception `label~label` — « le seul cas des deux écrans » — et
-           repartage ses lignes avec les autres : intitulés sur la première,
-           commandes sur la deuxième. -->
-      <!-- LA DATE DE COMMANDE NE S'AFFICHE PLUS : c'est TOUJOURS celle du
-           jour, personne ne la saisit, et elle occupait une cellule entière en
-           tête du bloc. Elle reste dans la page, et gardée — huit endroits s'en
-           servent : le palier de délai, l'enregistrement de l'article, la
-           réouverture d'une commande, le contrôle des champs obligatoires et
-           le ticket, qui l'imprime.
-           `isoDate()` rend la date CIVILE LOCALE (il retire le décalage avant
-           de formater) : à Saint-Martin, un `toISOString()` nu daterait du
-           lendemain dès 20 h. Vérifié avant de la retirer de l'écran — une date
-           fausse ne se verrait plus. -->
-      <input id="orderDate" type="date" class="hidden">
-      <div class="grid">
-        <div class="field">
-          <label for="deliveryDate">Date souhaitée *</label>
-          <input id="deliveryDate" type="date" onchange="updateDeadlineInfo()">
+    <div class="rangs">
+      <div class="rang">
+        <label class="rang__k" for="productName">Article *</label>
+        <div class="rang__v">
+          <input id="productName" list="productsList" placeholder="Ex. Tee-shirt personnalisé">
+          <datalist id="productsList">
+            <option value="Tee-shirt personnalisé">
+            <option value="Sweat personnalisé">
+            <option value="Casquette personnalisée">
+            <option value="Tasse personnalisée">
+            <option value="Gourde personnalisée">
+            <option value="Porte-clés personnalisé">
+            <option value="Plaque gravée">
+          </datalist>
         </div>
-        <div class="field">
-          <label for="deliveryTime">Heure souhaitée *</label>
+      </div>
+      <div class="rang">
+        <label class="rang__k" for="quantity">Quantité *</label>
+        <div class="rang__v"><input id="quantity" type="number" min="1" step="1" class="nb" placeholder="Ex. 10"></div>
+      </div>
+      <!-- L'ASTÉRISQUE PORTE SUR LE TOTAL, PAS SUR CHAQUE PART : le client qui
+           apporte son propre t-shirt ne paie que la personnalisation, l'article
+           revendu tel quel n'en porte aucune.
+           TTC EST DIT DANS L'INTITULÉ. C'est la seule pratique du comptoir
+           (voir `productFromForm`), et un prix dont on ne sait pas s'il est HT
+           se retape une fois sur deux. Le devis flash dit « HT » de la même
+           façon, dans l'intitulé de sa colonne. -->
+      <div class="rang">
+        <label class="rang__k" for="articlePrice">Prix article TTC</label>
+        <div class="rang__v"><input id="articlePrice" type="number" min="0" step="0.01" class="nb" placeholder="0,00"></div>
+      </div>
+      <div class="rang">
+        <label class="rang__k" for="customPrice">Prix personnalisation TTC</label>
+        <div class="rang__v"><input id="customPrice" type="number" min="0" step="0.01" class="nb" placeholder="0,00"></div>
+      </div>
+      <div class="rang">
+        <label class="rang__k" for="productDescription">Description de production *</label>
+        <div class="rang__v"><textarea id="productDescription" placeholder="Ex. Logo cœur, logo dos 30 cm, tailles S x2 / M x5, impression DTF..."></textarea></div>
+      </div>
+      <div class="rang">
+        <label class="rang__k" for="deliveryDate">Date souhaitée *</label>
+        <div class="rang__v"><input id="deliveryDate" type="date" onchange="updateDeadlineInfo()"></div>
+      </div>
+      <div class="rang">
+        <label class="rang__k" for="deliveryTime">Heure souhaitée *</label>
+        <div class="rang__v">
           <select id="deliveryTime" data-menu-manuel-non>
-          <option value="09:00">09:00</option>
-          <option value="10:00">10:00</option>
-          <option value="11:00">11:00</option>
-          <option value="12:00">12:00</option>
-          <option value="13:00">13:00</option>
-          <option value="14:00" selected>14:00</option>
-          <option value="15:00">15:00</option>
-          <option value="16:00">16:00</option>
-          <option value="17:00">17:00</option>
-        </select>
+            <option value="09:00">09:00</option>
+            <option value="10:00">10:00</option>
+            <option value="11:00">11:00</option>
+            <option value="12:00">12:00</option>
+            <option value="13:00">13:00</option>
+            <option value="14:00" selected>14:00</option>
+            <option value="15:00">15:00</option>
+            <option value="16:00">16:00</option>
+            <option value="17:00">17:00</option>
+          </select>
         </div>
       </div>
+    </div>
 
-      <!-- Le délai sous la rangée : les raccourcis à gauche, le réglage du
-           barème qui ferme la rangée à droite. -->
-      <div class="delai-rangee">
-        <!-- Les trois paliers ne sont plus un choix : ce sont des RACCOURCIS qui
-             posent une date dans le calendrier au-dessus. -->
-        <div class="delay-quick">
-          <button type="button" class="delay-chip" data-jours="5">Dans 5 jours</button>
-          <button type="button" class="delay-chip" data-jours="10">Dans 10 jours</button>
-          <button type="button" class="delay-chip" data-jours="15">Dans 15 jours</button>
-        </div>
-        <!-- LE BARÈME A QUITTÉ L'ÉCRAN DE VENTE (27/08). Ce sont trois
-             pourcentages d'atelier — ils valent pour tous les postes, ils
-             changent une fois par an, et ils n'ont rien à faire sous les yeux
-             d'une vendeuse qui a un client devant elle. Ils se règlent dans
-             Réglages, sur la même API `/api/supplements-express`. Le supplément
-             lui-même continue de s'afficher ici, sous la date. -->
-      </div>
+    <!-- SOUS LA FEUILLE, SUR TOUTE LA LARGEUR. Les trois paliers ne sont pas un
+         choix : ce sont des RACCOURCIS qui posent une date dans le champ
+         au-dessus. Le barème, lui, a quitté cet écran le 27/08 — trois
+         pourcentages d'atelier qui valent pour tous les postes et changent une
+         fois par an n'ont rien à faire sous les yeux d'une vendeuse qui a un
+         client devant elle. Ils se règlent dans Réglages. -->
+    <div class="delay-quick">
+      <button type="button" class="delay-chip" data-jours="5">Dans 5 jours</button>
+      <button type="button" class="delay-chip" data-jours="10">Dans 10 jours</button>
+      <button type="button" class="delay-chip" data-jours="15">Dans 15 jours</button>
+    </div>
 
-      <!-- SUR TOUTE LA LARGEUR. Cet avis CHANGE de texte à chaque date choisie,
-           et un texte qui change de hauteur pousse tout ce qui le suit — ce que
-           la règle du 24/08 interdit. Il tenait déjà sur une ligne dans la
-           cellule de 430 px (mesuré : 22 px là aussi, il ne débordait pas),
-           mais à 30 px près : un barème à trois chiffres ou un libellé de
-           palier plus long l'y faisait passer à deux. Sur 875 px il a la marge
-           qui manquait. Vérifié : les quatre textes possibles font 22 px, le
-           bloc 224 px et « Ajouter l'article » ne bouge pas d'un pixel. -->
-      <div id="deadlineInfo" class="help delai-etat"></div>
-      
-    </div><div class="actions">
+    <!-- Cet avis CHANGE de texte à chaque date choisie, et un texte qui change
+         de hauteur pousse tout ce qui le suit — ce que la règle du 24/08
+         interdit. Sur toute la largeur, les quatre textes possibles tiennent
+         sur une ligne. -->
+    <div id="deadlineInfo" class="help delai-etat"></div>
+
+    <!-- LE PRIX EST OBLIGATOIRE, PAS CHACUNE DE SES DEUX PARTS. Une vente à
+         zéro euro part sans que personne ne le remarque : c'est le seul texte
+         d'aide que cet écran garde, et il porte une règle, pas un rappel. -->
+    <div class="help">Prix obligatoire — l'article, la personnalisation, ou les deux : le client paie la somme.</div>
+    <div class="actions">
       <div class="error msg-flottant hidden" id="productEditMsg"></div>
       <button id="cancelEditBtn" class="secondary hidden">Annuler la modification</button>
       <button id="saveProductBtn" class="primary">Ajouter l'article</button>
@@ -252,25 +243,52 @@ try {
     </div>
   </details>
 
-  <div class="grid">
+  <!-- LES DEUX CARTES S'EMPILENT DEPUIS LE 02/09, elles ne se partagent plus la
+       largeur. Mesuré au rendu : côte à côte, le tableau des articles disposait
+       de 570 px pour cinq colonnes — la désignation tombait à 140 px et sortait
+       en « Tee-shi… » sur la ligne qu'on relit avant d'encaisser. Le compte,
+       lui, n'a jamais eu besoin de plus que sa colonne de nombres. C'est aussi
+       la mise en place du devis flash : les articles prennent la largeur, le
+       compte se lit dessous. -->
     <details class="card volet-plus volet-carte">
       <summary><h2>Articles de la commande</h2></summary>
       <div class="vd-corps">
-      <div id="productList"><p class="help">Aucun article ajouté.</p></div>
+      <!-- LE TABLEAU DES LIGNES COMMERCIALES (02/09). Le même que celui du
+           devis flash (`.lignes`, charte.css) : l'intitulé se lit UNE fois en
+           tête de colonne, et l'œil descend une colonne de nombres. Chaque
+           article tenait dans une carte à quatre lignes de texte — le nom, la
+           pastille de délai, la description, la date de récupération — et deux
+           prix ne se comparaient pas d'une carte à l'autre.
+           SES COLONNES SONT CELLES DE LA VENTE : le prix est TTC (c'est ce
+           qu'on encaisse), et la dernière piste porte DEUX actions — on
+           modifie un article ici, alors que le devis se corrige dans sa ligne.
+           L'en-tête est masqué tant qu'il n'y a rien à coiffer. -->
+      <div class="lignes">
+        <div class="lignes__tete" id="productListHead" hidden>
+          <span>Désignation</span>
+          <span class="nb">Qté</span>
+          <span class="nb">PU TTC</span>
+          <span class="nb">Total TTC</span>
+          <span></span>
+        </div>
+        <div class="lignes__corps" id="productList"></div>
+      </div>
       </div>
     </details>
 
     <details class="card volet-plus volet-carte">
       <summary><h2>Résumé TTC</h2></summary>
       <div class="vd-corps">
-      <div id="summaryLines">
-        <p class="help">Les articles ajoutés apparaîtront ici avec leur tarif TTC.</p>
+      <!-- LE COMPTE (02/09) : `.totaux` / `.tot` / `.tot--grand`, celui du
+           devis flash. Les nombres tombent sur la même colonne, en chiffres de
+           largeur fixe, et le dernier — celui qu'on cherche des yeux — est
+           séparé par un trait plein. « Tous les montants sont TTC » est parti
+           dans les intitulés : une phrase qu'on lit une fois puis qu'on
+           franchit à chaque vente. -->
+      <div class="totaux" id="summaryLines"></div>
+      <div class="totaux">
+        <div class="tot tot--grand"><span>TOTAL À ENCAISSER</span><b id="summaryTTC">0,00 €</b></div>
       </div>
-      <div class="summary-row summary-total" style="margin-top:16px">
-        <span>TOTAL À ENCAISSER</span>
-        <span id="summaryTTC">0,00 €</span>
-      </div>
-      <div class="help">Tous les montants affichés dans ce résumé sont TTC.</div>
 
       <!-- Calculs conservés en interne, mais masqués à l'écran -->
       <span id="summaryHT" class="hidden">0,00 €</span>
@@ -278,7 +296,6 @@ try {
       <span id="summarySurcharge" class="hidden">0,00 €</span>
       </div>
     </details>
-  </div>
 
   <!-- REPLIÉE (27/08) : remplie 5 fois sur 33 ventes réelles. Elle reste à un
        clic, et le volet DIT qu'elle existe — ce qu'un champ supprimé ne dit
@@ -307,14 +324,17 @@ try {
     <summary><h2>2. Associer le client</h2></summary>
     <div class="vd-corps">
 
-    <div class="bloc"><div class="field client-search-wrap">
-      <label for="clientSearch">Rechercher un client existant</label>
-      <input id="clientSearch" placeholder="Nom, société ou WhatsApp">
-      
-      <div id="clientResults" class="client-results"></div>
+    <div class="rangs">
+      <div class="rang">
+        <label class="rang__k" for="clientSearch">Rechercher un client</label>
+        <div class="rang__v client-search-wrap">
+          <input id="clientSearch" placeholder="Nom, société ou WhatsApp">
+          <div id="clientResults" class="client-results"></div>
+        </div>
+      </div>
     </div>
 
-    </div><div id="selectedClientCard" class="product-card client-selected hidden">
+    <div id="selectedClientCard" class="product-card client-selected hidden">
       <span class="badge green">✓ Client sélectionné</span>
       <div class="client-result-name" id="selectedClientName"></div>
       <div class="client-result-meta" id="selectedClientMeta"></div>
@@ -353,42 +373,39 @@ try {
       </div>
 
       <div id="individualForm" class="bloc" style="margin-top:16px">
-        <div class="grid">
-          <div class="field">
-            <label for="newIndividualName">Prénom et nom *</label>
-            <input id="newIndividualName" placeholder="Ex. Jean Dupont">
+        <div class="rangs">
+          <div class="rang">
+            <label class="rang__k" for="newIndividualName">Prénom et nom *</label>
+            <div class="rang__v"><input id="newIndividualName" placeholder="Ex. Jean Dupont"></div>
           </div>
-          <div class="field">
-            <label for="newIndividualPhone">WhatsApp *</label>
-            <input id="newIndividualPhone" placeholder="Ex. 06 90 47 97 88">
+          <div class="rang">
+            <label class="rang__k" for="newIndividualPhone">WhatsApp *</label>
+            <div class="rang__v"><input id="newIndividualPhone" placeholder="Ex. 06 90 47 97 88"></div>
           </div>
-        </div>
-        <div class="field">
-          <label for="newIndividualEmail">E-mail (facultatif)</label>
-          <input id="newIndividualEmail" type="email" placeholder="client@email.com">
+          <div class="rang">
+            <label class="rang__k" for="newIndividualEmail">E-mail (facultatif)</label>
+            <div class="rang__v"><input id="newIndividualEmail" type="email" placeholder="client@email.com"></div>
+          </div>
         </div>
       </div>
 
       <div id="professionalForm" class="bloc hidden" style="margin-top:16px">
-        <div class="grid">
-          <div class="field">
-            <label id="companyNameLabel" for="newCompanyName">Raison sociale EBP *</label>
-            <input id="newCompanyName" placeholder="Ex. Hôtel Exemple">
+        <div class="rangs">
+          <div class="rang">
+            <label id="companyNameLabel" class="rang__k" for="newCompanyName">Raison sociale EBP *</label>
+            <div class="rang__v"><input id="newCompanyName" placeholder="Ex. Hôtel Exemple"></div>
           </div>
-          <div class="field">
-            <label for="newCompanyContact">Prénom contact *</label>
-            <input id="newCompanyContact" placeholder="Ex. Marie">
+          <div class="rang">
+            <label class="rang__k" for="newCompanyContact">Prénom contact *</label>
+            <div class="rang__v"><input id="newCompanyContact" placeholder="Ex. Marie"></div>
           </div>
-        </div>
-
-        <div class="grid">
-          <div class="field">
-            <label for="newCompanyPhone">WhatsApp *</label>
-            <input id="newCompanyPhone" placeholder="Ex. 06 90 47 97 88">
+          <div class="rang">
+            <label class="rang__k" for="newCompanyPhone">WhatsApp *</label>
+            <div class="rang__v"><input id="newCompanyPhone" placeholder="Ex. 06 90 47 97 88"></div>
           </div>
-          <div class="field">
-            <label for="newCompanyEmail">E-mail *</label>
-            <input id="newCompanyEmail" type="email" placeholder="contact@entreprise.com">
+          <div class="rang">
+            <label class="rang__k" for="newCompanyEmail">E-mail *</label>
+            <div class="rang__v"><input id="newCompanyEmail" type="email" placeholder="contact@entreprise.com"></div>
           </div>
         </div>
 
@@ -405,9 +422,10 @@ try {
              valeur, c'est la valeur qui finit par se perdre. -->
         <details class="volet-plus">
           <summary class="volet-titre">Coordonnées et secteur d’activité</summary>
-          <div class="grid">
-            <div class="field">
-              <label for="newCompanySector">Secteur d’activité</label>
+          <div class="rangs">
+            <div class="rang">
+              <label class="rang__k" for="newCompanySector">Secteur d’activité</label>
+              <div class="rang__v">
               <select id="newCompanySector">
                 <option value="">Choisir un secteur</option>
               <option>Hôtel</option>
@@ -430,24 +448,23 @@ try {
               <option>Administration</option>
               <option>Autre</option>
               </select>
+              </div>
             </div>
-            <div class="field">
-              <label for="newCompanyContactRole">Fonction du contact</label>
-              <input id="newCompanyContactRole" placeholder="Ex. Responsable communication">
+            <div class="rang">
+              <label class="rang__k" for="newCompanyContactRole">Fonction du contact</label>
+              <div class="rang__v"><input id="newCompanyContactRole" placeholder="Ex. Responsable communication"></div>
             </div>
-          </div>
-          <div class="grid-3">
-            <div class="field">
-              <label for="newCompanyAddress">Adresse</label>
-              <input id="newCompanyAddress" placeholder="Adresse">
+            <div class="rang">
+              <label class="rang__k" for="newCompanyAddress">Adresse</label>
+              <div class="rang__v"><input id="newCompanyAddress" placeholder="Adresse"></div>
             </div>
-            <div class="field">
-              <label for="newCompanyCity">Ville</label>
-              <input id="newCompanyCity" placeholder="Ex. Saint-Martin">
+            <div class="rang">
+              <label class="rang__k" for="newCompanyCity">Ville</label>
+              <div class="rang__v"><input id="newCompanyCity" placeholder="Ex. Saint-Martin"></div>
             </div>
-            <div class="field">
-              <label for="newCompanyPostal">Code postal</label>
-              <input id="newCompanyPostal" placeholder="97150">
+            <div class="rang">
+              <label class="rang__k" for="newCompanyPostal">Code postal</label>
+              <div class="rang__v"><input id="newCompanyPostal" placeholder="97150"></div>
             </div>
           </div>
         </details>
@@ -473,7 +490,7 @@ try {
   <details class="card hidden volet-plus volet-carte" id="paymentSection">
     <summary><h2>3. Paiement</h2></summary>
     <div class="vd-corps">
-    <div id="amountDue" class="summary-row summary-total"><span>À encaisser</span><span>0,00 €</span></div>
+    <div class="totaux"><div id="amountDue" class="tot tot--grand"><span>À encaisser</span><b>0,00 €</b></div></div>
 
     <div class="bloc"><label class="payment-option"><input type="radio" name="payment" value="Carte bancaire" checked> Carte bancaire</label>
     <label class="payment-option"><input type="radio" name="payment" value="Espèces"> Espèces</label>
@@ -482,21 +499,25 @@ try {
     <label class="payment-option"><input type="radio" name="payment" value="Paiement au retrait"> Paiement au retrait</label>
 
     </div><div id="cashZone" class="bloc hidden">
-      <div class="field">
-        <label for="cashGiven">Montant donné par le client</label>
-        <input id="cashGiven" type="number" min="0" step="0.01">
+      <div class="rangs">
+        <div class="rang">
+          <label class="rang__k" for="cashGiven">Montant donné par le client</label>
+          <div class="rang__v"><input id="cashGiven" type="number" min="0" step="0.01" class="nb"></div>
+        </div>
       </div>
-      <div class="summary-row"><span>Monnaie à rendre</span><b id="cashChange">0,00 €</b></div>
+      <div class="totaux"><div class="tot"><span>Monnaie à rendre</span><b id="cashChange">0,00 €</b></div></div>
     </div>
 
-    <div id="mixZone" class="grid bloc hidden">
-      <div class="field">
-        <label for="mixCard">Carte bancaire</label>
-        <input id="mixCard" type="number" min="0" step="0.01">
-      </div>
-      <div class="field">
-        <label for="mixCash">Espèces</label>
-        <input id="mixCash" type="number" min="0" step="0.01">
+    <div id="mixZone" class="bloc hidden">
+      <div class="rangs">
+        <div class="rang">
+          <label class="rang__k" for="mixCard">Carte bancaire</label>
+          <div class="rang__v"><input id="mixCard" type="number" min="0" step="0.01" class="nb"></div>
+        </div>
+        <div class="rang">
+          <label class="rang__k" for="mixCash">Espèces</label>
+          <div class="rang__v"><input id="mixCash" type="number" min="0" step="0.01" class="nb"></div>
+        </div>
       </div>
     </div>
 
@@ -1062,26 +1083,41 @@ function deleteProduct(index){
     renderProducts();
   }
 }
+// UN ARTICLE EST UNE LIGNE DE TABLEAU (02/09). Charlie : « normalise en ligne
+// exactement comme dans flash devis ». C'était une carte à quatre lignes de
+// texte — le nom et la quantité collés, une pastille de délai, la description,
+// la date de récupération — où deux prix ne se comparaient pas d'une carte à
+// l'autre. La ligne commerciale monte dans la table (ce qu'on vend, combien, à
+// quel prix, le total) ; ce qui dit comment on le PRODUIT reste dessous, comme
+// sur le devis.
+//
+// LE PRIX UNITAIRE EST CELUI QU'ON A TAPÉ — la somme de l'article et de la
+// personnalisation (`p.price`, voir `productFromForm`). Le total, lui, porte le
+// supplément de délai et la taxe : c'est ce qu'on encaisse.
 function renderProducts(){
   const box=document.getElementById("productList");
+  const tete=document.getElementById("productListHead");
+  if(tete) tete.hidden=products.length===0;
   if(products.length===0){
-    box.innerHTML='<p class="help">Aucun article ajouté.</p>';
+    box.innerHTML='<div class="lignes__vide">Aucun article. Remplis la ligne au-dessus, puis « Ajouter l’article ».</div>';
   } else {
     box.innerHTML=products.map((p,i)=>`
-      <div class="product-card">
-        <div class="product-top">
-          <div>
-            <div class="product-title">${escapeHtml(p.name)} × ${p.qty}</div>
-            <span class="badge ${p.rate ? "orange":"green"}">${p.rate ? "Supplément "+(p.rate*100)+" %":"Délai standard"}</span>
+      <div class="lignes__art">
+        <div class="lignes__rang">
+          <div class="lignes__lu lignes__lu--texte" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
+          <div class="lignes__lu nb">${p.qty}</div>
+          <div class="lignes__lu nb">${euro.format(p.price)}</div>
+          <div class="lignes__lu nb">${euro.format(p.totalTTC)}</div>
+          <div class="lignes__actes">
+            <button type="button" class="lignes__act" aria-label="Modifier cet article" title="Modifier" onclick="editProduct(${i})"><span class="material-symbols-outlined" aria-hidden="true">draw</span></button>
+            <button type="button" class="lignes__act lignes__act--sup" aria-label="Retirer cet article" title="Retirer" onclick="deleteProduct(${i})"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
           </div>
-          <b>${euro.format(p.totalTTC)} TTC</b>
         </div>
-        <div class="product-description">${escapeHtml(p.description)}</div>
-        <div class="help">Récupération : ${new Date(p.deliveryDate+"T12:00:00").toLocaleDateString("fr-FR")} à ${p.deliveryTime||"14:00"}</div>
-        <div class="actions" style="margin-top:10px">
-          <button class="secondary" onclick="editProduct(${i})">✏️ Modifier</button>
-          <button class="danger" onclick="deleteProduct(${i})">🗑️ Supprimer</button>
+        <div class="vd-detail">
+          <span class="badge ${p.rate ? "orange":"green"}">${p.rate ? "Supplément "+pourcent(p.rate)+" %":"Délai standard"}</span>
+          <span class="vd-detail__quand">Récupération : ${new Date(p.deliveryDate+"T12:00:00").toLocaleDateString("fr-FR")} à ${p.deliveryTime||"14:00"}</span>
         </div>
+        <div class="vd-detail__prod">${escapeHtml(p.description)}</div>
       </div>`).join("");
   }
   calculateTotals();
@@ -1101,12 +1137,12 @@ function calculateTotals(){
 
   const summaryLines=document.getElementById("summaryLines");
   if(products.length===0){
-    summaryLines.innerHTML='<p class="help">Les articles ajoutés apparaîtront ici avec leur tarif TTC.</p>';
+    summaryLines.innerHTML='<div class="lignes__vide">Le compte se remplit à mesure que les articles s’ajoutent.</div>';
   }else{
     const articleLines = products.map(p=>{
       const articleTTC = p.totalTTC - (p.surcharge * (p.taxApplied ? 1.04 : 1));
       return `
-        <div class="summary-row">
+        <div class="tot">
           <span>${escapeHtml(p.name)} × ${p.qty}</span>
           <b>${euro.format(articleTTC)}</b>
         </div>
@@ -1124,7 +1160,7 @@ function calculateTotals(){
     }
 
     const expressLine = expressTTC>0 ? `
-      <div class="summary-row">
+      <div class="tot">
         <span>${expressLabel}</span>
         <b>${euro.format(expressTTC)}</b>
       </div>
@@ -1133,7 +1169,7 @@ function calculateTotals(){
     summaryLines.innerHTML = articleLines + expressLine;
   }
 
-  if(!document.getElementById("amountDueVal"))document.getElementById("amountDue").innerHTML='<span>TOTAL À ENCAISSER</span><span id="amountDueVal">0,00 €</span>';
+  if(!document.getElementById("amountDueVal"))document.getElementById("amountDue").innerHTML='<span>À encaisser</span><b id="amountDueVal">0,00 €</b>';
   rollMoney(document.getElementById("amountDueVal"),totals.ttc);
   updateCashChange();
 }

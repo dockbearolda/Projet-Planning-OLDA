@@ -1315,6 +1315,48 @@ html[data-theme="dark"] .ecran-comptoir {
   --scrollbar-hover: #6b7280;
 }
 
+
+/* ===========================================================================
+   LA POLICE D'ICÔNES — servie par nous, lue par les TROIS écrans (02/09/2026)
+   ---------------------------------------------------------------------------
+   Elle vivait dans `styles.css`, la feuille du CRM. Les deux écrans du
+   comptoir ne lisent que cette charte : le glyphe s'y rendait en TEXTE, et
+   « draw » s'affichait en toutes lettres dans un bouton de 50 px — l'échec est
+   MUET, rien dans la console, seulement un mot anglais dans une case.
+   Elle est locale (16 Ko) : un poste s'ouvre sans dépendre d'un tiers
+   joignable. `font-display: block` plutôt que `swap` — un glyphe manquant se
+   rendrait sinon avec le nom de la ligature (« search », « delete ») avant de
+   basculer, et le fichier étant local l'attente se compte en millisecondes.
+   ⚠ ELLE NE SE TÉLÉCHARGE QUE SI UN GLYPHE LA DEMANDE : un écran qui n'en pose
+   aucun ne paie rien pour la déclaration.
+   =========================================================================== */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: var(--graisse-texte) 500;
+  font-display: block;
+  src: url('olda-icones.woff2') format('woff2');
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  width: 1em;
+  overflow: hidden;
+  flex-shrink: 0;
+  font-weight: normal;
+  font-style: normal;
+  line-height: var(--ligne-glyphe);
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  direction: ltr;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
 /* ===========================================================================
    CONNEXION — « Qui est au poste ? »
    Le voile qui s'affiche quand les comptes sont allumés et que personne ne
@@ -1591,6 +1633,276 @@ body.a-connecter { overflow: hidden; }
 /* Le titre ne porte plus sa marge : c'est la poignee qui fait la boite. */
 .volet-carte > summary h2,
 .volet-carte > summary h3 { margin: 0; }
+
+
+/* ===========================================================================
+   LA FEUILLE DE CALCUL — une rangée par champ (02/09/2026)
+   ---------------------------------------------------------------------------
+   Charlie, 01/09 : « les lignes simples à remplir façon Google Sheet », et le
+   02/09 : « je veux que tu normalises en ligne exactement comme dans flash
+   devis ; vente doit être une copie de flash devis avec ses spécificités ».
+
+   L'intitulé passe à GAUCHE et la case à droite : le regard descend une seule
+   colonne de cases au lieu de sauter d'un intitulé à sa boîte, deux fois par
+   rangée. L'intitulé au-dessus (`.fa-lab` dans `.fa-case`) reste celui du
+   TABLEAU des articles, où il coiffe une colonne et se lit une fois pour
+   toutes les lignes.
+
+   ⚠ ELLE ÉTAIT ÉCRITE DANS `devis-flash.css`, ET ELLE EST MONTÉE ICI. L'écran
+   de vente porte la même depuis le 02/09 ; deux écrans du même poste, à un
+   clic l'un de l'autre, ne peuvent pas avoir deux grammaires de ligne. Ce qui
+   reste à chaque écran, c'est la LARGEUR de sa colonne d'intitulés — le jeton
+   `--rangs-k` — parce qu'elle dépend du plus long libellé de l'écran.
+
+   LES TRAITS VIENNENT DE LA GRILLE, PAS DE CHAQUE RANGÉE : une bordure écrite
+   par rangée en pose une de trop sous la dernière.
+   =========================================================================== */
+.rangs {
+  /* La colonne des intitulés. 176 px : « Personne à contacter », le plus long
+     du devis, tient en une ligne au cran des libellés. Un écran dont les
+     libellés sont plus longs réécrit le jeton, jamais la grille. */
+  --rangs-k: 176px;
+  display: grid;
+  grid-template-columns: var(--rangs-k) minmax(0, 1fr);
+  /* ⚠ PAS D'`align-items: center` ICI (02/09). Il faisait tomber chaque cellule
+     sur SA hauteur de contenu au lieu de la hauteur de la rangée : l'intitulé
+     sortait en 33,3 px, la case en 59, et leurs deux traits de séparation se
+     retrouvaient à 12,9 px l'un de l'autre — mesuré au rendu. Les mots, eux,
+     étaient bien alignés : c'est la ligne sous eux qui ne l'était pas.
+     Les cellules s'étirent donc (le défaut d'une grille), et c'est l'intitulé
+     qui centre son texte DANS sa cellule. */
+  column-gap: var(--pas-3);
+}
+.rang { display: contents; }
+/* L'INTITULÉ EST SUR LE RAIL DE SA CASE : même rangée, même hauteur, même
+   trait au pied. Il se replie plutôt que de pousser sa colonne — un intitulé
+   long ne doit pas rétrécir toutes les cases de la feuille. */
+.rang__k {
+  display: flex;
+  align-items: center;
+  line-height: var(--ligne-texte);
+  /* `margin: 0` : sur les deux écrans du comptoir, `label` porte une marge
+     basse (l'écart intitulé/champ de la mise en place verticale). Ici
+     l'intitulé est À CÔTÉ de sa case, pas au-dessus : cette marge le décalait
+     vers le haut dans sa cellule. */
+  margin: 0;
+  /* L'ENCRE ET LE CRAN DE L'INTITULÉ, écrits ICI et plus dans `.fa-lab` seul :
+     l'écran de vente ne charge pas `fiche-atelier.css`, et sans cette règle
+     ses intitulés seraient sortis au cran du texte. C'est celui du comptoir —
+     14 px, graisse 600, encre pleine : l'intitulé est ce qu'on balaie pour
+     trouver la bonne case, c'est la VALEUR qui se lit en 400. */
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--text-1);
+}
+/* La case remplit sa piste : une grille étire ses enfants, il n'y a donc
+   qu'à ne pas l'en empêcher. Le padding vertical fait l'écart d'une rangée à
+   la suivante — écrit sur la grille, il en aurait mis un sous la dernière. */
+.rang__v { display: grid; min-width: 0; padding: calc(var(--lab-gap) / 2) 0; }
+/* LE TRAIT D'UNE RANGÉE À LA SUIVANTE — c'est lui qui fait la feuille de
+   calcul. Il est sur les DEUX cellules (`display: contents` ne dessine rien
+   sur la rangée elle-même), et la dernière rangée n'en a pas : la carte ferme
+   déjà le bloc. */
+.rang__k, .rang__v { border-bottom: 1px solid var(--border-soft); }
+.rang:last-child > .rang__k, .rang:last-child > .rang__v { border-bottom: 0; }
+/* Une rangée masquée ne laisse pas ses deux cellules derrière elle :
+   `display: contents` ne se masque pas tout seul (même piège que `.dvf-r3`). */
+.rang[hidden] > .rang__k, .rang[hidden] > .rang__v { display: none; }
+
+/* ===========================================================================
+   LE TABLEAU DES LIGNES COMMERCIALES (02/09/2026)
+   ---------------------------------------------------------------------------
+   Un article tenait dans un bloc de rangées à intitulés : autant d'étiquettes
+   que de champs, et les mêmes étiquettes réécrites à l'article suivant. En
+   tableau, l'intitulé se lit UNE fois en tête de colonne.
+
+   CE QUE LA TABLE PORTE, C'EST LA LIGNE COMMERCIALE — ce qu'on vend, combien,
+   à quel prix. Le reste dit comment on le PRODUIT et vit sous la ligne : ça ne
+   se compare pas d'un article à l'autre, et ça n'entre pas dans la largeur.
+
+   LES PISTES SONT ÉCRITES UNE FOIS, sur le tableau, et l'en-tête comme les
+   rangées les lisent. Deux écritures, ce serait un intitulé qui coiffe la
+   mauvaise case au premier changement. Chaque écran règle `--lignes-cols` chez
+   lui : le devis compte en HT, la vente en TTC, et leurs colonnes diffèrent.
+   =========================================================================== */
+.lignes {
+  --lignes-cols: minmax(0, 1fr) 56px 76px 96px var(--ctrl-h);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-2);
+}
+.lignes__tete,
+.lignes__rang {
+  display: grid;
+  grid-template-columns: var(--lignes-cols);
+  gap: var(--pas-1);
+  align-items: center;
+}
+/* L'EN-TÊTE TOMBE SUR LE RAIL DES LIGNES, PAS À CÔTÉ. Mesuré au rendu le
+   02/09 : il portait son propre rembourrage (6 px) quand la rangée hérite de
+   celui du bloc d'article (10 px) plus son trait — ses intitulés tombaient
+   5 px à côté de leurs colonnes. Il reprend donc EXACTEMENT la boîte du bloc :
+   même rembourrage, et un trait transparent pour le pixel du bord. Sans lui,
+   l'écart revient à 1 px, ce qui est pire — on ne le voit plus, et il est
+   toujours là.
+   Il reste une ligne de LECTURE : il ne prend pas la boîte de l'application,
+   il prend la place de son texte. */
+.lignes__tete {
+  padding: 0 var(--pas-2);
+  border: 1px solid transparent;
+}
+/* L'intitulé d'une colonne prend le cran et la graisse de celui d'une case :
+   c'est le même objet, il coiffe seulement plusieurs lignes au lieu d'une. */
+.lignes__tete > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--text-1);
+}
+.lignes__tete[hidden] { display: none; }
+/* LE NOMBRE QUI NE SE TAPE PAS. Il prend la boîte des cases pour tomber sur
+   elles, mais ni fond ni bordure : ce qui a une boîte se remplit, et un total
+   ne se remplit pas. */
+.lignes__lu {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: var(--ctrl-h);
+  min-width: 0;
+  /* À DROITE COMME LES CASES, ET RIEN À GAUCHE. C'est le bord DROIT qui aligne
+     la colonne — un montant se lit par la virgule. Le rembourrage gauche d'une
+     case sert à écarter le texte de sa bordure ; ici il n'y a pas de bordure,
+     et ces quatorze pixels manquaient au nombre. */
+  padding: 0 var(--champ-x) 0 0;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  color: var(--text-1);
+}
+/* UNE CASE DE LECTURE QUI PORTE DU TEXTE, pas un nombre : elle se lit par la
+   GAUCHE, garde la graisse d'un texte, et s'ellipse plutôt que de pousser ses
+   voisines. C'est la désignation d'un article qu'on ne corrige pas dans sa
+   ligne — la vente la modifie dans son formulaire, le devis la tape dans sa
+   case. */
+.lignes__lu--texte {
+  justify-content: flex-start;
+  padding: 0 var(--champ-x);
+  font-weight: var(--graisse-texte);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  line-height: var(--ctrl-h);
+}
+/* L'ACTION D'UNE LIGNE — retirer, modifier. Une boîte CARRÉE à la mesure de
+   l'application : posée dans une rangée dont toutes les cases font `--ctrl-h`,
+   elle ne peut pas en faire 44 ni 36. Le rouge n'arrive qu'au survol de ce qui
+   détruit : la couleur dit un état, pas une catégorie de bouton.
+   ⚠ Les Réglages gardent le leur (`.reg-tarif-del`) : ce n'est pas le même
+   composant, c'est le même bouton dans une liste qui n'est pas un tableau. */
+.lignes__act {
+  flex: 0 0 var(--ctrl-h);
+  width: var(--ctrl-h);
+  min-height: var(--ctrl-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--arrondi-champ);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.lignes__act .material-symbols-outlined { font-size: var(--ic); }
+.lignes__act:hover { border-color: var(--border-strong); color: var(--text-1); }
+.lignes__act--sup:hover { border-color: var(--danger-line); color: var(--danger); }
+/* Deux actions dans la dernière piste : elles gardent l'écart des cases de la
+   rangée, et la piste est écrite pour les deux (voir `--lignes-cols`). */
+.lignes__actes { display: flex; gap: var(--pas-1); }
+
+/* UNE CASE CALCULÉE SE DIT. Sans ce fond, on tape dedans et rien ne bouge,
+   sans savoir pourquoi. C'est le gris des zones de l'application, celui qui
+   dit « ici on lit ». */
+.lignes__calc { background: var(--zone-bg); color: var(--text-2); cursor: default; }
+/* CE QU'ON N'A PAS ENCORE CHIFFRÉ. Le total d'une ligne sans prix ne dit pas
+   « 0,00 € » — il dit ce qui manque, dans le gris atténué de l'application et
+   à la taille des notes : c'est une CONSIGNE, pas un montant, et elle ne doit
+   pas se lire comme les autres nombres de la colonne. */
+.lignes__attente {
+  justify-content: flex-end;
+  /* DEUX MOTS NE FONT PAS DEUX LIGNES. Un montant ne s'enroule pas (l'espace
+     des milliers est insécable) ; « À chiffrer » en porte une vraie, et la
+     case doublait de hauteur — dans une rangée dont toutes les autres font
+     `--ctrl-h`. */
+  white-space: nowrap;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-texte);
+  color: var(--text-2);
+}
+/* Un article : sa ligne, et son détail dessous. Le bloc reprend la zone douce
+   de l'application (`--zone-bg`) : ce n'est pas une carte dans une carte,
+   c'est un groupe DANS la carte des articles. */
+.lignes__art {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-2);
+  padding: var(--pas-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--arrondi-bloc);
+  background: var(--zone-bg);
+}
+.lignes__corps { display: flex; flex-direction: column; gap: var(--pas-2); }
+/* Quand il n'y a encore aucune ligne. Le pointillé dit qu'il y a une place à
+   remplir — un texte gris seul se lit comme une phrase qu'on a oubliée là. */
+.lignes__vide {
+  padding: var(--pas-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--arrondi-bloc);
+  text-align: center;
+  font-size: var(--taille-texte);
+  color: var(--text-2);
+}
+
+/* UN NOMBRE SE LIT PAR LA DROITE, et ses chiffres font tous la même largeur :
+   sans ça, deux prix l'un sous l'autre ne s'alignent pas sur la virgule. */
+.nb { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ===========================================================================
+   LE COMPTE — ce que le client va payer (02/09/2026)
+   ---------------------------------------------------------------------------
+   Les mêmes nombres que le papier, dans la même colonne que ce qui les
+   produit : c'est là qu'on les regarde en parlant au client. Le devis y met
+   son HT, sa taxe et son acompte ; la vente son total TTC et son supplément.
+   Deux comptes qui se ressemblent finissent par se contredire — c'est la MISE
+   EN PLACE qui est partagée, pas le calcul, qui reste à chaque écran.
+   =========================================================================== */
+.totaux { display: flex; flex-direction: column; }
+.tot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pas-3);
+  padding: var(--pas-2) 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--taille-texte);
+  color: var(--text-2);
+}
+.tot b { color: var(--text-1); font-weight: var(--graisse-forte); font-variant-numeric: tabular-nums; }
+/* LE DERNIER NOMBRE EST CELUI QU'ON CHERCHE DES YEUX. Le trait plein au-dessus
+   le sépare de ce qui l'a construit, et c'est la seule ligne du compte à
+   prendre le cran des grands nombres. */
+.tot--grand {
+  border-bottom: 0;
+  border-top: 2px solid var(--text-1);
+  padding-top: var(--pas-3);
+  color: var(--text-1);
+  font-weight: var(--graisse-forte);
+}
+.tot--grand b { font-size: var(--taille-grand); letter-spacing: -.02em; }
 
 
 /* ===========================================================================

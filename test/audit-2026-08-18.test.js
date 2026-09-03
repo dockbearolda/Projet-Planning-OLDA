@@ -367,8 +367,13 @@ assert.strictEqual(palier('2026-08-18', '2026-09-08'), 'j15');  // 15 jours ouvr
 assert.ok(!/for="articlePrice">Prix article \*/.test(VENTE)
   && !/for="customPrice">Prix personnalisation \*/.test(VENTE),
 'les deux parts du prix ne sont pas obligatoires chacune : l\'astérisque mentait');
-assert.ok(/Prix obligatoire \* — l’un des deux, ou les deux/.test(VENTE),
+// Elle est REFORMULÉE depuis le 02/09, quand la saisie est passée en feuille de
+// calcul : l'astérisque a quitté la phrase (il ne coiffait plus deux champs
+// voisins) et « TTC » est monté dans les deux intitulés, où il manquait.
+assert.ok(/Prix obligatoire — l'article, la personnalisation, ou les deux/.test(VENTE),
   'la règle du prix doit être écrite à l\'écran, là où elle s\'applique');
+assert.ok(/Prix article TTC/.test(VENTE) && /Prix personnalisation TTC/.test(VENTE),
+  '… et chaque part dit qu\'elle est TTC : un prix dont on ignore le régime se retape');
 
 // Le code mort ne revient pas : `addBusinessDays` n'avait plus d'appelant et
 // portait la même lecture de date à sec.

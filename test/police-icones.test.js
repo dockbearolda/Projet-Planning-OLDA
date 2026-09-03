@@ -74,6 +74,12 @@ assert.strictEqual(POLICE.size, 91, 'la police porte 91 ligatures — pas une de
 const FABRIQUES = [
   'public/app.js',
   'public/clients.js',
+  // L'ecran de VENTE depuis le 02/09 : les deux actions d'une ligne du tableau
+  // (`draw` pour modifier, `delete` pour retirer) ont remplace deux emojis. La
+  // ligne commerciale y prend la grammaire du devis flash, et le devis pose
+  // deja une corbeille de police — deux ecrans a un clic l'un de l'autre ne
+  // peuvent pas avoir l'un un glyphe et l'autre un emoji.
+  'public/comptoir/vente-directe.html',
   'public/dashboard.js',
   // L'ecran du DEVIS depuis le 01/09 : sa fabrique est `ic()`, la forme (b) de
   // l'extracteur ci-dessous.

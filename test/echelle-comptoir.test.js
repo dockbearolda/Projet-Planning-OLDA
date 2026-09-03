@@ -396,9 +396,13 @@ for (const m of FEUILLES_V.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
     taillesVente.add(v);
   }
 }
+// ⚠ IL N'EN RESTE PLUS QUE DEUX DANS SA FEUILLE DEPUIS LE 02/09. Le cran des
+// grands nombres n'y est plus écrit : le total qu'on annonce est porté par
+// `.tot--grand` (charte.css), le compte du devis flash, que cet écran partage.
+// C'est un cran de moins à tenir ici, pas un cran de moins à l'écran.
 assert.deepStrictEqual([...taillesVente].sort(),
-  ['var(--taille-grand)', 'var(--taille-note)', 'var(--taille-texte)'],
-  'l’écran de vente n’a droit qu’à l’intitulé, à la taille du texte et à celle des chiffres qu’on annonce');
+  ['var(--taille-note)', 'var(--taille-texte)'],
+  'l’écran de vente n’a droit qu’à l’intitulé et à la taille du texte : le grand nombre vient de la charte');
 // Le ticket ne pioche PAS dans l'échelle de l'écran, et l'écran ne pioche pas
 // dans la sienne : deux échelles qui se mélangent, c'est vingt-cinq tailles qui
 // reviennent par la bande.
@@ -608,17 +612,29 @@ console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, e
   // 2. LE MESSAGE NE REMONTE PLUS LE CHAMP. Les grilles collaient leurs
   //    cellules en bas : une ligne de texte ajoutée SOUS un champ le faisait
   //    remonter de 27 px au-dessus de ses voisins de rangée.
-  assert.ok(/@supports \(grid-template-rows:subgrid\)\{/.test(css),
-    `${nom} : les rangées partagent leurs lignes, pour que rien ne déplace une commande`);
-  assert.ok(/>\.field\{display:grid;grid-template-rows:subgrid;grid-row:span 3/.test(css),
-    `${nom} : … chaque cellule reprend les trois lignes de sa rangée`);
-  assert.ok(/>\.field>\.error,[^{]*>\.field>\.help\{grid-row:3\}/.test(css.replace(/\n\s*/g, '')),
-    `${nom} : … et les messages vivent sur la troisième, jamais dans la boîte du champ`);
-  // Un champ qui porte tout un empilement (une date, ses raccourcis, son barème
-  // ET une heure avec son propre intitulé) déborde des trois lignes : sa rangée
-  // renonce au partage plutôt que de se démonter.
-  assert.ok(/:has\(>\.field label~label\)\{grid-template-rows:none\}/.test(css),
-    `${nom} : une rangée qui porte un champ à deux intitulés se range normalement`);
+  //
+  // ⚠ CE CONTRÔLE NE VAUT PLUS QUE POUR LA DEMANDE DE DEVIS (02/09). L'écran de
+  // VENTE n'a plus une seule rangée de champs côte à côte : sa saisie est une
+  // FEUILLE DE CALCUL (`.rangs` / `.rang`, la grammaire du devis flash), où
+  // chaque champ a sa propre ligne et son intitulé à gauche. Le défaut que le
+  // partage de lignes corrigeait — un message qui remonte son champ au-dessus
+  // de ses voisins — ne peut plus s'y produire : il n'y a plus de voisins de
+  // rangée. C'est le contrôle « 13 bis » qui tient la nouvelle mise en place.
+  if (nom === 'devis') {
+    assert.ok(/@supports \(grid-template-rows:subgrid\)\{/.test(css),
+      `${nom} : les rangées partagent leurs lignes, pour que rien ne déplace une commande`);
+    assert.ok(/>\.field\{display:grid;grid-template-rows:subgrid;grid-row:span 3/.test(css),
+      `${nom} : … chaque cellule reprend les trois lignes de sa rangée`);
+    assert.ok(/>\.field>\.error,[^{]*>\.field>\.help\{grid-row:3\}/.test(css.replace(/\n\s*/g, '')),
+      `${nom} : … et les messages vivent sur la troisième, jamais dans la boîte du champ`);
+    // Un champ qui porte tout un empilement déborde des trois lignes : sa
+    // rangée renonce au partage plutôt que de se démonter.
+    assert.ok(/:has\(>\.field label~label\)\{grid-template-rows:none\}/.test(css),
+      `${nom} : une rangée qui porte un champ à deux intitulés se range normalement`);
+  } else {
+    assert.ok(!/class="field"/.test(src) && !/@supports \(grid-template-rows:subgrid\)\{/.test(css),
+      `${nom} : la grille de champs est partie avec la feuille de calcul — pas de mise en place en double`);
+  }
 });
 
 // ===========================================================================
@@ -694,8 +710,47 @@ console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, e
     'vente : deux groupes qui se suivent sont séparés par UN filet, écrit sur le second');
   assert.ok(/\.bloc>:first-child\{margin-top:0\}/.test(css) && /\.bloc>:last-child\{margin-bottom:0\}/.test(css),
     'vente : les bords du groupe n\'ajoutent pas une deuxième marge');
-  assert.ok((VENTE.match(/class="bloc"/g) || []).length >= 4,
-    'vente : les groupes de champs sont bien tous emballés');
+}
+
+// ---------------------------------------------------------------------------
+// 13 bis. LA VENTE ÉCRIT SES CHAMPS EN LIGNES, COMME LE DEVIS FLASH (02/09)
+// ---------------------------------------------------------------------------
+// Charlie : « je veux que tu normalises en ligne exactement comme dans flash
+// devis, les lignes, la façon dont on écrit les prix ; vente doit être une
+// copie de flash devis avec ses spécificités. »
+//
+// Ce qui se vérifie ici, ce n'est pas une apparence : c'est qu'il n'existe plus
+// DEUX mises en place de champ sur cet écran. L'intitulé au-dessus (`.field`)
+// et l'intitulé à gauche (`.rang`) se ressemblaient assez pour cohabiter des
+// mois — et c'est comme ça qu'un écran repart en deux grammaires.
+{
+  const page = require('./ecran-comptoir').page('vente-directe');
+  // Le balisage seul : la feuille garde des règles `.field` pour l'écran d'à
+  // côté (les deux partagent leur recette de rangée), c'est le HTML qui dit
+  // quelle mise en place est en service.
+  assert.ok(!/class="field"/.test(page),
+    'vente : plus un seul champ à intitulé au-dessus — la feuille de calcul les porte tous');
+  const rangs = (page.match(/class="rang"/g) || []).length;
+  assert.ok(rangs >= 15, `vente : les champs sont des rangées (${rangs} trouvées, 15 attendues au moins)`);
+  // Une rangée sans son intitulé ou sans sa case n'est pas une rangée : elle
+  // tombe dans la grille et décale toutes les suivantes d'une colonne. On les
+  // COMPTE — trois nombres égaux — plutôt que de découper le balisage : une
+  // rangée peut en contenir une liste d'options ou un `<datalist>`, et un
+  // découpage naïf s'y arrête au mauvais `</div>`.
+  const k = (page.match(/class="rang__k"/g) || []).length;
+  const v = (page.match(/class="rang__v[ "]/g) || []).length;
+  assert.strictEqual(k, rangs, 'vente : chaque rangée porte son intitulé — sinon la grille se décale d’une colonne');
+  assert.strictEqual(v, rangs, 'vente : chaque rangée porte sa case — même raison');
+  // ET LES NOMBRES S'ÉCRIVENT COMME SUR LE DEVIS : à droite, chiffres de
+  // largeur fixe. Sans ça, deux prix l'un sous l'autre ne s'alignent pas sur la
+  // virgule — et c'est la colonne qu'on parcourt en annonçant le total.
+  for (const id of ['quantity', 'articlePrice', 'customPrice', 'cashGiven', 'mixCard', 'mixCash']) {
+    const m = page.match(new RegExp(`<input id="${id}"[^>]*>`));
+    assert.ok(m && /class="[^"]*\bnb\b/.test(m[0]), `vente : le champ « ${id} » est un nombre, il se lit par la droite`);
+  }
+  assert.ok(/\.nb \{ text-align: right; font-variant-numeric: tabular-nums; \}/
+    .test(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public/charte.css'), 'utf8')),
+    '… et cette écriture est déclarée UNE fois, dans la charte');
 }
 // Sur l'écran de devis, chaque étape du parcours porte ses bulles.
 // (« step4 » a disparu le 27/08 avec l'étape « Contrôle ».)
@@ -708,7 +763,7 @@ console.log('✓ charte du comptoir : les DEUX écrans, thème sombre compris, e
 // une `.card` blanche, qui ne se voyaient qu'à leur trait.
 ['individualForm', 'professionalForm', 'cashZone', 'mixZone'].forEach((id) => {
   const m = VENTE.match(new RegExp(`<div id="${id}"[^>]*>`));
-  assert.ok(m && /class="[^"]*\bbloc\b/.test(m[0]), `${id} porte la bulle`);
+  assert.ok(m && /class="[^"]*\bbloc\b/.test(m[0]), `${id} porte le groupe`);
   assert.ok(m && !/class="[^"]*\bcard\b/.test(m[0]), `${id} n'est plus une carte blanche dans une carte blanche`);
 });
 // Une bulle posée dans un encadré repasse en blanc, et l'inverse : deux fonds

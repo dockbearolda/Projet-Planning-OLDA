@@ -272,9 +272,14 @@ function carte(icone, titre, cle) {
 // Il garde `.fa-lab` et `.fa-in` — l'intitulé et la boîte de l'application. Ce
 // qui change, c'est la mise en place, pas les composants.
 function rang(nom, noeud) {
-  const c = el('div', 'dvf-rang');
-  const lab = el('label', 'fa-lab dvf-rang__k', nom);
-  const boite = el('div', 'dvf-rang__v');
+  const c = el('div', 'rang');
+  // L'INTITULÉ NE PORTE PLUS `fa-lab` (02/09) : `.rang__k` déclare lui-même le
+  // cran, la graisse et l'encre du comptoir, dans `charte.css`. L'écran de
+  // vente, qui porte la même rangée, ne charge pas `fiche-atelier.css` — une
+  // police écrite dans deux fichiers pour un seul composant, c'est deux polices
+  // le jour où l'un des deux bouge.
+  const lab = el('label', 'rang__k', nom);
+  const boite = el('div', 'rang__v');
   boite.append(noeud);
   if (noeud.id) lab.setAttribute('for', noeud.id);
   c.append(lab, boite);
@@ -284,7 +289,7 @@ function rang(nom, noeud) {
 // UNE COLONNE DE RANGÉES. Les traits de séparation viennent de la grille, pas
 // de chaque rangée : une bordure écrite par rangée en pose une de trop en bas.
 function feuille(...rangs) {
-  const g = el('div', 'dvf-grille');
+  const g = el('div', 'rangs');
   g.append(...rangs);
   return g;
 }
@@ -883,12 +888,12 @@ function carteArticles() {
   // qui dit DE QUOI on parle : sans elle sous les yeux, un prix corrigé à
   // droite se corrige sur la ligne d'à côté. Elle se fige donc à gauche —
   // exactement ce que fait une feuille de calcul avec sa première colonne.
-  const tab = el('div', 'dvf-tab');
-  const tete = el('div', 'dvf-tab__tete');
+  const tab = el('div', 'lignes');
+  const tete = el('div', 'lignes__tete');
   tete.id = 'dvf-tab-tete';
   for (const nom of COLONNES) tete.append(el('span', 'fa-lab', nom));
   tab.append(tete);
-  const liste = el('div', 'dvf-liste');
+  const liste = el('div', 'lignes__corps');
   liste.id = 'dvf-liste';
   tab.append(liste);
   corps.append(tab);
@@ -1423,7 +1428,7 @@ function ajouterLigne(modele) {
   });
   const hote = $('#dvf-liste');
   if (hote) {
-    const vide = hote.querySelector('.dvf-vide');
+    const vide = hote.querySelector('.lignes__vide');
     if (vide) vide.remove();
     hote.append(rangeeArticle(saisie.lignes[saisie.lignes.length - 1]));
   }
@@ -1452,7 +1457,7 @@ function poserLignes() {
   hote.replaceChildren();
   majTeteTableau();
   if (!saisie.lignes.length) {
-    hote.append(el('div', 'dvf-vide', 'Aucun article. Pioche dans le catalogue, ou ajoute une ligne libre.'));
+    hote.append(el('div', 'lignes__vide', 'Aucun article. Pioche dans le catalogue, ou ajoute une ligne libre.'));
     return;
   }
   for (const l of saisie.lignes) hote.append(rangeeArticle(l));
@@ -1464,7 +1469,7 @@ function poserLignes() {
 // suivante partirait dans le vide.
 function rangeeArticle(ligne) {
   const n = Math.random().toString(36).slice(2, 8);
-  const bloc = el('div', 'dvf-art');
+  const bloc = el('div', 'lignes__art');
   // LA LIGNE PEUT DEVENIR UN TEXTILE APRÈS SA CONSTRUCTION — c'est le cas
   // normal : on ajoute une ligne, PUIS on cherche son produit. Ce drapeau ne
   // dit donc que l'état de DÉPART, celui d'un brouillon relu ; partout ailleurs
@@ -1474,7 +1479,7 @@ function rangeeArticle(ligne) {
 
   // LA RANGÉE DU TABLEAU. Ses cases suivent `COLONNES` dans l'ordre, sans
   // intitulé : l'en-tête les nomme une fois pour toutes les lignes.
-  const rangee = el('div', 'dvf-tab__rang');
+  const rangee = el('div', 'lignes__rang');
   bloc.append(rangee);
 
   const design = entree(`dvf-a-${n}-d`, {
@@ -1520,18 +1525,18 @@ function rangeeArticle(ligne) {
   // zéro mètre de DTF, et la ligne sortirait au prix du vêtement nu.
   const marq = entree(`dvf-a-${n}-m`, { valeur: ligne.marquage, exemple: 'Cœur + dos' });
   marq.id = `dvf-a-${n}-m`;
-  const qte = entree(`dvf-a-${n}-q`, { type: 'number', valeur: ligne.quantite, classe: 'dvf-nb' });
+  const qte = entree(`dvf-a-${n}-q`, { type: 'number', valeur: ligne.quantite, classe: 'nb' });
   // LE PRIX SE TAPE, OU IL SE CHIFFRE — et tant qu'il n'existe ni l'un ni
   // l'autre, la case reste VIDE et le dit. Un « 0 » affiché est un prix : il
   // laisse partir un devis à zéro euro sans que personne ne le remarque.
   const pu = entree(`dvf-a-${n}-p`, {
-    type: 'number', valeur: ligne.unitaireHt == null ? '' : ligne.unitaireHt, classe: 'dvf-nb',
+    type: 'number', valeur: ligne.unitaireHt == null ? '' : ligne.unitaireHt, classe: 'nb',
   });
   pu.step = '0.01';
   pu.placeholder = SANS_PRIX;
   // LE TOTAL DE LA LIGNE EST UNE CASE, PAS UN CHAMP : il ne se tape pas, il se
   // lit. Il prend le rail des cases pour tomber sur elles.
-  const total = el('div', 'dvf-tab__lu dvf-nb');
+  const total = el('div', 'lignes__lu nb');
   const sup = el('button', 'reg-tarif-del');
   sup.type = 'button';
   sup.setAttribute('aria-label', 'Retirer cet article');
@@ -1569,7 +1574,7 @@ function rangeeArticle(ligne) {
   // tailles de logo, qui les déclare par FAMILLE : c'est la même source que la
   // fiche de l'atelier et que le ticket.
   const faces = entree(`dvf-a-${n}-f`, { valeur: ligne.faces, exemple: 'Coeur, Dos…' });
-  const remise = entree(`dvf-a-${n}-rm`, { type: 'number', valeur: ligne.remise || '', classe: 'dvf-nb' });
+  const remise = entree(`dvf-a-${n}-rm`, { type: 'number', valeur: ligne.remise || '', classe: 'nb' });
   remise.max = '100';
   remise.placeholder = '0';
 
@@ -1613,7 +1618,7 @@ function rangeeArticle(ligne) {
   libre.hidden = !ligne.libre;
   const lRef = entree(`dvf-a-${n}-lr`, { valeur: ligne.libre ? ligne.libre.ref : '', exemple: 'SWEAT-XL' });
   const lAchat = entree(`dvf-a-${n}-la`, {
-    type: 'number', valeur: ligne.libre ? ligne.libre.achat : '', classe: 'dvf-nb',
+    type: 'number', valeur: ligne.libre ? ligne.libre.achat : '', classe: 'nb',
   });
   lAchat.step = '0.01';
   lAchat.placeholder = '12.50';
@@ -1645,7 +1650,7 @@ function rangeeArticle(ligne) {
   for (const t of TAILLES) {
     const boite = el('div', 'fa-taille');
     const c = entree(`dvf-a-${n}-t-${t}`, {
-      type: 'number', valeur: Number(ligne.parTaille && ligne.parTaille[t]) || '', classe: 'dvf-nb',
+      type: 'number', valeur: Number(ligne.parTaille && ligne.parTaille[t]) || '', classe: 'nb',
     });
     c.placeholder = '0';
     boite.append(el('label', 'fa-lab fa-taille__k', t), c);
@@ -1682,7 +1687,7 @@ function rangeeArticle(ligne) {
   const rafraichirQte = () => {
     const somme = totalTailles(ligne.parTaille);
     qte.readOnly = somme > 0;
-    qte.classList.toggle('dvf-tab__calc', somme > 0);
+    qte.classList.toggle('lignes__calc', somme > 0);
     if (somme > 0) {
       ligne.quantite = somme;
       if (document.activeElement !== qte) qte.value = String(somme);
@@ -1714,7 +1719,7 @@ function rangeeArticle(ligne) {
     total.textContent = sansPrix
       ? SANS_PRIX
       : euro((Number(ligne.quantite) || 0) * (Number(ligne.unitaireHt) || 0));
-    total.classList.toggle('dvf-tab__vide', sansPrix);
+    total.classList.toggle('lignes__attente', sansPrix);
     reprendre.hidden = !((ligne.textile || ligne.tasse) && ligne.puManuel);
   };
   // LE PRIX QUE LE MOTEUR VIENT DE POSER REDESCEND DANS LE CHAMP. C'est la
@@ -1958,8 +1963,8 @@ function carteArgent() {
     rang('Régime TGCA', regime), rang('Acompte', acompte), rang('Arrondi commercial', arrondi),
   ));
 
-  const totaux = el('div', 'dvf-totaux');
-  totaux.id = 'dvf-totaux';
+  const totaux = el('div', 'totaux');
+  totaux.id = 'totaux';
   corps.append(totaux);
 
   regime.addEventListener('change', () => { saisie.regime = regime.value; redessiner(); });
@@ -1983,7 +1988,7 @@ function redessiner() {
 function peindre() {
   const compte = calculerDevis(saisie);
 
-  const totaux = $('#dvf-totaux');
+  const totaux = $('#totaux');
   // LES DEUX MOITIÉS DE L'ÉCRAN DISENT LA MÊME CHOSE. Rien de chiffré, pas de
   // totaux — ni ici, ni sur la feuille (voir `calculerDevis`). Le volet garde
   // ses trois réglages : c'est l'addition qui disparaît, pas la fiscalité.
@@ -1997,15 +2002,15 @@ function peindre() {
       : compte.regime.label, compte.taxe]);
     totaux.replaceChildren();
     for (const [k, v] of lignes) {
-      const l = el('div', 'dvf-tot');
+      const l = el('div', 'tot');
       l.append(el('span', null, k), el('b', null, euro(v)));
       totaux.append(l);
     }
-    const grand = el('div', 'dvf-tot dvf-tot--grand');
+    const grand = el('div', 'tot tot--grand');
     grand.append(el('span', null, 'TOTAL À PAYER'), el('b', null, euro(compte.ttc)));
     totaux.append(grand);
     if (compte.acompte.pourcent) {
-      const a = el('div', 'dvf-tot');
+      const a = el('div', 'tot');
       a.append(el('span', null, `Acompte ${compte.acompte.pourcent} % à verser`),
         el('b', null, euro(compte.acompte.montant)));
       totaux.append(a);

@@ -574,14 +574,26 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
     'une catégorie qu’on n’a jamais ouverte est fermée : « par défaut ces bulles doivent être fermé »');
 }
 {
-  // LA FEUILLE : intitulé à gauche (`.fa-lab`), case à droite (`.fa-in`), et
-  // l'écran garde aussi le champ à intitulé au-dessus pour le détail d'un
-  // article — deux mises en place, UNE grammaire.
-  assert.ok(/el\('label', 'fa-lab dvf-rang__k', nom\)/.test(ECRAN), 'l’intitulé d’une rangée est celui de l’application');
-  assert.ok(/\.dvf-grille \{[^}]*grid-template-columns: var\(--dvf-k\) minmax\(0, 1fr\)/.test(FEUILLE),
+  // LA FEUILLE : intitulé à gauche, case à droite (`.fa-in`), et l'écran garde
+  // aussi le champ à intitulé au-dessus pour le détail d'un article — deux
+  // mises en place, UNE grammaire.
+  // ⚠ ELLE A DÉMÉNAGÉ DANS LA CHARTE LE 02/09 : l'écran de VENTE porte la même
+  // rangée, et deux écrans du même poste ne peuvent pas avoir deux grammaires
+  // de ligne. L'intitulé ne porte plus `fa-lab` non plus — `.rang__k` déclare
+  // sa police, et la vente ne charge pas `fiche-atelier.css`.
+  assert.ok(/el\('label', 'rang__k', nom\)/.test(ECRAN), 'l’intitulé d’une rangée est celui de l’application');
+  assert.ok(/\.rangs \{[^}]*grid-template-columns: var\(--rangs-k\) minmax\(0, 1fr\)/.test(CHARTE_CSS),
     'la feuille a deux colonnes : les intitulés sur un rail, les cases sur l’autre');
-  assert.ok(/\.dvf-rang \{ display: contents; \}/.test(FEUILLE),
+  assert.ok(/\.rang \{ display: contents; \}/.test(CHARTE_CSS),
     'une rangée ne fait pas sa propre grille : elle tombe dans celle de la feuille');
+  // … ET LE DEVIS N'EN REDÉCLARE AUCUNE. Ce qu'il garde, ce sont les règles qui
+  // MASQUENT le détail d'un de ses articles (`.lignes__art .fa-…`) : c'est son
+  // contenu à lui, pas le composant.
+  const feuilleNue = FEUILLE.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  for (const sel of (feuilleNue.match(/(^|\n)\.[A-Za-z0-9_-]+/g) || []).map((x) => x.trim())) {
+    assert.ok(!/^\.(rangs|rang|tot|totaux|nb)$/.test(sel) && sel !== '.lignes',
+      `devis-flash.css redéclare « ${sel} » : c’est charte.css qui le porte`);
+  }
   // L'INTITULÉ ET SA CASE REMPLISSENT LA MÊME RANGÉE — donc leurs deux traits
   // tombent au même endroit. `align-items: center` sur la grille faisait tomber
   // chaque cellule sur SA hauteur de contenu : 33,3 px pour l'intitulé, 59 pour
@@ -589,18 +601,20 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
   // ⚠ SUR LA FEUILLE DÉPOUILLÉE DE SES COMMENTAIRES : la règle EXPLIQUE
   // pourquoi elle ne porte pas `align-items: center`, et chercher la phrase
   // ferait échouer le test sur sa propre note.
-  const grille = FEUILLE.replace(/\/\*[\s\S]*?\*\//g, ' ').match(/\.dvf-grille \{[\s\S]*?\n\}/);
+  const grille = CHARTE_CSS.replace(/\/\*[\s\S]*?\*\//g, ' ').match(/\.rangs \{[\s\S]*?\n\}/);
   assert.ok(grille && !/align-items:\s*center/.test(grille[0]),
     'la feuille étire ses cellules : deux traits de séparation à des hauteurs différentes, ça se voit');
-  assert.ok(/\.dvf-rang__k \{[^}]*display: flex;[^}]*align-items: center/.test(FEUILLE),
+  assert.ok(/\.rang__k \{[^}]*display: flex;[^}]*align-items: center/.test(CHARTE_CSS),
     '… et c’est l’intitulé qui centre son texte DANS sa cellule');
 }
 {
   // LE TABLEAU : les pistes sont écrites UNE fois et lues par l'en-tête et par
   // la rangée — deux écritures, c'est un intitulé sur la mauvaise colonne.
-  const pistes = FEUILLE.match(/--dvf-cols:/g) || [];
+  const pistes = CHARTE_CSS.match(/--lignes-cols:/g) || [];
   assert.strictEqual(pistes.length, 1, 'les colonnes du tableau sont déclarées une seule fois');
-  assert.ok(/\.dvf-tab__tete,\n\.dvf-tab__rang \{[^}]*grid-template-columns: var\(--dvf-cols\)/.test(FEUILLE),
+  assert.ok(!/--lignes-cols/.test(FEUILLE.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+    '… et le devis ne les réécrit pas chez lui : ce sont SES mesures, elles vivent dans la charte');
+  assert.ok(/\.lignes__tete,\n\.lignes__rang \{[^}]*grid-template-columns: var\(--lignes-cols\)/.test(CHARTE_CSS),
     'l’en-tête et la rangée lisent la même déclaration, dans la même règle');
   // CINQ COLONNES : ce qu'on vend, combien, à quel prix, le total, la corbeille.
   // Référence, couleur, marquage, note et tailles sont SOUS la ligne — les huit
@@ -614,7 +628,7 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
     'la rangée remplit les cinq colonnes dans l’ordre de l’en-tête');
   // ⚠ ON COMPTE DES PISTES, PAS DES MOTS : `minmax(0, 1fr)` en fait deux si on
   // découpe sur l'espace. Les parenthèses se replient d'abord.
-  const pistes5 = FEUILLE.match(/--dvf-cols:([^;]*);/);
+  const pistes5 = CHARTE_CSS.match(/--lignes-cols:([^;]*);/);
   assert.ok(pistes5, 'les pistes du tableau sont déclarées');
   assert.strictEqual(pistes5[1].replace(/\([^)]*\)/g, '()').trim().split(/\s+/).length,
     colonnes[1].split(',').length,
@@ -651,8 +665,8 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
     'et c’est la grammaire de la maison : « 2 × S · 3 × M »');
   // LA QUANTITÉ SE COMPTE dès qu'une taille est remplie, et la case le DIT.
   assert.ok(/qte\.readOnly = somme > 0/.test(ECRAN), 'la quantité devient la somme des tailles, et ne se tape plus');
-  assert.ok(/qte\.classList\.toggle\('dvf-tab__calc', somme > 0\)/.test(ECRAN)
-    && /\.dvf-tab__calc \{ background: var\(--zone-bg\)/.test(FEUILLE),
+  assert.ok(/qte\.classList\.toggle\('lignes__calc', somme > 0\)/.test(ECRAN)
+    && /\.lignes__calc \{ background: var\(--zone-bg\)/.test(CHARTE_CSS),
     '… et elle prend le gris des zones qu’on lit : sinon on tape dedans et rien ne bouge');
   // Le prix suit : le coefficient est dégressif, et une taille de plus est une
   // pièce de plus.
