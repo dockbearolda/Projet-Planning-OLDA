@@ -34,14 +34,14 @@ import { JETONS_PAPIER, SOCLE_PAPIER, maisonPapier } from './papier.js';
 // une pile. La règle vit dans `nom-client.js`, une seule fois.
 import { nomClientAffiche } from './nom-client.js';
 
-const texte = (v) => String(v == null ? '' : v).trim();
+export const texte = (v) => String(v == null ? '' : v).trim();
 
 const EURO = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
-const euro = (n) => (Number.isFinite(Number(n)) ? EURO.format(Number(n)) : '');
+export const euro = (n) => (Number.isFinite(Number(n)) ? EURO.format(Number(n)) : '');
 
 // L'ARGENT SE COMPTE EN CENTIMES. Une somme de flottants dérive au troisième
 // article, et c'est sur le document qui engage la maison que ça se voit.
-const cents = (n) => Math.round((Number(n) || 0) * 100) / 100;
+export const cents = (n) => Math.round((Number(n) || 0) * 100) / 100;
 // CE QUE PORTE LA COLONNE D'UN ARTICLE QU'ON N'A PAS ENCORE CHIFFRÉ. Un seul
 // mot, écrit une fois : l'écran le reconnaît pour compter ses lignes en
 // attente, le papier l'imprime tel quel.
@@ -53,7 +53,7 @@ export const SANS_PRIX = 'À chiffrer';
 const JOUR_ATELIER = new Intl.DateTimeFormat('fr-FR', {
   timeZone: 'America/Marigot', day: '2-digit', month: '2-digit', year: 'numeric',
 });
-function dateSeule(iso) {
+export function dateSeule(iso) {
   const m = texte(iso).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
 }
