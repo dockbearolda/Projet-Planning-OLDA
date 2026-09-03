@@ -6538,6 +6538,12 @@ function onStreamChange(e) {
     // fera, et personne ne paie une requête pour un écran qui n'est pas ouvert.
     taillesLogo = null;
     taillesLogoEnVol = null;
+    // L'IDENTITÉ DE L'ATELIER (nom, RIB, mentions légales) EST UN RÉGLAGE
+    // (03/09/2026). Un poste qui a déjà le devis flash ouvert quand quelqu'un
+    // la remplit continuait d'imprimer sans elle tant qu'il ne quittait pas
+    // l'écran et n'y revenait pas — `dfModule` sait se relire, contrairement
+    // aux tailles de logo ci-dessus, l'écran est déjà ouvert.
+    if (dfModule && dfModule.refreshDevisFlash) dfModule.refreshDevisFlash();
   }
   // Une étape vient d'être rangée (ou dérangée) par un autre poste : la décision
   // est partagée, l'ordre affiché ici doit suivre.

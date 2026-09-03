@@ -4613,13 +4613,27 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
       regime: borner(b.regime, 40),
       tauxTgca: Number(b.tauxTgca) || 0,
       arrondi: borner(b.arrondi, 20),
+      // LA BASCULE VEDETTE (03/09/2026) — lequel des deux totaux est le géant
+      // de la feuille. Elle ne touche à aucun montant.
+      vedette: b.vedette === 'ht' ? 'ht' : 'ttc',
+      // L'AJUSTEMENT GLOBAL (03/09/2026) — remise ou majoration négociée sur
+      // l'ensemble, en plus des remises par article. Un montant NÉGATIF est
+      // une remise : `prixComptoir` le refuserait, donc on borne ici.
+      ajustement: {
+        unite: b.ajustementUnite === 'pct' ? 'pct' : 'eur',
+        valeur: Number.isFinite(Number(b.ajustementValeur))
+          ? Math.max(-1000000, Math.min(1000000, Math.round(Number(b.ajustementValeur) * 100) / 100)) : 0,
+        montant: Number.isFinite(Number(b.ajustementMontant))
+          ? Math.max(-1000000, Math.min(1000000, Math.round(Number(b.ajustementMontant) * 100) / 100)) : 0,
+      },
       lignes,
       sousTotalHt: prixComptoir(b.sousTotalHt).valeur ?? null,
       totalHt: prixComptoir(b.totalHt).valeur ?? null,
       taxe: prixComptoir(b.taxe).valeur ?? null,
       ttc: prix.valeur,
       acompte: {
-        pourcent: [0, 30, 50, 100].includes(Number(b.acomptePourcent)) ? Number(b.acomptePourcent) : 0,
+        // UN POURCENTAGE LIBRE (03/09/2026) — plus un menu figé à 0/30/50/100.
+        pourcent: Math.min(100, Math.max(0, Number(b.acomptePourcent) || 0)),
         montant: prixComptoir(b.acompteMontant).valeur ?? null,
       },
     },

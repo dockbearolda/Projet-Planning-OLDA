@@ -32,7 +32,7 @@
 // reste dans `devis-flash.css`, c'est la coupe en deux et la rangée d'article.
 
 import {
-  APPROS, APPRO_DEFAUT, ACOMPTES, ARRONDIS, REGIMES,
+  APPROS, APPRO_DEFAUT, ARRONDIS, REGIMES, AJUSTEMENT_UNITES, VEDETTES,
   calculerDevis, modeleDevis, dessinerDevis, CSS_DEVIS, jourAtelier, jourPlus,
   SANS_PRIX,
 } from './devis.js';
@@ -105,6 +105,13 @@ function saisieNeuve() {
     tauxTgca: 0.04,
     acompte: 50,
     arrondi: 'euro',
+    // L'AJUSTEMENT GLOBAL (03/09/2026) — une remise ou une majoration
+    // négociée sur l'ensemble du devis, en plus des remises par article.
+    // Vide par défaut : rien n'est ajusté tant que personne ne le décide.
+    ajustement: { unite: 'eur', valeur: 0 },
+    // LA BASCULE VEDETTE (03/09/2026) — quel total est le géant de la
+    // feuille. TTC par défaut : c'est ce que le client paie.
+    vedette: 'ttc',
   };
 }
 
@@ -325,6 +332,43 @@ function menu(id, options, valeur) {
   return n;
 }
 
+// LE SÉLECTEUR SEGMENTÉ DE LA CHARTE (`.segmente`, `public/charte.css`) — deux
+// à quatre choix qui tiennent sur une ligne, dont un seul est actif. C'est
+// déjà celui de la fiche client (nature pro/perso) : un composant partagé,
+// pas un qui lui ressemble.
+function segmente(id, options, valeur, onChange) {
+  const n = el('div', 'segmente');
+  n.id = id;
+  n.setAttribute('role', 'radiogroup');
+  for (const o of options) {
+    const on = String(o.id) === String(valeur);
+    const b = el('button', `segmente__btn${on ? ' is-on' : ''}`, o.label);
+    b.type = 'button';
+    b.dataset.valeur = String(o.id);
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(on));
+    n.append(b);
+  }
+  n.addEventListener('click', (e) => {
+    const b = e.target.closest('.segmente__btn');
+    if (!b || !n.contains(b)) return;
+    segmenteRegle(n, b.dataset.valeur);
+    onChange(b.dataset.valeur);
+  });
+  return n;
+}
+// LE SEGMENTÉ REPREND UNE VALEUR POSÉE PAR PROGRAMME (reprise d'un devis,
+// devis vierge) — les boutons ne le voient pas tout seuls, contrairement à un
+// `<select>` dont `remettreChamps()` pose `.value`.
+function segmenteRegle(n, valeur) {
+  if (!n) return;
+  for (const b of n.querySelectorAll('.segmente__btn')) {
+    const on = b.dataset.valeur === String(valeur);
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-checked', String(on));
+  }
+}
+
 // ===========================================================================
 // LE MONTAGE
 // ===========================================================================
@@ -399,6 +443,10 @@ export async function reprendreDevis(id) {
     tauxTgca: Number(dv.tauxTgca) || neuve.tauxTgca,
     arrondi: dv.arrondi || neuve.arrondi,
     acompte: dv.acompte && dv.acompte.pourcent != null ? Number(dv.acompte.pourcent) : neuve.acompte,
+    ajustement: dv.ajustement && typeof dv.ajustement === 'object'
+      ? { unite: dv.ajustement.unite === 'pct' ? 'pct' : 'eur', valeur: Number(dv.ajustement.valeur) || 0 }
+      : neuve.ajustement,
+    vedette: dv.vedette === 'ht' ? 'ht' : neuve.vedette,
     client: {
       ...neuve.client,
       nom: ligne.billing_company || '',
@@ -461,16 +509,20 @@ function remettreChamps() {
     ['#dvf-note-interne', saisie.noteInterne], ['#dvf-appro', saisie.appro],
     ['#dvf-regime', saisie.regime], ['#dvf-arrondi', saisie.arrondi],
     ['#dvf-acompte', String(saisie.acompte)],
+    ['#dvf-ajustement-unite', saisie.ajustement.unite],
+    ['#dvf-ajustement-valeur', saisie.ajustement.valeur ? String(saisie.ajustement.valeur) : ''],
     ['#dvf-maquette', saisie.maquette ? 'oui' : 'non'],
   ]) {
     const n = $(id);
     if (n) n.value = v == null ? '' : v;
   }
   // Les menus déjà habillés ne voient pas une valeur posée par programme.
-  for (const id of ['#dvf-appro', '#dvf-regime', '#dvf-arrondi', '#dvf-acompte', '#dvf-maquette']) {
+  for (const id of ['#dvf-appro', '#dvf-regime', '#dvf-arrondi', '#dvf-ajustement-unite', '#dvf-maquette']) {
     const n = $(id);
     if (n) menuRafraichir(n);
   }
+  // LE SEGMENTÉ N'A PAS DE `.value` : ses boutons se règlent à part.
+  segmenteRegle($('#dvf-vedette'), saisie.vedette);
 }
 
 async function rechargerReglages() {
@@ -1951,11 +2003,34 @@ function rangeeArticle(ligne) {
 function carteArgent() {
   const [c, corps] = carte('receipt_long', 'Fiscalité et règlement', 'argent');
 
+  // LA BASCULE VEDETTE (03/09/2026) : quel total est le géant de la feuille.
+  // Elle ne change aucun montant, juste ce qui est mis en avant.
+  const vedette = segmente('dvf-vedette', VEDETTES, saisie.vedette, (v) => { saisie.vedette = v; redessiner(); });
   const regime = menu('dvf-regime', REGIMES, saisie.regime);
-  const acompte = menu('dvf-acompte', ACOMPTES.map((p) => ({ id: p, label: p ? `${p} %` : 'Aucun' })), saisie.acompte);
+  // L'ACOMPTE EST UN POURCENTAGE LIBRE (03/09/2026) — plus un menu figé à
+  // 0/30/50/100 %. Le patron tape ce qu'il négocie.
+  const acompte = entree('dvf-acompte', { type: 'number', valeur: saisie.acompte, classe: 'dvf-nb' });
+  acompte.max = '100';
+  acompte.placeholder = '0';
   const arrondi = menu('dvf-arrondi', ARRONDIS, saisie.arrondi);
+  // L'AJUSTEMENT GLOBAL (03/09/2026) : une remise (négatif) ou une majoration
+  // (positif) sur l'ensemble, en euros ou en pourcentage du sous-total HT.
+  const ajustementUnite = menu('dvf-ajustement-unite', AJUSTEMENT_UNITES, saisie.ajustement.unite);
+  const ajustementValeur = entree('dvf-ajustement-valeur', {
+    type: 'number', valeur: saisie.ajustement.valeur || '', classe: 'dvf-nb',
+  });
+  ajustementValeur.removeAttribute('min');
+  ajustementValeur.step = '0.01';
+  ajustementValeur.placeholder = '0';
+  const ajustementWrap = el('div', 'dvf-ajustement');
+  ajustementWrap.append(ajustementValeur, ajustementUnite);
+
   corps.append(feuille(
-    rang('Régime TGCA', regime), rang('Acompte', acompte), rang('Arrondi commercial', arrondi),
+    rang('Total mis en avant', vedette),
+    rang('Régime TGCA', regime),
+    rang('Ajustement', ajustementWrap),
+    rang('Arrondi commercial', arrondi),
+    rang('Acompte %', acompte),
   ));
 
   const totaux = el('div', 'dvf-totaux');
@@ -1963,8 +2038,19 @@ function carteArgent() {
   corps.append(totaux);
 
   regime.addEventListener('change', () => { saisie.regime = regime.value; redessiner(); });
-  acompte.addEventListener('change', () => { saisie.acompte = Number(acompte.value); redessiner(); });
+  acompte.addEventListener('input', () => {
+    saisie.acompte = Math.min(100, Math.max(0, Number(acompte.value) || 0));
+    redessiner();
+  });
   arrondi.addEventListener('change', () => { saisie.arrondi = arrondi.value; redessiner(); });
+  ajustementUnite.addEventListener('change', () => {
+    saisie.ajustement.unite = ajustementUnite.value;
+    redessiner();
+  });
+  ajustementValeur.addEventListener('input', () => {
+    saisie.ajustement.valeur = Number(ajustementValeur.value) || 0;
+    redessiner();
+  });
   return c;
 }
 
@@ -1990,11 +2076,18 @@ function peindre() {
   if (totaux && compte.aucunPrix) totaux.replaceChildren();
   else if (totaux) {
     const lignes = [['Sous-total HT', compte.sousTotalHt]];
+    if (compte.ajustement.montant) lignes.push(['Ajustement', compte.ajustement.montant]);
     if (compte.ecart) lignes.push(['Arrondi commercial', compte.ecart]);
-    lignes.push(['Total HT', compte.totalHt]);
-    lignes.push([compte.regime.taxable
+    const taxeLigne = [compte.regime.taxable
       ? `${compte.regime.label} ${(compte.tauxTgca * 100).toFixed(compte.tauxTgca * 100 % 1 ? 1 : 0)} %`
-      : compte.regime.label, compte.taxe]);
+      : compte.regime.label, compte.taxe];
+    // LA BASCULE VEDETTE : le total mis en avant devient le géant en bas de
+    // carte, l'autre reste une ligne normale ici — le calcul ne change pas.
+    if (compte.vedette === 'ht') {
+      lignes.push(taxeLigne, ['TTC', compte.ttc]);
+    } else {
+      lignes.push(['Total HT', compte.totalHt], taxeLigne);
+    }
     totaux.replaceChildren();
     for (const [k, v] of lignes) {
       const l = el('div', 'dvf-tot');
@@ -2002,7 +2095,8 @@ function peindre() {
       totaux.append(l);
     }
     const grand = el('div', 'dvf-tot dvf-tot--grand');
-    grand.append(el('span', null, 'TOTAL À PAYER'), el('b', null, euro(compte.ttc)));
+    grand.append(el('span', null, compte.vedette === 'ht' ? 'TOTAL HT' : 'TOTAL À PAYER'),
+      el('b', null, euro(compte.vedette === 'ht' ? compte.totalHt : compte.ttc)));
     totaux.append(grand);
     if (compte.acompte.pourcent) {
       const a = el('div', 'dvf-tot');
@@ -2140,6 +2234,10 @@ async function enregistrer() {
       regime: saisie.regime,
       tauxTgca: saisie.tauxTgca,
       arrondi: saisie.arrondi,
+      vedette: saisie.vedette,
+      ajustementUnite: compte.ajustement.unite,
+      ajustementValeur: compte.ajustement.valeur,
+      ajustementMontant: compte.ajustement.montant,
       lignes: compte.lignes,
       sousTotalHt: compte.sousTotalHt,
       totalHt: compte.totalHt,
@@ -2178,7 +2276,14 @@ function repartirDeZero() {
     ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cl-wa', ''],
     ['#dvf-cherche', ''],
     ['#dvf-projet', ''], ['#dvf-due', ''], ['#dvf-heure', ''], ['#dvf-note-interne', ''],
-    ['#dvf-validite', saisie.validite]]) {
+    ['#dvf-validite', saisie.validite],
+    // LA CARTE FISCALITÉ REPART À ZÉRO ELLE AUSSI : `saisie` retrouve ses
+    // valeurs neuves, les champs à l'écran doivent les suivre — sinon le
+    // devis vierge calcule sur des réglages neufs pendant que l'écran affiche
+    // encore ceux du devis précédent.
+    ['#dvf-regime', saisie.regime], ['#dvf-arrondi', saisie.arrondi],
+    ['#dvf-acompte', String(saisie.acompte)],
+    ['#dvf-ajustement-unite', saisie.ajustement.unite], ['#dvf-ajustement-valeur', '']]) {
     const n = $(id);
     if (n) n.value = v;
   }
@@ -2186,6 +2291,7 @@ function repartirDeZero() {
   if (appro) appro.value = saisie.appro;
   const maquette = $('#dvf-maquette');
   if (maquette) maquette.value = 'non';
+  segmenteRegle($('#dvf-vedette'), saisie.vedette);
   poserLignes();
   redessiner();
 }

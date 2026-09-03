@@ -264,6 +264,96 @@ const MAISON = {
 }
 
 // ---------------------------------------------------------------------------
+// 2 ter. L'AJUSTEMENT GLOBAL, L'ACOMPTE LIBRE, LA BASCULE VEDETTE (03/09/2026)
+// ---------------------------------------------------------------------------
+// UNE REMISE OU UNE MAJORATION NÉGOCIÉE SUR L'ENSEMBLE, en plus des remises
+// par article : elle porte sur le sous-total HT, avant la TGCA, et l'addition
+// continue de tomber juste par construction.
+{
+  const remise = calculerDevis({
+    lignes: [{ designation: 'x', quantite: 10, unitaireHt: 20 }],
+    regime: 'tgca', tauxTgca: 0.04, arrondi: 'aucun', acompte: 0,
+    ajustement: { unite: 'eur', valeur: -50 },
+  });
+  assert.strictEqual(remise.sousTotalHt, 200, 'le sous-total brut ne bouge pas');
+  assert.strictEqual(remise.ajustement.montant, -50, 'la remise est bien de -50 €');
+  assert.strictEqual(remise.totalHt, 150, 'la remise porte sur le HT, avant la taxe');
+  assert.strictEqual(Math.round((remise.totalHt + remise.taxe) * 100) / 100, remise.ttc,
+    'HT + taxe = TTC, même avec un ajustement');
+
+  const majoration = calculerDevis({
+    lignes: [{ designation: 'x', quantite: 10, unitaireHt: 20 }],
+    regime: 'tgca', tauxTgca: 0.04, arrondi: 'aucun', acompte: 0,
+    ajustement: { unite: 'pct', valeur: 10 },
+  });
+  assert.strictEqual(majoration.ajustement.montant, 20, '10 % de majoration sur 200 € HT = 20 €');
+  assert.strictEqual(majoration.totalHt, 220);
+}
+// L'ARRONDI NE MESURE QUE L'ARRONDI, PAS L'AJUSTEMENT : sinon la ligne
+// « Arrondi commercial » mentirait sur ce qu'elle doit à chaque euro rond.
+for (const arrondi of ['aucun', 'euro', 'dix']) {
+  for (const valeur of [-37.5, 0, 62.3]) {
+    const c = calculerDevis({
+      lignes: [{ designation: 'x', quantite: 7, unitaireHt: 13.37 }],
+      regime: 'tgca', tauxTgca: 0.04, arrondi, acompte: 20,
+      ajustement: { unite: 'eur', valeur },
+    });
+    assert.strictEqual(Math.round((c.totalHt + c.taxe) * 100) / 100, c.ttc,
+      `HT + taxe ≠ TTC pour un ajustement de ${valeur} € (arrondi « ${arrondi} »)`);
+    assert.strictEqual(Math.round((c.sousTotalHt + c.ajustement.montant + c.ecart) * 100) / 100, c.totalHt,
+      `sous-total + ajustement + écart ≠ total HT pour ${valeur} € (arrondi « ${arrondi} »)`);
+  }
+}
+// L'ACOMPTE EST UN POURCENTAGE LIBRE (03/09/2026) : 17 %, 85 %… n'importe quel
+// nombre entre 0 et 100, plus seulement 0/30/50/100.
+{
+  const c = calculerDevis({
+    lignes: [{ designation: 'x', quantite: 1, unitaireHt: 200 }],
+    regime: 'tgca', tauxTgca: 0.04, arrondi: 'aucun', acompte: 17,
+  });
+  assert.strictEqual(c.acompte.pourcent, 17, 'un pourcentage libre est accepté tel quel');
+  assert.strictEqual(c.acompte.montant, Math.round(c.ttc * 0.17 * 100) / 100);
+}
+// UN ACOMPTE HORS BORNES EST RAMENÉ ENTRE 0 ET 100 : une saisie de travers
+// (négative, ou au-delà de 100 %) ne doit pas réclamer plus que le total.
+{
+  const trop = calculerDevis({
+    lignes: [{ designation: 'x', quantite: 1, unitaireHt: 100 }],
+    regime: 'tgca', tauxTgca: 0.04, arrondi: 'aucun', acompte: 250,
+  });
+  assert.strictEqual(trop.acompte.pourcent, 100);
+  const negatif = calculerDevis({
+    lignes: [{ designation: 'x', quantite: 1, unitaireHt: 100 }],
+    regime: 'tgca', tauxTgca: 0.04, arrondi: 'aucun', acompte: -10,
+  });
+  assert.strictEqual(negatif.acompte.pourcent, 0);
+}
+// LA BASCULE VEDETTE NE CHANGE AUCUN MONTANT — juste lequel des deux totaux
+// est le géant de la feuille.
+{
+  const ttcDevant = dessinerDevis(modeleDevis({ ...SAISIE, vedette: 'ttc' }, MAISON), faireDoc());
+  const grandTtc = tousLes(ttcDevant, 'dv__grand');
+  assert.strictEqual(grandTtc.length, 1);
+  assert.ok(texteEntier(grandTtc[0]).includes('TOTAL À PAYER'), 'par défaut, le TTC est le géant');
+  assert.ok(texteEntier(grandTtc[0]).includes('502,00'));
+
+  const htDevant = dessinerDevis(modeleDevis({ ...SAISIE, vedette: 'ht' }, MAISON), faireDoc());
+  const grandHt = tousLes(htDevant, 'dv__grand');
+  assert.strictEqual(grandHt.length, 1);
+  assert.ok(texteEntier(grandHt[0]).includes('TOTAL HT'), 'la bascule met le HT en géant');
+  assert.ok(texteEntier(htDevant).includes('TTC'), 'le TTC redescend en ligne normale, il ne disparaît pas');
+}
+// L'AJUSTEMENT NE S'IMPRIME QUE S'IL N'EST PAS NUL — comme l'arrondi.
+{
+  const sansAjustement = modeleDevis(SAISIE, MAISON);
+  assert.strictEqual(sansAjustement.totaux.ajustement, '', 'pas d’ajustement, pas de ligne');
+  const avecAjustement = modeleDevis({ ...SAISIE, ajustement: { unite: 'eur', valeur: -20 } }, MAISON);
+  assert.notStrictEqual(avecAjustement.totaux.ajustement, '');
+  assert.ok(texteEntier(dessinerDevis(avecAjustement, faireDoc())).includes('Ajustement'),
+    'la ligne « Ajustement » sort sur le papier quand elle n’est pas nulle');
+}
+
+// ---------------------------------------------------------------------------
 // 3. L'ÉCRAN N'INVENTE AUCUN COMPOSANT
 // ---------------------------------------------------------------------------
 // Deux écrans à un clic l'un de l'autre doivent donner le MÊME composant, pas
@@ -278,12 +368,13 @@ for (const [classe, ou] of [
   ['ecran-tete', 'l’en-tête de la charte'],
   ['champ-recherche', 'la pilule de recherche de la charte'],
   ['msg-flottant', 'le message qui ne pousse personne'],
+  ['segmente', 'le sélecteur segmenté de la charte (bascule TTC/HT)'],
 ]) {
   assert.ok(ECRAN.includes(classe), `le devis doit reprendre ${ou} (${classe})`);
 }
 // … et sa feuille ne les redéclare pas : elle ne porte que ce qu'aucun autre
 // écran n'a — la coupe en deux moitiés et la rangée d'un article.
-for (const classe of ['.reg-card', '.reg-btn', '.fa-in', '.fa-case', '.ecran-tete']) {
+for (const classe of ['.reg-card', '.reg-btn', '.fa-in', '.fa-case', '.ecran-tete', '.segmente']) {
   assert.ok(!new RegExp(`\\${classe}\\s*(,|\\{)`).test(FEUILLE),
     `devis-flash.css redéclare ${classe} : c’est le composant partagé qu’il faut lire`);
 }
