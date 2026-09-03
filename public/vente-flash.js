@@ -669,7 +669,18 @@ function carteClient() {
   corps.append(cherche);
 
   const nom = entree('dvf-cl-nom', { valeur: saisie.client.nom, exemple: 'Nom ou société' });
-  const code = entree('dvf-cl-code', { valeur: saisie.client.code, exemple: 'ALO' });
+  // ⚠ LECTURE SEULE (03/09/2026, trouvé en vérifiant avec Charlie). Le code
+  // client est attribué par le SERVEUR (nextClientCode, db.js), à la
+  // première commande de ce client — automatiquement, en permanence, jamais
+  // réécrit ensuite (le champ `code` n'est même pas dans CLIENT_FIELDS,
+  // aucun PATCH ne peut l'atteindre). Un champ TAPABLE ici laissait croire
+  // qu'il fallait le remplir à la main ; ce qu'on y tape n'est d'ailleurs
+  // jamais envoyé à /api/comptoir/projet. Pour un client déjà connu,
+  // `prendreClient` le remplit avec le VRAI code ci-dessous ; pour un client
+  // neuf, il reste vide jusqu'à l'émission — le serveur en attribue un à ce
+  // moment-là, qu'on ne peut pas deviner avant.
+  const code = entree('dvf-cl-code', { valeur: saisie.client.code, exemple: 'attribué automatiquement' });
+  code.readOnly = true;
   const ville = entree('dvf-cl-ville', { valeur: saisie.client.ville, exemple: '97150 Saint-Martin' });
   const email = entree('dvf-cl-email', { type: 'email', valeur: saisie.client.email, exemple: 'facultatif' });
   const contact = entree('dvf-cl-contact', { valeur: saisie.client.contact, exemple: 'facultatif' });
@@ -687,7 +698,8 @@ function carteClient() {
     rang('WhatsApp', wa),
   ));
 
-  for (const [n, cle] of [[nom, 'nom'], [code, 'code'], [ville, 'ville'],
+  // `code` N'EST PAS DANS CETTE LISTE : lecture seule, rien à écouter.
+  for (const [n, cle] of [[nom, 'nom'], [ville, 'ville'],
     [email, 'email'], [contact, 'contact'], [tel, 'tel'], [wa, 'whatsapp']]) {
     n.addEventListener('input', () => { saisie.client[cle] = n.value; redessiner(); });
   }
