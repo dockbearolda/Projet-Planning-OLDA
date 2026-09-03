@@ -156,32 +156,29 @@ assert.match(APP, /function annulerGlisser\(\)/,
 assert.match(APP, /if \(!famille \|\| railGlisse\.has\(famille\)\) return false;/,
   'une phase déjà ouverte ne déclenche pas un second rendu');
 
-// CE QUI N'A PAS DE `data-slug` N'EST PAS UNE ÉTAPE, ET NE REÇOIT RIEN. Deux
-// entrées du rail empruntent la classe `.stage` pour en garder le rythme sans
-// en être — la ligne de repli, et l'agenda des retraits depuis le 03/09. Donc
-// `closest('.stage')` les ramasse toutes les deux. Sans refus explicite elles
-// passaient le test (leur `data-slug` étant `undefined`, il « diffère » de
-// l'étape de la ligne), devenaient cibles, et la dépose partait en PATCH
-// `stage: undefined`.
+// CE QUI N'A PAS DE `data-slug` N'EST PAS UNE ÉTAPE, ET NE REÇOIT RIEN. La ligne
+// de repli emprunte la classe `.stage` pour en garder le rythme sans en être,
+// donc `closest('.stage')` la ramasse. Sans refus explicite elle passait le test
+// (son `data-slug` étant `undefined`, il « diffère » de l'étape de la ligne),
+// devenait cible, et la dépose partait en PATCH `stage: undefined`.
 //
-// LA GARDE PORTE SUR L'ABSENCE DE SLUG, plus sur le nom d'une classe : écrite
-// `.contains('stage-repli')`, elle ne couvrait QUE la ligne de repli, et
-// l'agenda est passé à côté sans que rien ne le signale le jour où il est
-// arrivé. Une garde nommée protège un cas ; une garde sur la règle protège
-// ceux qu'on n'a pas encore écrits.
+// LA GARDE PORTE SUR L'ABSENCE DE SLUG, plus sur le nom d'une classe. Écrite
+// `.contains('stage-repli')`, elle ne couvrait QUE la ligne de repli — et
+// l'entrée d'agenda posée ici le 03/09 est passée à travers en silence le jour
+// même. Elle a depuis rejoint la rangée d'onglets, mais la leçon reste : une
+// garde nommée protège un cas, une garde sur la règle protège ceux qu'on n'a
+// pas encore écrits.
 assert.match(APP, /if \(!stageEl\.dataset\.slug\) return false;/,
   'une entrée du rail sans étape est refusée comme cible de dépôt');
-assert.match(APP, /a\.className = 'stage stage--agenda';/,
-  'l’agenda emprunte le gabarit d’une étape…');
-assert.ok(!/stage--agenda[\s\S]{0,300}?dataset\.slug =/.test(APP),
-  '… et JAMAIS son data-slug : ce n’est pas une étape');
 // Les deux boucles qui balaient le rail ne doivent voir que les VRAIES étapes :
-// comptées, ces deux entrées héritaient d'un « 0 » — donc de la teinte « étape
-// vide » — et l'agenda perdait sa surbrillance à chaque repeinture.
-for (const balayage of [/document\.querySelectorAll\('\.stage\[data-slug\]'\)/g]) {
-  assert.strictEqual((APP.match(balayage) || []).length, 2,
-    'les compteurs ET la surbrillance ne balaient que les entrées qui portent une étape');
-}
+// comptée, la ligne de repli hérite d'un « 0 » — donc de la teinte « étape
+// vide » — et d'un nom accessible qui annonce « … — 0 commandes ».
+assert.strictEqual(
+  (APP.match(/document\.querySelectorAll\('\.stage\[data-slug\]'\)/g) || []).length, 2,
+  'les compteurs ET la surbrillance ne balaient que les entrées qui portent une étape');
+// Le rail ne porte QUE des étapes : l'agenda a son onglet, à côté de Planning.
+assert.ok(!/stage--agenda|stage-epingle/.test(APP + CSS),
+  'plus d’entrée d’agenda dans le rail — deux sorties pour le même écran, c’est un doublon');
 assert.match(APP, /el\.dataset\.repli = famille;/,
   'elle porte sa phase pour qu’un glisser sache laquelle ouvrir');
 assert.ok(!/stage-repli[\s\S]{0,300}?dataset\.slug =/.test(APP),

@@ -707,49 +707,6 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
 .stage-repli::before { content: none; }
 .stage-repli:hover { color: var(--rail-nonvide); }
 
-/* ------------------------------------------- L'AGENDA DES RETRAITS (03/09/2026)
-   Le rail range le planning par ÉTAPE ; l'agenda le range par JOUR. C'est la
-   même liste vue par l'autre bout, donc son entrée est ICI, épinglée en tête,
-   là où la vendeuse choisit déjà ses listes — et pas dans la barre du haut, qui
-   est pleine (868 px de rangée pour 868 disponibles à 1 280, déjà resserrée).
-
-   ELLE PREND EXACTEMENT LE GABARIT D'UNE ÉTAPE — `.stage` porte la boîte, le
-   rembourrage et l'arrondi, cette règle n'en réécrit AUCUN. Deux hauteurs dans
-   la même colonne se voient tout de suite ; c'est la règle du 27/08, et elle
-   passe avant le confort d'écriture.
-
-   CE QU'ELLE NE PREND PAS : la puce (elle ne dit aucune phase — hors d'une zone
-   `[data-fam]`, `--zr` n'existe pas et le disque serait invisible tout en
-   gardant ses 7 px) et le compteur (ce n'est pas une étape, elle ne compte pas
-   de dossiers). Le retrait de gauche reprend donc celui de la ligne de repli :
-   les libellés d'étape commencent à 37 px du bord du rail, celui-ci aussi.
-
-   LA SÉPARATION EST CELLE DES PHASES, à l'envers : l'air et le filet
-   appartiennent au bloc épinglé, sous lui, parce que c'est LUI qui commence le
-   rail. Même recette que `.stage-zone + .stage-zone`, mêmes valeurs. */
-.stage-epingle {
-  margin-bottom: 22px;
-  padding-bottom: 22px;
-  border-bottom: 1px solid var(--rail-separation);
-}
-.stage--agenda {
-  padding-left: 25px;
-  text-decoration: none;
-}
-.stage--agenda::before { content: none; }
-.stage--agenda .stage-label {
-  font-weight: var(--graisse-note);
-  color: var(--rail-nonvide);
-}
-.stage--agenda.active .stage-label {
-  font-weight: var(--graisse-forte);
-  color: var(--rail-encre);
-}
-/* L'étape sélectionnée prend le fond tonal de SA phase (`--za`) ; l'agenda n'en
-   a pas, et un fond gris de plus le ferait passer pour une étape vide. Il
-   s'allume donc comme le titre d'une catégorie active : l'encre pleine. */
-.stage--agenda.active { background: var(--primary-soft); }
-
 /* LE COMPTEUR : pastille tonale de la phase quand l'étape a du monde ; VIDE
    sinon — ni pastille ni zéro, mais la cellule garde sa largeur pour que la
    colonne des chiffres reste un seul axe (le texte est retiré par le JS). */

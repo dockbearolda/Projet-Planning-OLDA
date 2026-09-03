@@ -597,44 +597,8 @@ function poignéeDeZone(famille, plieee) {
   return b;
 }
 
-// L'AGENDA DES RETRAITS, EN TÊTE DU RAIL (03/09/2026)
-// ---------------------------------------------------------------------------
-// Le rail range le planning par ÉTAPE — où en est le travail. L'agenda le range
-// par JOUR — qui passe le prendre, et quand. C'est la même liste vue par
-// l'autre bout, donc sa porte est ici, là où la vendeuse choisit déjà ses
-// listes, et pas dans la barre du haut (pleine, voir HASH_AGENDA).
-//
-// ELLE PREND LE GABARIT D'UNE ÉTAPE — même boîte, même rembourrage, même
-// arrondi — parce que le rail doit garder UN rythme : deux hauteurs dans la
-// même colonne se voient tout de suite. Mais elle n'en est pas une, et elle le
-// dit : ni puce, ni compteur, et surtout PAS de `data-slug`, sans quoi elle
-// deviendrait cible de dépôt et une commande lâchée dessus partirait en PATCH
-// `stage: undefined` (le piège que la ligne de repli a déjà payé).
-//
-// C'EST UN LIEN, pas un bouton : il mène à une adresse, donc il s'ouvre dans un
-// nouvel onglet à la molette comme les huit autres écrans.
-function entreeAgenda() {
-  const bloc = document.createElement('div');
-  bloc.className = 'stage-epingle';
-  const a = document.createElement('a');
-  a.className = 'stage stage--agenda';
-  a.href = HASH_AGENDA;
-  const label = document.createElement('span');
-  label.className = 'stage-label';
-  label.textContent = 'Agenda des retraits';
-  a.append(label);
-  if (viewMode === 'agenda') {
-    a.classList.add('active');
-    a.setAttribute('aria-current', 'page');
-  }
-  attachTip(a, 'Qui vient chercher quoi — aujourd’hui, demain, après');
-  bloc.append(a);
-  return bloc;
-}
-
 function renderSidebar() {
   $stages.replaceChildren();
-  $stages.appendChild(entreeAgenda());
   // Chaque FAMILLE est une ZONE : un grand titre (en-tête) qui coiffe ses
   // sous-catégories. On enveloppe le tout dans un bloc pour que l'œil isole d'un
   // coup une zone de la suivante (miroir de la « Vue Étapes » du CRM : total
@@ -728,12 +692,12 @@ function clearGrid() {
 
 // Surbrillance du rail : une seule entrée active à la fois (famille OU sous-cat).
 //
-// `[data-slug]` ET PAS `.stage` : deux entrées du rail portent la classe sans
-// être des étapes — la ligne de repli et l'agenda des retraits. Prises dans
-// cette boucle, elles se faisaient ÉTEINDRE à chaque repeinture (leur slug
-// valant `undefined`, aucune ne correspond jamais à l'étape courante) : l'agenda
-// perdait sa surbrillance dès le premier rafraîchissement, alors qu'il est
-// l'écran affiché.
+// `[data-slug]` ET PAS `.stage` : la ligne de repli porte la classe sans être
+// une étape. Prise dans cette boucle, elle se faisait ÉTEINDRE à chaque
+// repeinture — son slug valant `undefined`, elle ne correspond jamais à l'étape
+// courante. Ça ne se voyait pas sur elle (elle n'est jamais allumée) ; ça s'est
+// vu sur l'entrée d'agenda qui a vécu ici deux jours, et qui perdait sa
+// surbrillance au premier rafraîchissement.
 function paintSidebarActive() {
   let active = null;
   document.querySelectorAll('.stage[data-slug]').forEach((el) => {
@@ -912,10 +876,12 @@ function marquerEnAttente(on) {
 // --- Chargement données ----------------------------------------------------
 async function loadCounts() {
   counts = await api('GET', '/api/counts');
-  // `[data-slug]` : la ligne de repli et l'agenda des retraits empruntent la
-  // classe `.stage` sans être des étapes. Comptées ici, elles héritaient d'un
-  // « 0 » — donc de la teinte « étape vide » — et d'un nom accessible qui
-  // annonçait « Agenda des retraits — 0 commandes ».
+  // `[data-slug]` : la ligne de repli (« + 4 étapes vides ») emprunte la classe
+  // `.stage` sans être une étape. Comptée ici, elle héritait d'un « 0 » — donc
+  // de la teinte « étape vide » — et d'un nom accessible qui annonçait
+  // « … — 0 commandes ». La garde porte sur la RÈGLE (pas de slug, pas une
+  // étape) et non sur le nom d'une classe : elle couvre celles qu'on n'a pas
+  // encore écrites.
   document.querySelectorAll('.stage[data-slug]').forEach((el) => {
     // Sous-catégorie → compteur par sous-slug ; famille → total famille.
     const key = el.dataset.sub != null ? el.dataset.sub : el.dataset.slug;
@@ -5401,15 +5367,14 @@ function onDragMove(e) {
 // restent des cibles directes — il n'y a rien de plus fin où viser.
 function stageAcceptsDrop(stageEl, r) {
   // CE QUI N'A PAS DE `data-slug` N'EST PAS UNE ÉTAPE, ET NE REÇOIT RIEN.
-  // Deux entrées du rail empruntent la classe `.stage` pour en garder le
-  // rythme sans en être : la ligne de repli (« + 4 étapes vides ») et l'agenda
-  // des retraits. `closest('.stage')` les ramasse toutes les deux — et sans ce
-  // refus elles passaient le test, leur `data-slug` valant `undefined`, il
-  // « diffère » donc de l'étape de la ligne : elles devenaient cibles, et la
-  // dépose partait en PATCH `stage: undefined`.
+  // La ligne de repli (« + 4 étapes vides ») emprunte la classe `.stage` pour en
+  // garder le rythme sans en être, et `closest('.stage')` la ramasse — sans ce
+  // refus elle passait le test, son `data-slug` valant `undefined`, il
+  // « diffère » donc de l'étape de la ligne : elle devenait cible, et la dépose
+  // partait en PATCH `stage: undefined`.
   // LA GARDE PORTE SUR L'ABSENCE DE SLUG, plus sur le nom d'une classe : la
-  // première écriture nommait `.stage-repli`, et l'agenda serait passé à
-  // travers en silence le jour où il est arrivé.
+  // première écriture nommait `.stage-repli`, et l'entrée d'agenda posée dans le
+  // rail le 03/09 est passée à travers en silence le jour même.
   if (!stageEl.dataset.slug) return false;
   const slug = stageEl.dataset.slug;
   const isSub = stageEl.dataset.sub != null;
@@ -7585,6 +7550,7 @@ if ($railToggle) {
 
 const $dashboard = document.getElementById('dashboard');
 const $viewPlanning = document.getElementById('viewPlanning');
+const $viewAgenda = document.getElementById('viewAgenda');
 const $viewDashboard = document.getElementById('viewDashboard');
 const $viewClients = document.getElementById('viewClients');
 const $clients = document.getElementById('clients');
@@ -8125,17 +8091,7 @@ function setViewMode(mode) {
   if ($viewTaillesLogos) $viewTaillesLogos.classList.toggle('active', mode === 'tailleslogos');
   if ($viewDevisFlash) $viewDevisFlash.classList.toggle('active', mode === 'devisflash');
   if ($viewVenteFlash) $viewVenteFlash.classList.toggle('active', mode === 'venteflash');
-  // L'AGENDA S'ALLUME DANS LE RAIL, pas dans la barre du haut. Le rail n'est
-  // reconstruit qu'au changement des étapes vides : sans cette ligne, son
-  // entrée resterait éteinte pendant qu'on lit l'agenda, ou allumée après
-  // l'avoir quitté. Elle est ICI, avant le retour anticipé quelques lignes plus
-  // bas — les onglets se repeignent même quand la vue ne change pas.
-  const entree = document.querySelector('.stage--agenda');
-  if (entree) {
-    entree.classList.toggle('active', mode === 'agenda');
-    if (mode === 'agenda') entree.setAttribute('aria-current', 'page');
-    else entree.removeAttribute('aria-current');
-  }
+  if ($viewAgenda) $viewAgenda.classList.toggle('active', mode === 'agenda');
   // Deux onglets pour une seule vue : c'est le HASH qui dit lequel est allumé.
   if ($viewVente) $viewVente.classList.toggle('active', mode === 'projet' && location.hash === HASH_VENTE);
   if ($viewDevis) $viewDevis.classList.toggle('active', mode === 'projet' && location.hash === HASH_DEVIS);
@@ -8214,15 +8170,16 @@ const HASH_CLIENTS = '#clients';
 const HASH_VENTE = '#vente';
 const HASH_DEVIS = '#devis';
 const PARCOURS_PAR_HASH = { [HASH_VENTE]: 'vente', [HASH_DEVIS]: 'devis' };
-// L'AGENDA A UNE ADRESSE, comme les huit autres écrans — c'est ce qui lui
-// permet de s'ouvrir dans un second onglet à la molette, de revenir par le
-// bouton « précédent », et de rester à l'écran après un rechargement. Il n'a
-// pas d'onglet dans la barre du haut pour autant : celle-ci est PLEINE (mesuré
-// le 03/09 à 1 280 px, 868 px de rangée pour 868 disponibles, déjà resserrée),
-// et le neuvième mot n'y tiendrait qu'en poussant le dernier hors de l'écran —
-// un onglet qu'on ne voit pas est un écran qui n'existe pas. Sa porte est donc
-// dans le RAIL, qui est la navigation propre au planning et qui reste à
-// l'écran sur toutes les vues depuis le 24/08.
+// L'AGENDA A UNE ADRESSE, comme les neuf autres écrans — c'est ce qui lui permet
+// de s'ouvrir dans un second onglet à la molette, de revenir par le bouton
+// « précédent », et de rester à l'écran après un rechargement. Son onglet est
+// COLLÉ À CELUI DU PLANNING (03/09, Charlie : « l'agenda doit être sur la ligne
+// à côté de planning ») : c'est le même planning vu par l'autre bout, sa place
+// est juste après lui.
+// SON ENTRÉE DANS LE RAIL A ÉTÉ RETIRÉE avec ce déplacement. Deux sorties pour
+// le même écran, c'est le doublon que la charte du dépôt nomme en toutes
+// lettres — et la rangée d'onglets est le seul endroit où l'on cherche un
+// écran.
 const HASH_AGENDA = '#agenda';
 const VIEWS = {
   '#dashboard': 'dashboard',

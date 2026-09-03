@@ -166,6 +166,20 @@
         <a class="nav-switch-btn" id="viewPlanning" href="#planning">
           <span class="nav-switch-label">Planning</span>
         </a>
+        <!-- L'AGENDA, COLLÉ AU PLANNING (03/09/2026, Charlie : « l'agenda doit
+             être sur la ligne à côté de planning »). C'est le MÊME planning vu
+             par l'autre bout — par jour au lieu de par étape — donc sa place est
+             juste après lui, pas dans le rail des étapes où il était né.
+             LA RANGÉE A LA PLACE, mesuré au rendu à 1 280 px : resserrée
+             (`est-serree`, écart 0), les dix onglets prennent 795 px pour 868
+             disponibles. « Agenda » en demande 58 : il en reste 15.
+             ⚠ `scrollWidth === clientWidth` ne prouve PAS qu'une rangée est
+             pleine — il vaut `max(contenu, clientWidth)`. C'est cette lecture
+             qui m'avait fait écrire « 868 pour 868, plus une place ». Ce qui se
+             mesure, c'est la SOMME des onglets plus les écarts. -->
+        <a class="nav-switch-btn" id="viewAgenda" href="#agenda">
+          <span class="nav-switch-label">Agenda</span>
+        </a>
         <!-- LE PILOTAGE N'EXISTE QUE POUR QUI VOIT LES MARGES — la Direction.
              Sans comptes, personne ne le voit. -->
         <a class="nav-switch-btn nav-switch-btn--pilotage" id="viewPilotage" href="#pilotage" hidden>

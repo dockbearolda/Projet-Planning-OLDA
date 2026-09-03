@@ -147,6 +147,15 @@
 .ag-jour.is-retard .ag-jour__date,
 .ag-jour.is-retard .ag-jour__n { color: var(--danger); }
 
+/* « Personne ne vient aujourd'hui. » — une RÉPONSE, pas un manque : elle se lit
+   comme le reste, en gris secondaire, à la place qu'aurait pris la liste. */
+.ag-jour__vide {
+  margin: 0;
+  padding: var(--pas-2);
+  font-size: var(--taille-texte);
+  color: var(--text-2);
+}
+
 /* ------------------------------------------------------------- UNE RANGÉE */
 .ag-liste { display: flex; flex-direction: column; }
 

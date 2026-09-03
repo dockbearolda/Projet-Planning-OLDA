@@ -1767,16 +1767,38 @@ app.get('/api/requests/corbeille', asyncH(async (req, res) => {
 //     de la famille le dit) : plus personne ne vient le chercher ;
 //   · « Commande récupérée » — il vient d'être remis, à la main, au comptoir ;
 //   · Fiverr — de la sous-traitance graphiste, aucun client au comptoir ;
-//   · l'archive (`deleted_at`).
-// TOUT LE RESTE Y EST, y compris ce qui n'est pas encore produit : une commande
-// promise pour aujourd'hui et encore « à chiffrer », c'est exactement ce que la
-// vendeuse doit voir AVANT que le client ne pousse la porte. Chaque ligne dit
-// donc où elle en est.
+//   · l'archive (`deleted_at`) ;
+//   · « DEMANDE & CHIFFRAGE » — et c'est le correctif du 03/09 au soir.
+//
+// UNE DEMANDE N'EST PAS UN RETRAIT. Tant qu'un dossier est dans cette famille,
+// RIEN n'a été produit : le client attend un prix, pas un carton. Il n'a donc
+// aucune raison de figurer dans une liste de gens qui passent au comptoir.
+//
+// Charlie, le 03/09 : « ce planning depuis plusieurs mois a évolué et on a en
+// ligne des anciennes DEMANDES dont on ne peut pas faire de modification comme
+// la date par exemple, et elles se retrouvent donc toutes en "en retard" ».
+// Mesuré sur la base de PRODUCTION le jour même, sur les 71 dossiers vivants du
+// périmètre :
+//
+//                                      avec la famille   sans elle
+//     retraits datés                          41             29
+//     dont EN RETARD                          18             12
+//     dossiers sans date de retrait           30              7
+//
+// Les six retards qu'elle apportait avaient 6, 32, 34, 36 et 37 jours, et cinq
+// des six étaient créés en juin ou juillet : personne ne vient les chercher.
+// Et les 23 dossiers sans date qu'elle apportait n'en manquaient pas — une
+// demande de devis n'A PAS de jour de retrait, c'est normal, et les compter
+// comme un manque était un faux reproche affiché en permanence.
+//
+// La règle est sur la FAMILLE et non sur `order_kind` : c'est la famille que les
+// écrans tiennent à jour, et un dossier passé en préparation ou en production
+// SE PRODUIT — il repart donc à l'agenda, quelle que soit sa nature d'origine.
 //
 // LES DOSSIERS SANS DATE NE SONT PAS DES RETRAITS : ils ne peuvent se ranger
 // sous aucun jour. On ne les renvoie pas — mais on les COMPTE, et l'écran le
 // dit dans son en-tête. Les taire ferait lire l'agenda comme complet.
-const AGENDA_FAMILLES = ['a_trier', 'demande_chiffrage', 'preparation', 'production', 'facturation'];
+const AGENDA_FAMILLES = ['a_trier', 'preparation', 'production', 'facturation'];
 const AGENDA_REMIS = 'commande_recuperee';
 const AGENDA_FILTRE = `r.stage IN (${AGENDA_FAMILLES.map((s) => `'${s}'`).join(', ')})
   AND (r.sub_stage IS NULL OR r.sub_stage <> '${AGENDA_REMIS}')
