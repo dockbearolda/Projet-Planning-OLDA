@@ -1,0 +1,227 @@
+/* ===========================================================================
+   L'AGENDA DES RETRAITS — la feuille de l'écran (03/09/2026)
+   ---------------------------------------------------------------------------
+   Elle part AVEC son écran (voir `poserFeuille` dans app.js), comme les six
+   autres feuilles d'écran : un poste qui ne quitte jamais le planning ne
+   télécharge pas l'habillage de l'agenda.
+
+   TROIS CRANS DE TEXTE, PAS UN DE PLUS — 21 pour le jour, 17 pour ce qui se
+   lit sur la ligne, 14 pour l'état. La hiérarchie se fait à la GRAISSE et à la
+   COULEUR, jamais à une quatrième taille.
+
+   LA COULEUR NE DIT QU'UN ÉTAT, et il n'y en a que deux ici : c'est prêt
+   (succès), c'est bloqué (danger). Une ligne ordinaire est grise comme le
+   reste de l'application.
+
+   L'en-tête d'écran vit dans la charte (`.ecran-tete`) : il n'est pas réécrit
+   ici, et il ne doit jamais l'être.
+   =========================================================================== */
+
+/* LES QUATRE COLONNES SONT DÉCLARÉES UNE FOIS, et toutes les rangées les
+   lisent : écrites bloc par bloc, deux journées côte à côte prendraient deux
+   grilles différentes — chaque `fr` se résout sur le contenu de SA grille — et
+   les noms de clients ne tomberaient plus sur le même axe d'un jour à l'autre.
+   C'est exactement l'écart qu'on ne voit qu'en comparant deux blocs.
+     · `quand` tient « 10h00 » et « 31/08 » en chiffres tabulaires ;
+     · `etat`  tient « Client prévenu – Attente retrait », le plus long des
+       libellés de retrait, et s'abrège au-delà. */
+.agenda {
+  --ag-quand: 72px;
+  --ag-etat: 210px;
+}
+/* `:not([hidden])` : posé nu, `display` défait `hidden` et l'écran resterait
+   affiché ET focusable par-dessus le planning. Piège maison, déjà payé.
+   `container-type` : ce qui décide de la largeur des colonnes, c'est CETTE
+   zone — le rail des étapes se replie et se redimensionne à la main, la
+   largeur de la fenêtre ne dit donc rien de la place réellement disponible. */
+.agenda:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* LES DEUX AXES SE DÉCLARENT. `overflow-y: auto` seul laisse l'axe horizontal
+   en `visible`, que le navigateur promeut alors en `auto` : une barre de
+   défilement latérale apparaît sous la liste pour quelques pixels d'arrondi. */
+.ag-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: var(--pas-3) var(--ecran-pad-x) 40px;
+}
+
+.ag-vide {
+  margin: 0;
+  padding: var(--pas-3) 0;
+  color: var(--text-2);
+}
+
+/* ------------------------------------------------------------- UNE JOURNÉE */
+.ag-jour + .ag-jour { margin-top: var(--pas-4); }
+
+/* L'EN-TÊTE RESTE SOUS LES YEUX pendant qu'on parcourt ses lignes : à
+   mi-liste, sans lui, on ne sait plus quel jour on lit. Il est collant DANS SON
+   BLOC — le bloc est son bloc conteneur, donc celui de demain ne peut pas venir
+   se coller en haut pendant qu'on lit encore aujourd'hui.
+   Le fond est celui de la zone de travail : sans lui, les lignes passeraient au
+   travers du titre. */
+.ag-jour__tete {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--pas-2);
+  padding: var(--pas-2) var(--pas-2) var(--pas-1);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-soft);
+}
+/* PAS DE QUATRIÈME TAILLE. Le cran de 21 px appartient au NOM DE L'ÉCRAN, et à
+   lui seul : il est déclaré une fois, dans `.ecran-tete__titre` (charte.css).
+   Un titre de journée est du texte de 17 en 800 — exactement comme les titres
+   de bloc de « Mon travail », qui sont le même objet à un écran près. La
+   hiérarchie se fait à la GRAISSE, jamais à une taille intermédiaire de plus. */
+.ag-jour__nom {
+  margin: 0;
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  line-height: var(--ligne-serre);
+  color: var(--text-1);
+  letter-spacing: -.01em;
+  white-space: nowrap;
+}
+/* La date en clair à côté d'« Aujourd'hui » / « Demain ». Elle ne répète pas le
+   nom : elle le DATE — c'est ce qu'on recopie sur un post-it ou qu'on dit au
+   téléphone. Elle cède la place avant le nom du jour. */
+.ag-jour__date {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--taille-note);
+  color: var(--text-2);
+}
+/* Un REPÈRE, pas une performance : il dit combien de monde passe, il ne se
+   compare à rien. Poussé à droite, sur l'axe des états. */
+.ag-jour__n {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* LE RETARD EST UN ÉTAT, donc il a le droit à la couleur — et c'est le seul
+   endroit de cet écran où un TITRE en porte. Le fond pâle borne le bloc : ce
+   sont des clients qui attendent depuis hier ou avant, ils ne se lisent pas
+   comme la journée qui commence. */
+.ag-jour.is-retard .ag-jour__tete {
+  background: var(--danger-bg);
+  border-bottom-color: var(--danger-line);
+  border-radius: var(--arrondi-champ) var(--arrondi-champ) 0 0;
+}
+.ag-jour.is-retard .ag-jour__nom,
+.ag-jour.is-retard .ag-jour__date,
+.ag-jour.is-retard .ag-jour__n { color: var(--danger); }
+
+/* ------------------------------------------------------------- UNE RANGÉE */
+.ag-liste { display: flex; flex-direction: column; }
+
+/* UN VRAI BOUTON : la ligne ouvre le dossier, et le poste est un PC — clavier,
+   souris, focus visible. Sa hauteur est la boîte de l'application, jamais un
+   nombre : tout ce qui se clique fait la même hauteur d'un bout à l'autre du
+   CRM. */
+.ag-ligne {
+  display: grid;
+  /* LE GABARIT S'ÉCRIT LÀ OÙ IL SERT, et il ne s'écrit qu'ici. Rangé dans un
+     `--ag-cols` posé sur `.agenda`, il aurait figé ses deux largeurs à la
+     valeur qu'elles avaient SUR CET ÉLÉMENT-LÀ : une substitution de variable
+     se fait chez qui déclare, pas chez qui hérite, et la requête de conteneur
+     plus bas n'aurait plus rien changé. */
+  grid-template-columns:
+    var(--ag-quand) minmax(0, 1fr) minmax(0, 1.3fr) var(--ag-etat);
+  align-items: center;
+  gap: var(--pas-3);
+  width: 100%;
+  min-height: var(--ctrl-h);
+  margin: 0;
+  padding: var(--pas-1) var(--pas-2);
+  border: 0;
+  border-radius: var(--arrondi-champ);
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  /* APRÈS `font: inherit`, jamais avant : la forme courte réinitialise
+     l'interligne à `normal` et emporte tout ce qui a été posé au-dessus. */
+  font-size: var(--taille-texte);
+  line-height: var(--ligne-serre);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+/* Le filet vit sur la ligne SUIVANTE, en ombre intérieure et non en bordure :
+   une bordure entre dans la boîte et rabote un pixel de hauteur à toutes les
+   rangées sauf la première. */
+.ag-ligne + .ag-ligne { box-shadow: inset 0 1px 0 var(--row-line); }
+.ag-ligne:hover { background: var(--row-hover); }
+.ag-ligne:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+/* QUAND — l'heure du retrait, ou la date dans le bloc « En retard ». Chiffres
+   tabulaires : c'est une colonne qu'on lit de haut en bas, elle doit tomber sur
+   un seul axe. */
+.ag-ligne__quand {
+  font-weight: var(--graisse-note);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* QUI — ce qu'on cherche d'abord, donc la seule graisse forte de la rangée. */
+.ag-ligne__client {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--graisse-forte);
+  color: var(--text-1);
+}
+
+/* QUOI — même taille que le client, en gris : deux crans de texte par rangée,
+   la hiérarchie se fait à la graisse et à la couleur. */
+.ag-ligne__quoi {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+
+/* EST-CE PRÊT — la question qui reste quand le client est devant le comptoir. */
+.ag-ligne__etat {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--taille-note);
+  color: var(--text-2);
+}
+.ag-ligne__etat.is-pret { color: var(--success); font-weight: var(--graisse-note); }
+.ag-ligne__etat.is-bloque { color: var(--danger); font-weight: var(--graisse-note); }
+
+/* ------------------------------------------------- Quand la place se resserre
+   Le plancher de travail est 1 280 px de fenêtre, rail des étapes déployé —
+   la zone y fait 966 px, et les quatre colonnes tiennent. En dessous — rail
+   élargi à la main, fenêtre réduite — c'est l'ÉTAT qui rend sa largeur : il
+   s'abrège proprement, alors que le nom du client et l'article sont ce qu'on
+   est venu lire. */
+@container (max-width: 780px) {
+  .ag-page { --ag-quand: 62px; --ag-etat: 132px; }
+}

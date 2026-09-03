@@ -1747,6 +1747,66 @@ app.get('/api/requests/corbeille', asyncH(async (req, res) => {
   res.json(selonMoi(req, rows.map(allegerFiche)));
 }));
 
+// ===========================================================================
+// L'AGENDA DES RETRAITS — qui vient chercher quoi, et quel jour (03/09/2026)
+// ===========================================================================
+// Demande de Charlie : « un agenda par jours, avec juste les noms des clients
+// et les jours de retrait, pour que ma vendeuse en 1 regard puisse voir qui
+// vient chercher quoi pour aujourd'hui, demain… ».
+//
+// LE JOUR DE RETRAIT, C'EST `deadline`. La colonne s'appelle « Date souhaitée »
+// à l'écran : c'est le jour que le client a donné au comptoir, et c'est le seul
+// des trois qui soit rempli. `date_prevue` et `retrait_creneau` ont été mesurées
+// VIDES sur les 205 dossiers de production le 01/09 (voir schema.sql) — bâtir
+// l'agenda dessus, c'est bâtir un écran vide. L'HEURE, elle, vit dans le JSON de
+// la fiche (`heureSouhaitee`), que le comptoir remplit et que la fiche atelier
+// édite : d'où l'extraction ici plutôt qu'une colonne de plus.
+//
+// CE QUI N'Y FIGURE PAS, ET POURQUOI :
+//   · « Paiement & clôture » — le dossier est PARTI chez le client (le libellé
+//     de la famille le dit) : plus personne ne vient le chercher ;
+//   · « Commande récupérée » — il vient d'être remis, à la main, au comptoir ;
+//   · Fiverr — de la sous-traitance graphiste, aucun client au comptoir ;
+//   · l'archive (`deleted_at`).
+// TOUT LE RESTE Y EST, y compris ce qui n'est pas encore produit : une commande
+// promise pour aujourd'hui et encore « à chiffrer », c'est exactement ce que la
+// vendeuse doit voir AVANT que le client ne pousse la porte. Chaque ligne dit
+// donc où elle en est.
+//
+// LES DOSSIERS SANS DATE NE SONT PAS DES RETRAITS : ils ne peuvent se ranger
+// sous aucun jour. On ne les renvoie pas — mais on les COMPTE, et l'écran le
+// dit dans son en-tête. Les taire ferait lire l'agenda comme complet.
+const AGENDA_FAMILLES = ['a_trier', 'demande_chiffrage', 'preparation', 'production', 'facturation'];
+const AGENDA_REMIS = 'commande_recuperee';
+const AGENDA_FILTRE = `r.stage IN (${AGENDA_FAMILLES.map((s) => `'${s}'`).join(', ')})
+  AND (r.sub_stage IS NULL OR r.sub_stage <> '${AGENDA_REMIS}')
+  AND ${VIVANTES}`;
+
+// GET /api/agenda → { lignes: [...], sansDate: n }
+//
+// La réponse ne porte QUE ce que l'agenda affiche : pas de prix (l'écran n'en
+// montre aucun, et l'argent est réservé côté serveur), pas de fiche, pas de
+// pièce jointe. Une ligne pèse ~150 octets là où la liste du planning en pèse
+// dix fois plus — et cet écran se relit à chaque évènement temps réel.
+app.get('/api/agenda', asyncH(async (req, res) => {
+  const [{ rows: lignes }, { rows: sans }] = await Promise.all([
+    pool.query(
+      `SELECT r.id, r.stage, r.sub_stage, r.billing_company, r.client_type,
+              r.quantity, r.product, r.deadline, r.flag, r.flag_reason,
+              r.fiche->>'heureSouhaitee' AS heure
+         FROM requests r
+        WHERE ${AGENDA_FILTRE} AND r.deadline IS NOT NULL
+        ORDER BY r.deadline ASC, (r.fiche->>'heureSouhaitee') ASC NULLS LAST,
+                 r.billing_company ASC`,
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS n FROM requests r
+        WHERE ${AGENDA_FILTRE} AND r.deadline IS NULL`,
+    ),
+  ]);
+  res.json({ lignes, sansDate: sans[0] ? sans[0].n : 0 });
+}));
+
 // GET /api/requests/:id → UNE commande, fiche COMPLÈTE. C'est ce que le tiroir
 // de détail et le récapitulatif imprimable vont chercher : le détail n'est
 // chargé que pour la ligne qu'on ouvre, jamais pour les centaines d'autres.
