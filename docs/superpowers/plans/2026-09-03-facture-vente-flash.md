@@ -1626,6 +1626,7 @@ async function emettreFacture() {
     const rFacture = await api('POST', '/api/factures', {
       dossierId,
       client: saisie.client,
+      projet: saisie.projet,
       mode: saisie.mode,
       regime: saisie.regime,
       tauxTgca: saisie.tauxTgca,

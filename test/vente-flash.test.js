@@ -55,6 +55,18 @@ for (const idDevis of ["'dv-style'", "'dvf-produits'", "'dvf-marquages'", "'dvf-
     `${idDevis} (identifiant global du devis flash) ne doit pas réapparaître dans vente-flash.js — collision de DOM possible`);
 }
 
+// --- Les clés localStorage ne collisionnent pas non plus avec le devis -----
+// Trouvé en vérifiant au navigateur (03/09/2026, pas anticipé par le plan) :
+// CLE_BROUILLON et CLE_PART étaient restées identiques à celles de
+// devis-flash.js après la copie — Vente Flash s'ouvrait avec le brouillon EN
+// COURS du devis flash.
+assert.ok(/CLE_BROUILLON\s*=\s*'olda\.vente\.brouillon'/.test(ECRAN),
+  'CLE_BROUILLON doit être propre à Vente Flash, distincte de olda.devis.brouillon');
+assert.ok(/CLE_PART\s*=\s*'olda\.vente\.part'/.test(ECRAN),
+  'CLE_PART doit être propre à Vente Flash, distincte de olda.devis.part');
+assert.ok(!ECRAN.includes("'olda.devis.brouillon'") && !ECRAN.includes("'olda.devis.part'"),
+  'aucune clé localStorage du devis flash ne doit réapparaître dans vente-flash.js');
+
 // --- L'émission enchaîne bien les deux appels réseau, dans l'ordre ---------
 const idxProjet = ECRAN.indexOf("api('POST', '/api/comptoir/projet'");
 const idxFacture = ECRAN.indexOf("api('POST', '/api/factures'");

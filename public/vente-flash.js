@@ -180,12 +180,17 @@ let transports = {};
 // une facture est immuable, une nouvelle vente est un nouveau dossier.
 let dossierId = null;
 
-// LE BROUILLON EST PAR APPAREIL. Un devis se compose devant le client, en
+// LE BROUILLON EST PAR APPAREIL. Une vente se compose devant le client, en
 // quelques minutes, et un poste qui se ferme au milieu ne doit pas faire tout
-// retaper. Il ne remplace pas l'enregistrement : tant qu'on n'a pas cliqué
-// « Enregistrer au planning », ce devis n'existe que sur cette machine, et
+// retaper. Il ne remplace pas l'émission : tant qu'on n'a pas cliqué
+// « Émettre la facture », cette vente n'existe que sur cette machine, et
 // l'écran le DIT.
-const CLE_BROUILLON = 'olda.devis.brouillon';
+// ⚠ CLÉ DISTINCTE DE CELLE DU DEVIS FLASH (`olda.devis.brouillon`) — trouvé
+// en vérifiant au navigateur (03/09/2026) : les deux écrans partageant la
+// même clé, Vente Flash ouvrait avec le brouillon EN COURS du devis flash
+// (client, articles, mais aucun `mode` — un champ qui n'existe pas côté
+// devis), et l'inverse au retour. Deux écrans, deux brouillons.
+const CLE_BROUILLON = 'olda.vente.brouillon';
 function garderBrouillon() {
   try { localStorage.setItem(CLE_BROUILLON, JSON.stringify({ saisie, dossierId, replis })); } catch (_) { /* plein ou refusé */ }
 }
@@ -503,10 +508,11 @@ function batir() {
 // regarde, lui, change avec le devis — une désignation longue veut de la
 // saisie, une relecture avant impression veut du papier.
 //
-// LA PART EST RETENUE PAR LE POSTE, pas par le devis : c'est un réglage
-// d'écran, pas une donnée. Elle ne part donc PAS dans le brouillon — un devis
-// repris sur une autre machine ne doit pas y déplacer la coupe.
-const CLE_PART = 'olda.devis.part';
+// LA PART EST RETENUE PAR LE POSTE, pas par la vente : c'est un réglage
+// d'écran, pas une donnée. Elle ne part donc PAS dans le brouillon. Clé
+// distincte de celle du devis flash — chaque écran garde son propre réglage
+// de coupe, même principe que CLE_BROUILLON ci-dessus.
+const CLE_PART = 'olda.vente.part';
 // Les bornes : en deçà, la saisie ne montre plus une rangée d'article entière ;
 // au-delà, la feuille n'est plus lisible à deux. Ce sont des pourcentages,
 // parce que c'est ce que la grille attend.
@@ -1568,7 +1574,7 @@ function rangeeArticle(ligne) {
     cases.append(boite);
     champsTaille.set(t, c);
   }
-  const note = entree(`dvf-a-${n}-n`, { valeur: ligne.note, exemple: 'Précision qui figurera sur le devis' });
+  const note = entree(`dvf-a-${n}-n`, { valeur: ligne.note, exemple: 'Précision qui figurera sur la facture' });
   // « Recalculer » ne s'affiche QUE si le prix a été repris à la main : le reste
   // du temps il n'y a rien à reprendre, le moteur suit déjà la quantité et le
   // marquage. C'est le composant de la charte, celui de « Renommer » et de
@@ -1579,7 +1585,7 @@ function rangeeArticle(ligne) {
   const reprendre = el('button', 'action-ligne', 'Recalculer');
   reprendre.type = 'button';
   reprendre.hidden = true;
-  const caseNote = champ('Note du devis', note);
+  const caseNote = champ('Note de la facture', note);
   // Le bouton vit DANS la boîte de la note, à sa droite : c'est la case qui a
   // de la place à revendre, et il tombe sur le rail des champs plutôt que sur
   // une rangée à lui.

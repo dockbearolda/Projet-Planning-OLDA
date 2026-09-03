@@ -7324,6 +7324,7 @@ async function rafraichirLaVue() {
   if (viewMode === 'pilotage') return mountPilotage();
   if (viewMode === 'tailleslogos') return mountTaillesLogos();
   if (viewMode === 'devisflash') return mountDevisFlash();
+  if (viewMode === 'venteflash') return mountVenteFlash();
   // Nouveau Projet : le parcours est un document à part, il a sa propre base
   // clients — c'est LUI qui sait la relire (voir pont.js).
   const cadre = document.querySelector('.np-frame:not([hidden])');
@@ -7400,11 +7401,13 @@ const $viewMonTravail = document.getElementById('viewMonTravail');
 const $viewPilotage = document.getElementById('viewPilotage');
 const $viewTaillesLogos = document.getElementById('viewTaillesLogos');
 const $viewDevisFlash = document.getElementById('viewDevisFlash');
+const $viewVenteFlash = document.getElementById('viewVenteFlash');
 const $reglages = document.getElementById('reglages');
 const $montravail = document.getElementById('montravail');
 const $pilotage = document.getElementById('pilotage');
 const $tailleslogos = document.getElementById('tailleslogos');
 const $devisflash = document.getElementById('devis-flash');
+const $venteflash = document.getElementById('vente-flash');
 // « VENTE » ET « DEVIS » SONT DEUX ONGLETS (29/08/2026, Charlie : « je veux
 // retrouver directement vente et devis, ils doivent être cliquables direct »).
 // Il y avait un onglet « Nouveau Projet » qui ne menait nulle part : il
@@ -7674,6 +7677,24 @@ function mountDevisFlash() {
   }
 }
 
+// LA VENTE FLASH — même montage paresseux que le devis flash, et la MÊME
+// feuille de style (`devis-flash.css` : c'est la grammaire partagée, voir
+// vente-flash.js en tête de fichier).
+let vfLoading = null;
+let vfModule = null;
+function mountVenteFlash() {
+  if (!$venteflash) return;
+  if (!vfLoading) {
+    vfLoading = Promise.all([
+      poserFeuille('reglages.css'), poserFeuille('devis-flash.css'), import('./vente-flash.js'),
+    ])
+      .then(([, , m]) => { vfModule = m; return m.initVenteFlash($venteflash); })
+      .catch((err) => { vfLoading = null; vfModule = null; reportError(err); });
+  } else if (vfModule && vfModule.refreshVenteFlash) {
+    vfModule.refreshVenteFlash();
+  }
+}
+
 let mtLoading = null;
 let mtModule = null;
 function mountMonTravail() {
@@ -7867,6 +7888,7 @@ function setViewMode(mode) {
   if ($viewPilotage) $viewPilotage.classList.toggle('active', mode === 'pilotage');
   if ($viewTaillesLogos) $viewTaillesLogos.classList.toggle('active', mode === 'tailleslogos');
   if ($viewDevisFlash) $viewDevisFlash.classList.toggle('active', mode === 'devisflash');
+  if ($viewVenteFlash) $viewVenteFlash.classList.toggle('active', mode === 'venteflash');
   // Deux onglets pour une seule vue : c'est le HASH qui dit lequel est allumé.
   if ($viewVente) $viewVente.classList.toggle('active', mode === 'projet' && location.hash === HASH_VENTE);
   if ($viewDevis) $viewDevis.classList.toggle('active', mode === 'projet' && location.hash === HASH_DEVIS);
@@ -7888,6 +7910,7 @@ function setViewMode(mode) {
   const pilotage = mode === 'pilotage';
   const tailleslogos = mode === 'tailleslogos';
   const devisflash = mode === 'devisflash';
+  const venteflash = mode === 'venteflash';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($clients) $clients.hidden = !clients;
@@ -7896,6 +7919,7 @@ function setViewMode(mode) {
   if ($pilotage) $pilotage.hidden = !pilotage;
   if ($tailleslogos) $tailleslogos.hidden = !tailleslogos;
   if ($devisflash) $devisflash.hidden = !devisflash;
+  if ($venteflash) $venteflash.hidden = !venteflash;
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
@@ -7915,6 +7939,7 @@ function setViewMode(mode) {
   if (pilotage) mountPilotage();
   if (tailleslogos) mountTaillesLogos();
   if (devisflash) mountDevisFlash();
+  if (venteflash) mountVenteFlash();
   if (projet) mountProjet();
 
   jouerBasculeDeVue();
@@ -7947,6 +7972,7 @@ const VIEWS = {
   '#pilotage': 'pilotage',
   '#tailles-logos': 'tailleslogos',
   '#devis-flash': 'devisflash',
+  '#vente-flash': 'venteflash',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };
 function applyHash() {
