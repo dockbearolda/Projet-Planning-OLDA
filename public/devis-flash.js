@@ -94,7 +94,7 @@ function saisieNeuve() {
     // suit le dossier au planning, jamais le papier remis au client.
     noteInterne: '',
     client: {
-      nom: '', code: '', ville: '', contact: '', tel: '', email: '', type: 'pro',
+      nom: '', code: '', adresse: '', ville: '', contact: '', tel: '', email: '', type: 'pro',
       // LE WHATSAPP N'EST PAS LE TÉLÉPHONE. À Saint-Martin, c'est par là qu'on
       // relance : le planning en fait une pastille cliquable (`whatsapp.js`).
       whatsapp: '',
@@ -800,6 +800,12 @@ function carteClient() {
 
   const nom = entree('dvf-cl-nom', { valeur: saisie.client.nom, exemple: 'Nom ou société' });
   const code = entree('dvf-cl-code', { valeur: saisie.client.code, exemple: 'ALO' });
+  // L'ADRESSE DU CLIENT EST UNE MENTION OBLIGATOIRE DE LA FACTURE (03/09/2026)
+  // — pas une coordonnée de confort comme le WhatsApp. Elle est ici, et pas
+  // seulement dans l'écran de vente, parce que les deux cartes client sont le
+  // MÊME composant à un clic l'une de l'autre : un champ posé dans une seule
+  // des deux en refait deux cartes différentes dès que l'une bouge.
+  const adresse = entree('dvf-cl-adresse', { valeur: saisie.client.adresse, exemple: 'Numéro et rue' });
   const ville = entree('dvf-cl-ville', { valeur: saisie.client.ville, exemple: '97150 Saint-Martin' });
   const email = entree('dvf-cl-email', { type: 'email', valeur: saisie.client.email, exemple: 'facultatif' });
   const contact = entree('dvf-cl-contact', { valeur: saisie.client.contact, exemple: 'facultatif' });
@@ -812,12 +818,12 @@ function carteClient() {
   // `saisie.client.type` ne bouge pas pour autant : il voyage jusqu'au planning.
   corps.append(feuille(
     rang('Client / société', nom), rang('Code client', code),
-    rang('Ville', ville), rang('E-mail', email),
-    rang('Personne à contacter', contact), rang('Téléphone', tel),
-    rang('WhatsApp', wa),
+    rang('Adresse', adresse), rang('Ville', ville),
+    rang('E-mail', email), rang('Personne à contacter', contact),
+    rang('Téléphone', tel), rang('WhatsApp', wa),
   ));
 
-  for (const [n, cle] of [[nom, 'nom'], [code, 'code'], [ville, 'ville'],
+  for (const [n, cle] of [[nom, 'nom'], [code, 'code'], [adresse, 'adresse'], [ville, 'ville'],
     [email, 'email'], [contact, 'contact'], [tel, 'tel'], [wa, 'whatsapp']]) {
     n.addEventListener('input', () => { saisie.client[cle] = n.value; redessiner(); });
   }
@@ -869,7 +875,12 @@ function prendreClient(cl) {
   saisie.client = {
     nom: cl.entreprise || '',
     code: cl.code || '',
-    ville: cl.ville || '',
+    adresse: cl.adresse || '',
+    // `zone` EN REPLI DE `ville` : la fiche client porte les deux, et c'est
+    // `zone` qui est remplie (76 fiches sur 168 le 03/09, contre 5 pour
+    // `ville`). Sans ce repli, la localité existe en base et le papier sort
+    // quand même sans elle.
+    ville: cl.ville || cl.zone || '',
     contact: cl.nom || '',
     tel: cl.telephone || '',
     // La base clients ne tient qu'UN numéro : il sert des deux côtés tant que
@@ -879,6 +890,7 @@ function prendreClient(cl) {
     type: cl.type === 'perso' ? 'perso' : 'pro',
   };
   for (const [id, v] of [['#dvf-cl-nom', saisie.client.nom], ['#dvf-cl-code', saisie.client.code],
+    ['#dvf-cl-adresse', saisie.client.adresse],
     ['#dvf-cl-ville', saisie.client.ville], ['#dvf-cl-email', saisie.client.email],
     ['#dvf-cl-contact', saisie.client.contact], ['#dvf-cl-tel', saisie.client.tel],
     ['#dvf-cl-wa', saisie.client.whatsapp]]) {
@@ -2392,7 +2404,8 @@ function repartirDeZero() {
     && !window.confirm('Ce devis n’est pas au planning. Le remplacer par un devis vierge ?')) return;
   saisie = saisieNeuve();
   dossierId = null;
-  for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-ville', ''],
+  for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-adresse', ''],
+    ['#dvf-cl-ville', ''],
     ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cl-wa', ''],
     ['#dvf-cherche', ''],
     ['#dvf-projet', ''], ['#dvf-due', ''], ['#dvf-heure', ''], ['#dvf-note-interne', ''],

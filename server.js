@@ -4806,6 +4806,14 @@ app.post('/api/factures', exige('clients'), asyncH(async (req, res) => unDossier
   if (!nomClient) return res.status(400).json({ error: 'le nom du client est requis' });
   const client = {
     nom: nomClient,
+    // L'ADRESSE DU CLIENT — mention obligatoire de la facture. Acceptée VIDE :
+    // au comptoir, un particulier qui paie comptant n'a pas toujours donné la
+    // sienne, et refuser l'émission ferait attendre la file pour une donnée
+    // qu'on peut compléter dans la fiche client. L'écran la SIGNALE quand le
+    // client est un PROFESSIONNEL (compteur d'émission, vente-flash.js) sans
+    // jamais bloquer : c'est là que le manque coûte, la facture partant chez
+    // un comptable.
+    adresse: borner(cl.adresse, 160),
     ville: borner(cl.ville, 80),
     contact: borner(cl.contact, 120),
     tel: borner(cl.tel, 40),
@@ -4941,6 +4949,122 @@ app.get('/api/requests/:id/facture', exige('clients'), asyncH(async (req, res) =
   res.json({
     id: rows[0].id, numero: rows[0].numero, montantTtc: Number(rows[0].montant_ttc), document: rows[0].document,
   });
+}));
+
+// ---------------------------------------------------------------------------
+// LE JOURNAL DES FACTURES (03/09/2026)
+// ---------------------------------------------------------------------------
+// SANS LUI, PERSONNE NE PEUT SORTIR LA LISTE. La seule lecture qui existait
+// était `GET /api/requests/:id/facture` — une facture à la fois, à condition
+// de connaître son dossier. Un comptable qui demande « les ventes du mois »
+// n'avait aucun chemin, et le patron non plus : il aurait fallu ouvrir la base.
+//
+// CAPACITÉ `argent` ET NON `reglages` : la boutique encaisse, elle doit pouvoir
+// retrouver et relire ce qu'elle a émis. L'atelier, non.
+//
+// ⚠ RIEN N'EST RECALCULÉ ICI NON PLUS. Le TTC rendu est la COLONNE archivée
+// (`montant_ttc`), jamais une addition refaite sur les lignes. Le HT et la taxe
+// s'en DÉDUISENT avec l'arithmétique de `calculerDevis` (le TTC est le nombre
+// arrondi, le HT est ce qu'il redonne, la taxe est ce qui reste) — c'est la
+// même opération, dans le même sens, donc elle ne peut pas diverger du papier.
+function ligneJournal(r) {
+  const doc = r.document && typeof r.document === 'object' ? r.document : {};
+  const saisie = doc.saisie && typeof doc.saisie === 'object' ? doc.saisie : {};
+  const client = saisie.client && typeof saisie.client === 'object' ? saisie.client : {};
+  const ttc = Number(r.montant_ttc) || 0;
+  const taux = saisie.regime === 'tgca' ? Math.max(0, Number(saisie.tauxTgca) || 0) : 0;
+  const totalHt = taux ? Math.round((ttc / (1 + taux)) * 100) / 100 : ttc;
+  return {
+    id: r.id,
+    numero: r.numero,
+    dossierId: r.dossier_id,
+    date: saisie.date || null,
+    client: r.client_nom,
+    clientType: client.type === 'perso' ? 'perso' : 'pro',
+    // CE QUI MANQUE SE VOIT DANS LE JOURNAL, pas seulement au moment d'émettre :
+    // c'est la colonne qu'on trie pour savoir quelles factures rattraper.
+    clientAdresse: client.adresse || '',
+    projet: saisie.projet || '',
+    regime: saisie.regime || 'tgca',
+    tauxTgca: taux,
+    totalHt,
+    taxe: Math.round((ttc - totalHt) * 100) / 100,
+    ttc,
+    mode: saisie.mode || '',
+    emiseLe: r.emise_le,
+    emisePar: r.emise_par || '',
+  };
+}
+
+// L'ANNÉE EST LA MAILLE DU JOURNAL, parce que c'est celle de la NUMÉROTATION
+// (`FA-<annee>-<rang>`, colonne `annee`) — et donc celle sur laquelle un
+// contrôle vérifie qu'il ne manque aucun numéro. Sans année : tout, la plus
+// récente d'abord.
+app.get('/api/factures', exige('argent'), asyncH(async (req, res) => {
+  const annee = /^\d{4}$/.test(String(req.query.annee || '')) ? Number(req.query.annee) : null;
+  const { rows } = await pool.query(
+    `SELECT id, numero, annee, rang, dossier_id, client_nom, montant_ttc, emise_le, emise_par, document
+       FROM invoices ${annee ? 'WHERE annee = $1' : ''}
+      ORDER BY annee DESC, rang DESC`,
+    annee ? [annee] : [],
+  );
+  const { rows: annees } = await pool.query(
+    'SELECT annee, COUNT(*)::int AS n, SUM(montant_ttc)::numeric AS ttc FROM invoices GROUP BY annee ORDER BY annee DESC',
+  );
+  res.json({
+    factures: rows.map(ligneJournal),
+    annees: annees.map((a) => ({ annee: a.annee, n: a.n, ttc: Number(a.ttc) || 0 })),
+  });
+}));
+
+// L'EXPORT QUE LE COMPTABLE OUVRE. Point-virgule et non virgule : c'est le
+// séparateur qu'attend un tableur configuré en français, et une virgule y
+// collerait toutes les colonnes dans la première. Le BOM en tête pour la même
+// raison — sans lui, « Réglé » arrive en « RÃ©glÃ© ».
+//
+// LES NOMBRES PARTENT À LA VIRGULE DÉCIMALE, eux aussi pour le tableur français.
+const CSV_COLONNES = [
+  ['Numero', (f) => f.numero],
+  ['Date de vente', (f) => f.date || ''],
+  ['Client', (f) => f.client],
+  ['Type', (f) => (f.clientType === 'perso' ? 'Particulier' : 'Professionnel')],
+  ['Adresse client', (f) => f.clientAdresse],
+  ['Projet', (f) => f.projet],
+  ['Regime', (f) => f.regime],
+  ['Taux', (f) => (f.tauxTgca * 100).toFixed(2).replace('.', ',')],
+  ['Total HT', (f) => f.totalHt.toFixed(2).replace('.', ',')],
+  ['Taxe', (f) => f.taxe.toFixed(2).replace('.', ',')],
+  ['Total TTC', (f) => f.ttc.toFixed(2).replace('.', ',')],
+  ['Reglement', (f) => f.mode],
+  ['Emise le', (f) => (f.emiseLe ? new Date(f.emiseLe).toISOString() : '')],
+  ['Poste', (f) => f.emisePar],
+];
+
+// Un point-virgule, un guillemet ou un retour à la ligne DANS une valeur casse
+// la colonne suivante : on double les guillemets et on entoure. Un nom de
+// client contient « ; » plus souvent qu'on ne le croit.
+const csvChamp = (v) => {
+  const t = String(v == null ? '' : v);
+  return /[";\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+};
+
+app.get('/api/factures.csv', exige('argent'), asyncH(async (req, res) => {
+  const annee = /^\d{4}$/.test(String(req.query.annee || '')) ? Number(req.query.annee) : null;
+  const { rows } = await pool.query(
+    `SELECT id, numero, annee, rang, dossier_id, client_nom, montant_ttc, emise_le, emise_par, document
+       FROM invoices ${annee ? 'WHERE annee = $1' : ''}
+      ORDER BY annee ASC, rang ASC`,
+    annee ? [annee] : [],
+  );
+  const lignes = [CSV_COLONNES.map(([nom]) => nom).join(';')];
+  for (const r of rows) {
+    const f = ligneJournal(r);
+    lignes.push(CSV_COLONNES.map(([, prendre]) => csvChamp(prendre(f))).join(';'));
+  }
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition',
+    `attachment; filename="factures-olda-${annee || 'toutes'}.csv"`);
+  res.send(`\uFEFF${lignes.join('\r\n')}\r\n`);
 }));
 
 // ---------------------------------------------------------------------------

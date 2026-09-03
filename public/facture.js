@@ -50,10 +50,15 @@ const MODE_PAR_ID = new Map(MODES_PAIEMENT.map((m) => [m.id, m]));
 // LES MENTIONS LÉGALES — texte fixe, comme le BAT et le délai sur le devis :
 // ce n'est pas de la mise en forme, c'est ce qui rend le document opposable.
 // Voir l'avertissement en tête de fichier.
+// LE TAUX EST CELUI DES CGV DE LA MAISON, pas un taux inventé ici : trois fois
+// le taux d'intérêt légal, tel que publié sur myolda.com (fiche d'identité de
+// l'entreprise, 03/09/2026). Le document qui réclame et celui qui engage
+// doivent dire le MÊME chiffre — un écart entre les deux se retourne contre
+// celui qui réclame.
 const MENTIONS_REGLEMENT = 'Facture réglée en totalité à la remise. Aucun escompte pour paiement '
-  + 'anticipé. En cas de retard de paiement sur une facture à échéance : pénalité au taux légal en '
-  + 'vigueur, exigible sans qu’un rappel soit nécessaire, et indemnité forfaitaire de recouvrement '
-  + 'de 40 € (articles L441-10 et D441-5 du code de commerce).';
+  + 'anticipé. En cas de retard de paiement sur une facture à échéance : pénalité égale à trois fois '
+  + 'le taux d’intérêt légal en vigueur, exigible sans qu’un rappel soit nécessaire, et indemnité '
+  + 'forfaitaire de recouvrement de 40 € (articles L441-10 et D441-5 du code de commerce).';
 
 // ===========================================================================
 // LE MODÈLE
@@ -76,6 +81,7 @@ export function modeleFacture(saisie, entreprise) {
     projet: texte(s.projet),
     client: {
       nom: nomClientAffiche(texte(c.nom), c.type),
+      adresse: texte(c.adresse),
       ville: texte(c.ville),
       contact: texte(c.contact),
       tel: texte(c.tel),
@@ -245,11 +251,22 @@ export function dessinerFacture(t, doc) {
   const grille = el('div', 'fa__grille');
   grille.append(el('div', 'fa__section-k pap-cap', 'CLIENT'),
     el('div', 'fa__section-k pap-cap', 'DOSSIER'));
+  // L'ADRESSE PASSE DEVANT, ET ELLE EST OBLIGATOIRE SUR UNE FACTURE : le nom
+  // et l'adresse des deux parties sont ce qui rend le document opposable
+  // (art. L441-9 du code de commerce). Elle reste soumise à la même règle que
+  // le reste — un champ vide ne s'imprime pas — mais son absence est un
+  // MANQUE, pas un choix : voir le compteur d'émission de vente-flash.js.
   const gauche = [
-    ['VILLE', t.client.ville], ['CONTACT', t.client.contact],
+    ['ADRESSE', t.client.adresse], ['VILLE', t.client.ville],
+    ['CONTACT', t.client.contact],
     ['TÉLÉPHONE', t.client.tel], ['E-MAIL', t.client.email],
   ].filter(([, v]) => v);
-  const droite = [['PROJET', t.projet], ['DATE', t.date]].filter(([, v]) => v);
+  // « DATE DE VENTE », PAS « DATE » : l'en-tête porte déjà la date d'ÉMISSION
+  // (« DU … »), et une facture doit dire les deux. Au comptoir elles tombent
+  // le même jour — le libellé est ce qui distingue les deux lignes, et il ne
+  // coûte rien de le poser juste maintenant plutôt que le jour où une vente
+  // se facturera en différé.
+  const droite = [['PROJET', t.projet], ['DATE DE VENTE', t.date]].filter(([, v]) => v);
   const rangs = Math.max(1 + gauche.length, droite.length);
   for (let i = 0; i < rangs; i += 1) {
     if (i === 0) grille.append(el('div', 'fa__nom', t.client.nom));

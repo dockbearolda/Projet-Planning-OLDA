@@ -126,10 +126,24 @@ function buildStatic() {
   // glyphes, et un nom absent ne lève RIEN — il s'affiche en texte tronqué.
   // Mesuré au canevas le 28/08 : `store` sort à 100 px (cinq lettres à 20),
   // `storefront` à 20 (la ligature existe).
+  // ⚠ CE QUI EST LAISSÉ VIDE NE S'IMPRIME PAS — et depuis le 03/09 ça ne
+  // « reste » plus « honnête » : ces champs signent aussi les FACTURES, et une
+  // facture sans SIRET ni adresse n'est pas un papier incomplet, c'est un
+  // papier qui ne vaut rien. D'où la semence de db.js.
   page.appendChild(carteSimple('storefront', 'Identité de l’atelier',
-    'Le nom, l’adresse et les numéros qui s’impriment en haut et en bas du bon '
-    + 'de commande. Ce qui est laissé vide ne s’imprime pas : le papier sort '
-    + 'avec ce qu’on sait, jamais avec une ligne à trou.', 'reg-entreprise'));
+    'Le nom, l’adresse et les numéros qui signent la FACTURE, le devis et le '
+    + 'bon de commande. Ce qui est laissé vide ne s’imprime pas — et sur une '
+    + 'facture, un SIRET absent la vide de sa valeur.', 'reg-entreprise'));
+
+  // --- Carte « Journal des factures » -----------------------------------------
+  // CE QUE LE COMPTABLE DEMANDE. Une facture se relisait une par une, depuis sa
+  // fiche : personne ne pouvait sortir « les ventes du mois », ni vérifier
+  // qu'aucun numéro ne manque — le contrôle qui se fait en premier.
+  // L'année est la maille, parce que c'est celle de la numérotation.
+  page.appendChild(carteSimple('receipt_long', 'Journal des factures',
+    'Toutes les factures émises, par année, dans l’ordre où elles ont été '
+    + 'numérotées. L’export s’ouvre dans un tableur : c’est le fichier à '
+    + 'transmettre au comptable.', 'reg-journal'));
 
   // --- Carte « Tarifs tasse » -------------------------------------------------
   const tcard = el('section', 'reg-card');
@@ -499,6 +513,82 @@ const ENTREPRISE_LIGNES = [
   ['iban', 'IBAN', 'FR76 1234 5678 9012 3456 7890 123'],
   ['bic', 'BIC', 'CMCIFR2A'],
 ];
+
+// ===========================================================================
+// LE JOURNAL DES FACTURES (03/09/2026)
+// ===========================================================================
+// LA MAILLE EST L'ANNÉE, et ce n'est pas un confort d'affichage : la
+// numérotation est `FA-<annee>-<rang>` et repart à 1 chaque janvier. C'est donc
+// par année qu'on vérifie qu'aucun rang ne manque — le premier contrôle qu'on
+// subit, et le seul que le journal doit rendre évident.
+//
+// RIEN NE SE CALCULE ICI. Les montants viennent tels quels de `/api/factures`,
+// qui les tient lui-même de la colonne archivée. Un total recalculé à l'écran
+// serait un second moteur d'argent, et deux moteurs finissent par se
+// contredire — la règle est la même que pour le papier (voir facture.js).
+let journal = { factures: [], annees: [] };
+let journalAnnee = null;
+
+function renderJournal() {
+  const hote = $('#reg-journal');
+  if (!hote) return;
+  hote.replaceChildren();
+
+  if (!journal.annees.length) {
+    hote.append(el('p', 'reg-corb__vide', 'Aucune facture émise pour l’instant.'));
+    return;
+  }
+
+  const annees = journal.annees.map((a) => a.annee);
+  if (!annees.includes(journalAnnee)) journalAnnee = annees[0];
+  const courante = journal.annees.find((a) => a.annee === journalAnnee) || { n: 0, ttc: 0 };
+
+  // LA RANGÉE DE TÊTE : l'année, ce qu'elle pèse, et l'export. Trois choses de
+  // la même famille, donc UNE rangée et la MÊME hauteur (voir CLAUDE.md).
+  const tete = el('div', 'reg-ligne');
+  const choix = el('select', 'reg-tarif-input reg-tarif-input--nom');
+  choix.setAttribute('aria-label', 'Année du journal');
+  for (const a of journal.annees) {
+    const o = el('option', '', `${a.annee} — ${a.n} facture${a.n > 1 ? 's' : ''} · ${euroTexte(a.ttc)}`);
+    o.value = String(a.annee);
+    if (a.annee === journalAnnee) o.selected = true;
+    choix.append(o);
+  }
+  choix.addEventListener('change', () => {
+    journalAnnee = Number(choix.value);
+    renderJournal();
+  });
+  // UN LIEN, PAS UN BOUTON : le navigateur sait télécharger une réponse mieux
+  // que nous, et un lien garde le clic-droit « enregistrer sous ».
+  const exporter = el('a', 'reg-btn reg-btn--primary', 'Exporter en CSV');
+  exporter.href = `/api/factures.csv?annee=${journalAnnee}`;
+  exporter.setAttribute('download', `factures-olda-${journalAnnee}.csv`);
+  tete.append(choix, exporter);
+  hote.append(tete);
+
+  const dedans = journal.factures.filter((f) => String(f.numero).startsWith(`FA-${journalAnnee}-`));
+  if (!dedans.length) {
+    hote.append(el('p', 'reg-corb__vide', 'Aucune facture cette année-là.'));
+    return;
+  }
+  for (const f of dedans) {
+    const l = el('div', 'reg-ligne');
+    l.append(el('span', 'reg-ligne__nom', `${f.numero} — ${f.client}`));
+    // CE QUI MANQUE SE DIT DANS LE JOURNAL, pas seulement à l'émission : c'est
+    // ici qu'on repère les factures à rattraper, une fois la file passée.
+    const manque = f.clientType !== 'perso' && !String(f.clientAdresse || '').trim()
+      ? ' · adresse manquante' : '';
+    l.append(el('span', 'reg-ligne__aide',
+      `${f.date || ''} · ${euroTexte(f.ttc)} TTC${manque}`));
+    hote.append(l);
+  }
+}
+
+// Le même format que partout ailleurs, sans importer le moteur du devis pour
+// deux nombres : l'écran des Réglages n'a pas à connaître `devis.js`.
+function euroTexte(n) {
+  return `${(Number(n) || 0).toFixed(2).replace('.', ',')} €`;
+}
 
 function renderEntreprise() {
   const hote = $('#reg-entreprise');
@@ -1162,6 +1252,9 @@ export async function refreshReglages() {
     api('GET', '/api/catalogue-produits').then((d) => { if (Array.isArray(d)) catalogue = d; }).catch(() => {}),
     api('GET', '/api/tarifs-transport').then((d) => { if (d) transports = d; }).catch(() => {}),
     api('GET', '/api/settings/entreprise').then((d) => { if (d) entreprise = d; }).catch(() => {}),
+    // Le journal se relit à chaque retour sur l'onglet : une facture émise
+    // depuis un autre poste doit y être sans qu'on recharge la page.
+    api('GET', '/api/factures').then((d) => { if (d && Array.isArray(d.factures)) journal = d; }).catch(() => {}),
     api('GET', '/api/settings/textile').then((d) => { if (d) chiffrage = d; }).catch(() => {}),
   ]);
   renderMarges();
@@ -1172,6 +1265,7 @@ export async function refreshReglages() {
   renderMachines();
   renderFlags();
   renderCatalogue();
+  renderJournal();
   // UN APERÇU EN COURS DE LECTURE N'EST PAS ÉCRASÉ. Revenir sur l'onglet
   // pendant qu'on relit un rapport de 55 refus le ferait disparaître sous les
   // yeux — même règle que le message WhatsApp et l'identité de l'atelier.

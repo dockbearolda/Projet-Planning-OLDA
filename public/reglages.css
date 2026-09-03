@@ -140,6 +140,16 @@
   font: inherit;
   font-size: var(--taille-texte);
   font-weight: var(--graisse-forte);
+  /* UN BOUTON QUI EST UN LIEN RESTE UN BOUTON. L'export du journal des
+     factures est un <a download> — le navigateur sait telecharger une reponse
+     mieux que nous, et le clic droit « enregistrer sous » vaut d'etre garde.
+     Sans ces deux lignes il arrivait souligne et centre sur sa ligne de base :
+     meme hauteur, meme graisse, meme fond que les autres boutons, et pourtant
+     visiblement autre chose. La regle est ici, sur le composant, donc le
+     prochain <a class="reg-btn"> n'aura pas a la reecrire. */
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
   cursor: pointer;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }

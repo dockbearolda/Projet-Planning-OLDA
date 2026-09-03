@@ -136,7 +136,92 @@ delete process.env.APP_PASSWORD;
     assert.ok([404, 405].includes(rep.status), `${method} /api/factures/:id doit être refusé (reçu ${rep.status})`);
   }
 
-  console.log('✓ factures-api : numérotation sans trou, idempotence, immutabilité, relecture');
+  // --- LE JOURNAL : la liste et l'export que le comptable demande -------------
+  // SANS EUX, PERSONNE NE PEUT SORTIR LES VENTES DU MOIS : la seule lecture qui
+  // existait rendait UNE facture, à condition de connaître son dossier.
+  const journalRep = await fetch(`${base}/api/factures`);
+  assert.strictEqual(journalRep.status, 200);
+  const journal = await journalRep.json();
+  assert.ok(Array.isArray(journal.factures), 'le journal doit rendre une liste');
+  assert.ok(journal.factures.length >= 3, `au moins les trois factures émises ici : ${journal.factures.length}`);
+  assert.ok(journal.annees.length >= 1, 'le journal doit dire quelles années portent des factures');
+
+  const ligne = journal.factures.find((f) => f.numero === f1.numero);
+  assert.ok(ligne, 'la facture émise doit figurer au journal');
+  assert.strictEqual(ligne.ttc, 40.04, 'le TTC du journal est la COLONNE archivée, jamais une addition refaite');
+  // HT + taxe DOIVENT redonner le TTC au centime : c'est le contrôle qu'un
+  // comptable fait en premier, et une dérive d'un centime par ligne se voit
+  // sur le total du mois, pas sur la ligne.
+  assert.strictEqual(Math.round((ligne.totalHt + ligne.taxe) * 100) / 100, ligne.ttc,
+    `HT ${ligne.totalHt} + taxe ${ligne.taxe} ne redonne pas ${ligne.ttc}`);
+  assert.strictEqual(ligne.mode, 'cb');
+
+  // Le filtre par année est la maille de la NUMÉROTATION — celle sur laquelle
+  // un contrôle vérifie qu'il ne manque aucun rang.
+  const anneeCourante = Number(f1.numero.split('-')[1]);
+  const filtre = await fetch(`${base}/api/factures?annee=${anneeCourante}`).then((r) => r.json());
+  assert.ok(filtre.factures.length >= 3);
+  assert.ok(filtre.factures.every((f) => f.numero.startsWith(`FA-${anneeCourante}-`)),
+    'le filtre par année ne doit rendre que cette année-là');
+  const horsAnnee = await fetch(`${base}/api/factures?annee=1999`).then((r) => r.json());
+  assert.strictEqual(horsAnnee.factures.length, 0);
+
+  const csvRep = await fetch(`${base}/api/factures.csv?annee=${anneeCourante}`);
+  assert.strictEqual(csvRep.status, 200);
+  assert.match(csvRep.headers.get('content-type') || '', /text\/csv/);
+  // LE BOM ET LE POINT-VIRGULE ne sont pas cosmétiques : sans eux, le fichier
+  // s'ouvre en une seule colonne et « Réglé » arrive en « RÃ©glÃ© ».
+  //
+  // ⚠ ON LIT LES OCTETS, PAS LE TEXTE. `Response.text()` DÉCODE en UTF-8 et
+  // retire le BOM au passage (c'est la spec) : l'assertion sur la chaîne
+  // passerait tout aussi bien si le serveur n'en envoyait aucun.
+  const octets = new Uint8Array(await csvRep.clone().arrayBuffer());
+  assert.deepStrictEqual([...octets.slice(0, 3)], [0xef, 0xbb, 0xbf],
+    'le CSV doit commencer par un BOM UTF-8, sinon les accents sortent en mojibake');
+  const csv = await csvRep.text();
+  const entete = csv.replace('\uFEFF', '').split('\r\n')[0];
+  assert.ok(entete.split(';').length > 5, `l'en-tête doit être séparé par des point-virgules : ${entete}`);
+  assert.ok(csv.includes(f1.numero), 'la facture émise doit figurer dans l’export');
+  // Les lignes de l'export sont dans l'ordre CROISSANT des numéros : un journal
+  // comptable se lit dans le sens où il a été écrit.
+  const numerosCsv = csv.replace('\uFEFF', '').trim().split('\r\n').slice(1).map((l) => l.split(';')[0]);
+  assert.deepStrictEqual(numerosCsv, [...numerosCsv].sort(),
+    `l'export doit être trié par numéro croissant : ${numerosCsv.join(', ')}`);
+
+  // --- L'IDENTITÉ QUI SIGNE LA FACTURE ---------------------------------------
+  // LE DÉFAUT PAYÉ LE 03/09 : `app_meta.entreprise` n'existait pas en
+  // production, `getEntreprise()` retombait sur ses valeurs de repli (le nom
+  // seul) et une facture serait sortie sans SIRET, sans adresse et sans pied
+  // légal — un papier qui ne vaut rien. La semence de `db.js` la pose ; ce
+  // test est là pour qu'aucune base ne reparte nue.
+  const identite = await fetch(`${base}/api/settings/entreprise`).then((r) => r.json());
+  for (const cle of ['nom', 'adresse', 'ville', 'siret', 'ape', 'rcs', 'tva', 'capital']) {
+    assert.ok(String(identite[cle] || '').trim(),
+      `l’identité de l’atelier doit porter « ${cle} » — sans lui la facture n’est pas opposable`);
+  }
+  assert.strictEqual(identite.siret, '97829695200028');
+  // « RCS » est le préfixe posé par le papier (maisonPapier) : la valeur ne
+  // doit pas le reporter, sinon le pied dit « RCS RCS Saint-Martin ».
+  assert.ok(!/^RCS/i.test(identite.rcs), `le RCS ne doit pas reporter son préfixe : ${identite.rcs}`);
+  // Le document déjà archivé fige cette identité — il ne la relit jamais.
+  assert.strictEqual(f1.document.entreprise.siret, identite.siret);
+
+  // Une valeur SAISIE À LA MAIN n'est jamais réécrite par un second passage :
+  // c'est une décision, pas une case oubliée. La garde `app_meta` suffirait,
+  // mais c'est le « ne remplir que le vide » qu'on tient ici.
+  const { semerIdentiteAtelier, pool } = require('../db');
+  await fetch(`${base}/api/settings/entreprise`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adresse: 'Nouvelle adresse du patron' }),
+  });
+  await pool.query("DELETE FROM app_meta WHERE key = 'entreprise_seed_v1'");
+  await semerIdentiteAtelier();
+  const apresSemence = await fetch(`${base}/api/settings/entreprise`).then((r) => r.json());
+  assert.strictEqual(apresSemence.adresse, 'Nouvelle adresse du patron',
+    'la semence ne doit JAMAIS réécrire une identité saisie à la main');
+  assert.strictEqual(apresSemence.siret, '97829695200028', 'ce qui était déjà posé reste posé');
+
+  console.log('✓ factures-api : numérotation sans trou, idempotence, immutabilité, relecture, journal et export');
   process.exit(0);
 })().catch((err) => {
   console.error(err);
