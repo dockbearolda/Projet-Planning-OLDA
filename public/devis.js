@@ -138,8 +138,6 @@ export const REGIMES = [
 ];
 const REGIME_PAR_ID = new Map(REGIMES.map((r) => [r.id, r]));
 
-export const ACOMPTES = [0, 30, 50, 100];
-
 // L'ARRONDI COMMERCIAL PORTE SUR LE TTC, pas sur le HT : c'est le nombre que le
 // client paie, c'est donc lui qu'on rend rond. Le HT s'en déduit — dans l'autre
 // sens, un HT rond redonne un TTC à trois décimales, et on aurait arrondi
@@ -148,6 +146,24 @@ export const ARRONDIS = [
   { id: 'aucun', label: 'Aucun' },
   { id: 'euro', label: 'À l\u2019euro inférieur' },
   { id: 'dix', label: 'Au 0,10 \u20AC inférieur' },
+];
+
+// L'AJUSTEMENT GLOBAL (03/09/2026) — une remise ou une majoration négociée sur
+// L'ENSEMBLE du devis, en plus des remises par article déjà là. Un montant
+// négatif est une remise, positif une majoration ; il se tape en euros ou en
+// pourcentage du sous-total HT.
+export const AJUSTEMENT_UNITES = [
+  { id: 'eur', label: '\u20AC' },
+  { id: 'pct', label: '%' },
+];
+const AJUSTEMENT_UNITE_PAR_ID = new Set(AJUSTEMENT_UNITES.map((u) => u.id));
+
+// LA BASCULE VEDETTE (03/09/2026) — lequel des deux totaux, HT ou TTC, est le
+// géant de la feuille. Un devis en régime Revente/Export se discute en HT côté
+// client pro ; le calcul ne change pas, seule la mise en avant change.
+export const VEDETTES = [
+  { id: 'ttc', label: 'TTC' },
+  { id: 'ht', label: 'HT' },
 ];
 
 // LE CALCUL, UNE SEULE FOIS POUR LES DEUX MOITIÉS DE L'ÉCRAN. Le formulaire
@@ -180,10 +196,21 @@ export function calculerDevis(saisie) {
   });
   const sousTotalHt = cents(lignes.reduce((t, l) => t + l.totalHt, 0));
 
+  // L'AJUSTEMENT GLOBAL PORTE SUR LE SOUS-TOTAL HT, AVANT LA TGCA : une remise
+  // ou une majoration négociée sur l'ensemble se discute toujours hors taxe,
+  // et la taxe suit ensuite comme sur n'importe quelle ligne.
+  const ajustementUnite = AJUSTEMENT_UNITE_PAR_ID.has(s.ajustement && s.ajustement.unite)
+    ? s.ajustement.unite : 'eur';
+  const ajustementValeur = Number(s.ajustement && s.ajustement.valeur) || 0;
+  const ajustementMontant = ajustementUnite === 'pct'
+    ? cents(sousTotalHt * (ajustementValeur / 100))
+    : cents(ajustementValeur);
+  const sousTotalAjuste = cents(sousTotalHt + ajustementMontant);
+
   const regime = REGIME_PAR_ID.get(s.regime) || REGIMES[0];
   const taux = regime.taxable ? Math.max(0, Number(s.tauxTgca) || 0) : 0;
 
-  const vise = cents(sousTotalHt * (1 + taux));
+  const vise = cents(sousTotalAjuste * (1 + taux));
   let ttc = vise;
   if (s.arrondi === 'euro') ttc = Math.floor(vise + 1e-9);
   else if (s.arrondi === 'dix') ttc = Math.floor(vise * 10 + 1e-9) / 10;
@@ -191,9 +218,14 @@ export function calculerDevis(saisie) {
 
   const totalHt = taux ? cents(ttc / (1 + taux)) : ttc;
   const taxe = cents(ttc - totalHt);
-  const ecart = cents(totalHt - sousTotalHt);
+  // L'ÉCART NE MESURE QUE L'ARRONDI, PAS L'AJUSTEMENT : sinon la ligne
+  // « Arrondi commercial » mentirait sur ce qu'elle doit à chaque euro rond.
+  const ecart = cents(totalHt - sousTotalAjuste);
 
-  const pourcent = ACOMPTES.includes(Number(s.acompte)) ? Number(s.acompte) : 0;
+  // L'ACOMPTE EST UN POURCENTAGE LIBRE (0-100), tapé par la vendeuse — plus un
+  // menu figé à 0/30/50/100 % (03/09/2026). Il reste calculé sur le TTC : c'est
+  // ce que le client doit réellement, quelle que soit la bascule d'affichage.
+  const pourcent = Math.min(100, Math.max(0, Number(s.acompte) || 0));
   const acompte = cents(ttc * (pourcent / 100));
 
   // TANT QUE PERSONNE N'A POSÉ DE PRIX, IL N'Y A PAS DE TOTAL (02/09/2026,
@@ -211,12 +243,16 @@ export function calculerDevis(saisie) {
     lignes,
     aucunPrix,
     sousTotalHt,
+    ajustement: { unite: ajustementUnite, valeur: ajustementValeur, montant: ajustementMontant },
     ecart,
     totalHt,
     taxe,
     tauxTgca: taux,
     regime,
     ttc,
+    // LA BASCULE VEDETTE NE CHANGE AUCUN MONTANT — elle dit juste lequel des
+    // deux totaux (HT ou TTC) devient le géant de la feuille.
+    vedette: s.vedette === 'ht' ? 'ht' : 'ttc',
     acompte: { pourcent, montant: acompte, solde: cents(ttc - acompte) },
   };
 }
@@ -287,6 +323,9 @@ export function modeleDevis(saisie, entreprise) {
     // reste réservée, le premier prix posé la remplit sans rien décaler.
     totaux: compte.aucunPrix ? null : {
       sousTotalHt: euro(compte.sousTotalHt),
+      // L'AJUSTEMENT NE S'IMPRIME QUE S'IL N'EST PAS NUL. À zéro, c'est une
+      // ligne qui n'apprend rien et qui pousse le total d'un rang vers le bas.
+      ajustement: compte.ajustement.montant ? euro(compte.ajustement.montant) : '',
       // L'ARRONDI NE S'IMPRIME QUE S'IL EXISTE. À zéro, c'est une ligne qui
       // n'apprend rien et qui pousse le total d'un rang vers le bas.
       ecart: compte.ecart ? euro(compte.ecart) : '',
@@ -296,6 +335,8 @@ export function modeleDevis(saisie, entreprise) {
         : compte.regime.label,
       taxe: euro(compte.taxe),
       ttc: euro(compte.ttc),
+      // LA BASCULE VEDETTE : lequel des deux devient le géant de la feuille.
+      vedette: compte.vedette,
     },
     // LE CADRE DE RÈGLEMENT NE SORT QUE COMPLET. Un devis qui réclame un
     // acompte sans dire où le virer fait rappeler le client — c'est pire qu'un
@@ -551,11 +592,21 @@ export function dessinerDevis(t, doc) {
       return l;
     };
     totaux.append(ligneTotal('Sous-total HT', t.totaux.sousTotalHt));
+    if (t.totaux.ajustement) totaux.append(ligneTotal('Ajustement', t.totaux.ajustement));
     if (t.totaux.ecart) totaux.append(ligneTotal('Arrondi commercial', t.totaux.ecart));
-    totaux.append(ligneTotal('Total HT', t.totaux.totalHt));
-    totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
     const grand = el('div', 'dv__grand');
-    grand.append(el('div', 'pap-cap', 'TOTAL À PAYER'), el('div', 'dv__grand-v', t.totaux.ttc));
+    // LA BASCULE VEDETTE : le total mis en avant devient le géant, l'autre
+    // redescend en ligne normale — le calcul ne bouge pas, seule la mise en
+    // avant change (03/09/2026).
+    if (t.totaux.vedette === 'ht') {
+      totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
+      totaux.append(ligneTotal('TTC', t.totaux.ttc));
+      grand.append(el('div', 'pap-cap', 'TOTAL HT'), el('div', 'dv__grand-v', t.totaux.totalHt));
+    } else {
+      totaux.append(ligneTotal('Total HT', t.totaux.totalHt));
+      totaux.append(ligneTotal(t.totaux.taxeLabel, t.totaux.taxe));
+      grand.append(el('div', 'pap-cap', 'TOTAL À PAYER'), el('div', 'dv__grand-v', t.totaux.ttc));
+    }
     totaux.append(grand);
     bas.append(totaux);
   }

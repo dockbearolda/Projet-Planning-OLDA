@@ -212,6 +212,13 @@
 .dvf-rang__k, .dvf-rang__v { border-bottom: 1px solid var(--border-soft); }
 .dvf-rang:last-child > .dvf-rang__k, .dvf-rang:last-child > .dvf-rang__v { border-bottom: 0; }
 
+/* L'AJUSTEMENT GLOBAL (03/09/2026) — un montant et son unité (€ / %) sur la
+   même rangée. Les deux cases viennent de `.fa-in` : même hauteur que
+   n'importe quel autre champ de la carte, rien à répéter ici. */
+.dvf-ajustement { display: flex; gap: var(--pas-2); min-width: 0; }
+.dvf-ajustement > .dvf-nb { flex: 1; min-width: 0; }
+.dvf-ajustement > select { flex: 0 0 auto; width: 68px; }
+
 /* ===========================================================================
    LE TABLEAU DES ARTICLES (01/09/2026)
    ---------------------------------------------------------------------------
