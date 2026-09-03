@@ -82,4 +82,28 @@ assert.ok(/name:\s*articles\.length\s*===\s*1/.test(ECRAN),
 assert.ok(/quantity:\s*articles\.length\s*===\s*1/.test(ECRAN),
   'le payload doit poser `quantity` à la racine pour le cas d’un seul article');
 
-console.log('✓ vente-flash : exports, papier, mode de règlement obligatoire, ids sans collision, ordre des appels, panier à un article');
+// --- PU TTC, lié au PU HT (03/09/2026) --------------------------------------
+assert.ok(/COLONNES = \[.*'PU TTC'.*\]/.test(ECRAN), 'la colonne PU TTC doit exister dans l’en-tête du tableau');
+assert.ok(/const puTtc = entree/.test(ECRAN), 'le champ PU TTC doit exister sur chaque ligne');
+assert.ok(/tauxEffectif/.test(ECRAN), 'le taux effectif (régime + TGCA) doit servir à convertir HT ↔ TTC');
+assert.ok(/puTtc\.addEventListener\('input'/.test(ECRAN),
+  'éditer le TTC doit recalculer le HT — sinon le lien n’est que dans un sens');
+
+// --- Tailles libres, « Autres » retiré (03/09/2026) -------------------------
+assert.ok(!/TAILLES = \[[^\]]*'Autres'/.test(ECRAN), '« Autres » doit avoir disparu de la liste des tailles fixes');
+assert.ok(/taillesLibres/.test(ECRAN), 'les tailles libres (bulles nommées) doivent exister sur chaque ligne');
+assert.ok(/\+ Taille/.test(ECRAN), 'le bouton d’ajout d’une taille libre doit exister');
+
+// --- `[hidden]` DÉFAIT PAR `display` (piège déjà documenté du dépôt) -------
+// Trouvé en vérifiant au navigateur (03/09/2026) : `.dvf-libres-cadre` et
+// `.fa-tailles` portent toutes deux une règle `display` d'auteur qui bat le
+// `display: none` de l'agent utilisateur à spécificité égale — sans override
+// explicite, `cases.hidden`/`cadreLibres.hidden` ne masquent RIEN sur une
+// tasse (six cases vides, bouton « + Taille » cliquable dans le vide).
+const CSS_PARTAGE = lire('public/devis-flash.css');
+assert.ok(/\.dvf-libres-cadre\[hidden\]\s*\{\s*display:\s*none/.test(CSS_PARTAGE),
+  '.dvf-libres-cadre[hidden] doit forcer display:none — sinon le hidden JS ne masque rien');
+assert.ok(/\.fa-tailles\[hidden\]\s*\{\s*display:\s*none/.test(CSS_PARTAGE),
+  '.fa-tailles[hidden] (scopé à ces deux écrans) doit forcer display:none — même piège, déjà réel en production sur le devis flash');
+
+console.log('✓ vente-flash : exports, papier, mode de règlement obligatoire, ids sans collision, ordre des appels, panier à un article, PU TTC lié, tailles libres, hidden/display');

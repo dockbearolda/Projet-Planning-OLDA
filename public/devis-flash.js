@@ -125,28 +125,43 @@ function saisieNeuve() {
 // coefficient est dégressif sur la quantité, pas sur la répartition (voir
 // `chiffrerTextile`, qui lui passe `{ other: quantité }`). Un XS de plus ici ne
 // change donc rien au prix, et n'oblige à toucher à rien là-bas.
-// ⚠ « AUTRES » FERME LA GRILLE (02/09, Charlie : « ajoute autre taille »). Le
-// comptoir l'a depuis toujours : c'est le bac de ce qui ne rentre pas dans les
-// six — un 3XL, un enfant, une coupe femme comptée à part. Sans lui, ces pièces
-// se saisissaient dans la quantité et disparaissaient de la répartition.
-const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL', 'Autres'];
+// ⚠ « AUTRES » A DISPARU (03/09/2026). C'était un bac générique — un 3XL, un
+// enfant, une coupe femme comptaient tous pareil, sous le même mot, et le
+// devis ne disait plus lequel. Remplacé par les TAILLES LIBRES ci-dessous :
+// Charlie voulait pouvoir « créer sa bulle » et lui donner un nom (« 4XL »),
+// autant de fois que nécessaire sur une même ligne.
+const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
 
-// CE QUE LES TAILLES DISENT SUR LE DEVIS : « 2 × S · 3 × M ». C'est la
-// grammaire de toute la maison — la fiche de production et le ticket de
-// l'atelier comptent ainsi. Le texte est DÉRIVÉ des cases : il n'y a qu'une
-// source, et une répartition corrigée à l'écran ne peut pas laisser sur le
-// papier celle d'avant.
-function texteTailles(parTaille) {
-  return TAILLES
+// CE QUE LES TAILLES DISENT SUR LE DEVIS : « 2 × S · 3 × M · 3 × 4XL ». C'est
+// la grammaire de toute la maison — la fiche de production et le ticket de
+// l'atelier comptent ainsi. Le texte est DÉRIVÉ des cases (fixes ET libres) :
+// il n'y a qu'une source, et une répartition corrigée à l'écran ne peut pas
+// laisser sur le papier celle d'avant.
+//
+// `taillesLibres` : `[{ nom, qte }, …]` — les bulles créées à la main sur
+// CETTE ligne. Un nom vide ou une quantité à zéro ne compte pas : une bulle
+// qu'on vient d'ouvrir et qu'on n'a pas encore remplie ne doit ni s'imprimer
+// ni peser dans le total.
+function texteTailles(parTaille, taillesLibres) {
+  const fixes = TAILLES
     .filter((t) => Number((parTaille || {})[t]) > 0)
-    .map((t) => `${Number(parTaille[t])} × ${t}`)
-    .join(' · ');
+    .map((t) => `${Number(parTaille[t])} × ${t}`);
+  const libres = (Array.isArray(taillesLibres) ? taillesLibres : [])
+    .filter((l) => l && String(l.nom || '').trim() && Number(l.qte) > 0)
+    .map((l) => `${Number(l.qte)} × ${String(l.nom).trim()}`);
+  return [...fixes, ...libres].join(' · ');
 }
-function totalTailles(parTaille) {
-  return TAILLES.reduce((s, t) => s + (Number((parTaille || {})[t]) || 0), 0);
+function totalTailles(parTaille, taillesLibres) {
+  const fixes = TAILLES.reduce((s, t) => s + (Number((parTaille || {})[t]) || 0), 0);
+  const libres = (Array.isArray(taillesLibres) ? taillesLibres : [])
+    .filter((l) => l && String(l.nom || '').trim())
+    .reduce((s, l) => s + (Number(l.qte) || 0), 0);
+  return fixes + libres;
 }
 // UN BROUILLON D'AVANT LES CASES porte ses tailles en TEXTE. On le relit plutôt
-// que de le jeter : la grammaire est la nôtre, on sait la défaire.
+// que de le jeter : la grammaire est la nôtre, on sait la défaire. Les tailles
+// LIBRES n'existaient pas à l'époque de ce format texte : rien à en relire ici,
+// `taillesLibres` part toujours d'un tableau vide sur un brouillon ancien.
 function lireTailles(texte) {
   const par = {};
   const re = /(\d+)\s*[×x]\s*([A-Za-z0-9]+)/g;
@@ -196,9 +211,11 @@ function relireBrouillon() {
     saisie = { ...saisieNeuve(), ...d.saisie, client: { ...saisieNeuve().client, ...(d.saisie.client || {}) } };
     saisie.lignes = Array.isArray(d.saisie.lignes) ? d.saisie.lignes : [];
     // Une ligne d'avant les cases de taille garde sa répartition : on la relit
-    // du texte, seule écriture qu'elle en avait.
+    // du texte, seule écriture qu'elle en avait. Une ligne d'avant les tailles
+    // LIBRES (03/09) n'en a simplement aucune.
     for (const l of saisie.lignes) {
       if (!l.parTaille || typeof l.parTaille !== 'object') l.parTaille = lireTailles(l.tailles);
+      if (!Array.isArray(l.taillesLibres)) l.taillesLibres = [];
     }
     dossierId = d.dossierId || null;
     replis = d.replis && typeof d.replis === 'object' ? d.replis : {};
@@ -920,7 +937,7 @@ function carteProjet() {
 // LES COLONNES DU TABLEAU, ÉCRITES UNE FOIS. L'en-tête les pose, chaque ligne
 // les remplit dans le même ordre : deux listes, ce serait un intitulé qui coiffe
 // la mauvaise case le jour où l'on en insère une.
-const COLONNES = ['Désignation', 'Qté', 'PU HT', 'Total', ''];
+const COLONNES = ['Désignation', 'Qté', 'PU HT', 'PU TTC', 'Total', ''];
 
 function carteArticles() {
   const [c, corps] = carte('local_grocery_store', 'Articles', 'articles');
@@ -1460,6 +1477,10 @@ function ajouterLigne(modele) {
     // est dérivé — une seule source, sinon le papier dit une répartition et
     // l'écran une autre.
     parTaille: {},
+    // `taillesLibres` : les bulles créées à la main (03/09) — `[{ nom, qte }]`.
+    // Même principe que `parTaille` : `tailles` (le texte imprimé) en est
+    // dérivé, jamais tapé séparément.
+    taillesLibres: [],
     // ⚠ `null`, PAS `0`. Une ligne neuve n'a pas de prix ; un zéro serait un
     // prix — celui d'un article offert. Les deux s'écrivaient pareil, et une
     // tasse sans tarif sortait sur le papier du client à « 0,00 € ». Voir
@@ -1581,6 +1602,23 @@ function rangeeArticle(ligne) {
   });
   pu.step = '0.01';
   pu.placeholder = SANS_PRIX;
+  // LE PU TTC, LIÉ AU PU HT (03/09/2026). Charlie : « pouvoir modifier l'un ou
+  // l'autre mais qu'il reste lié ». Le HT reste la valeur qui COMPTE — c'est
+  // elle qui nourrit `calculerDevis` et la feuille — le TTC n'est qu'une
+  // commodité de saisie : au comptoir, on pense souvent au prix que le client
+  // voit, pas au prix hors taxe.
+  // ⚠ LIMITE ACCEPTÉE : si le régime TGCA change APRÈS avoir tapé un prix, ce
+  // champ ne se recalcule pas tout seul (rien ne le relie en continu à la
+  // carte Fiscalité) — mais le total réel de la feuille, lui, reste toujours
+  // juste, puisqu'il part du HT et du taux COURANT, pas de ce champ.
+  const tauxEffectif = () => (saisie.regime === 'tgca' ? (Number(saisie.tauxTgca) || 0) : 0);
+  const puTtc = entree(`dvf-a-${n}-ptc`, {
+    type: 'number',
+    valeur: ligne.unitaireHt == null ? '' : Math.round(ligne.unitaireHt * (1 + tauxEffectif()) * 100) / 100,
+    classe: 'dvf-nb',
+  });
+  puTtc.step = '0.01';
+  puTtc.placeholder = SANS_PRIX;
   // LE TOTAL DE LA LIGNE EST UNE CASE, PAS UN CHAMP : il ne se tape pas, il se
   // lit. Il prend le rail des cases pour tomber sur elles.
   const total = el('div', 'dvf-tab__lu dvf-nb');
@@ -1588,7 +1626,7 @@ function rangeeArticle(ligne) {
   sup.type = 'button';
   sup.setAttribute('aria-label', 'Retirer cet article');
   sup.append(ic('delete'));
-  rangee.append(design, qte, pu, total, sup);
+  rangee.append(design, qte, pu, puTtc, total, sup);
   // ⚠ APRÈS L'INSERTION, JAMAIS AVANT. `menuPoser` REMPLACE le champ par sa peau
   // dans la page (`hote.replaceWith(peau)`) : habillé hors de la page, le champ
   // se retrouve dans une peau détachée, et l'append suivant le sortirait de sa
@@ -1705,6 +1743,66 @@ function rangeeArticle(ligne) {
     cases.append(boite);
     champsTaille.set(t, c);
   }
+
+  // --- LES TAILLES LIBRES — « je crée ma bulle » (03/09/2026) -------------
+  // Charlie : un client demande un 4XL, qui n'est ni dans les six cases ni un
+  // « Autres » anonyme — il veut créer SA bulle et lui donner un nom. Répétable
+  // : rien n'empêche une ligne de porter un 4XL ET un « enfant 8 ans ».
+  //
+  // POSÉES DANS LEUR PROPRE CONTENEUR, PAS DANS `cases` (`.fa-tailles`) : cette
+  // classe est celle de la fiche de production (fiche-atelier.css), lue par
+  // l'écran de l'atelier — y ajouter un nombre variable de bulles la
+  // déborderait sans qu'on l'ait décidé pour elle. `dvf-libres` est propre à
+  // cet écran (devis-flash.css).
+  const libres = el('div', 'dvf-libres');
+  function redessinerLibres() {
+    libres.replaceChildren();
+    (ligne.taillesLibres || []).forEach((tl, i) => {
+      const bulle = el('div', 'dvf-taille-libre');
+      const champNom = entree(`dvf-a-${n}-tl-${i}-nom`, { valeur: tl.nom, exemple: '4XL' });
+      const champQte = entree(`dvf-a-${n}-tl-${i}-qte`, { type: 'number', valeur: tl.qte || '', classe: 'dvf-nb' });
+      champQte.placeholder = '0';
+      const retirer = el('button', 'reg-tarif-del');
+      retirer.type = 'button';
+      retirer.setAttribute('aria-label', 'Retirer cette taille');
+      retirer.append(ic('delete'));
+      champNom.addEventListener('input', () => {
+        tl.nom = champNom.value;
+        rafraichirQte();
+        redessiner();
+      });
+      champQte.addEventListener('input', () => {
+        tl.qte = Math.max(0, Number(champQte.value) || 0);
+        rafraichirQte();
+        redessiner();
+      });
+      retirer.addEventListener('click', () => {
+        ligne.taillesLibres.splice(i, 1);
+        rafraichirQte();
+        redessinerLibres();
+        redessiner();
+      });
+      bulle.append(champNom, champQte, retirer);
+      libres.append(bulle);
+    });
+  }
+  redessinerLibres();
+  const ajouterTaille = el('button', 'action-ligne', '+ Taille');
+  ajouterTaille.type = 'button';
+  ajouterTaille.addEventListener('click', () => {
+    if (!Array.isArray(ligne.taillesLibres)) ligne.taillesLibres = [];
+    ligne.taillesLibres.push({ nom: '', qte: 0 });
+    redessinerLibres();
+    // LE NOM DE LA BULLE QU'ON VIENT D'OUVRIR REÇOIT LE FOCUS. Elle est vide,
+    // donc silencieuse (ni imprimée ni comptée) tant qu'on n'a rien tapé —
+    // pas la peine de cliquer une seconde fois pour commencer à écrire.
+    const dernier = libres.lastElementChild;
+    const champ = dernier && dernier.firstElementChild;
+    if (champ) champ.focus();
+  });
+  const cadreLibres = el('div', 'dvf-libres-cadre');
+  cadreLibres.append(libres, ajouterTaille);
+
   const note = entree(`dvf-a-${n}-n`, { valeur: ligne.note, exemple: 'Précision qui figurera sur le devis' });
   // « Recalculer » ne s'affiche QUE si le prix a été repris à la main : le reste
   // du temps il n'y a rien à reprendre, le moteur suit déjà la quantité et le
@@ -1724,7 +1822,7 @@ function rangeeArticle(ligne) {
   detail.append(caseRef, caseCoul, caseMarq, caseFace1, caseFace2);
   // ⚠ UNE LIGNE SIMPLE S'ARRÊTE À SA RANGÉE. Un transport n'a ni référence, ni
   // couleur, ni marquage, ni tailles, et sa note est écrite d'avance.
-  if (!ligne.simple) bloc.append(detail, detail2, libre, caseNote, cases);
+  if (!ligne.simple) bloc.append(detail, detail2, libre, caseNote, cases, cadreLibres);
 
   // LA QUANTITÉ SE COMPTE QUAND LES TAILLES SONT REMPLIES, et elle se tape
   // sinon. Une tasse n'a pas de taille : sa case reste une saisie. Un t-shirt
@@ -1732,14 +1830,14 @@ function rangeeArticle(ligne) {
   // disent la même chose et qui peuvent se contredire, c'est le devis qui
   // annonce 24 pièces et en détaille 22.
   const rafraichirQte = () => {
-    const somme = totalTailles(ligne.parTaille);
+    const somme = totalTailles(ligne.parTaille, ligne.taillesLibres);
     qte.readOnly = somme > 0;
     qte.classList.toggle('dvf-tab__calc', somme > 0);
     if (somme > 0) {
       ligne.quantite = somme;
       if (document.activeElement !== qte) qte.value = String(somme);
     }
-    ligne.tailles = texteTailles(ligne.parTaille);
+    ligne.tailles = texteTailles(ligne.parTaille, ligne.taillesLibres);
   };
 
   // CE QUE LA LIGNE MONTRE DÉPEND DE CE QU'ELLE EST. Une seule écriture, appelée
@@ -1752,10 +1850,11 @@ function rangeeArticle(ligne) {
       [caseDessous, true], [caseBat, true]]) {
       c.hidden = pourTasse !== estTasse;
     }
-    // UNE TASSE N'A PAS DE TAILLES. Six cases vides sous chaque tasse, c'est
-    // six occasions d'y écrire un nombre qui ne veut rien dire — et la quantité
-    // deviendrait leur somme.
+    // UNE TASSE N'A PAS DE TAILLES — ni fixes, ni libres. Six cases vides sous
+    // chaque tasse, c'est six occasions d'y écrire un nombre qui ne veut rien
+    // dire, et la quantité en deviendrait la somme.
     cases.hidden = estTasse;
+    cadreLibres.hidden = estTasse;
   };
 
   const rafraichirTete = () => {
@@ -1778,6 +1877,11 @@ function rangeeArticle(ligne) {
     // que quelqu'un est en train d'y écrire.
     if (document.activeElement === pu) return;
     pu.value = ligne.unitaireHt == null ? '' : String(ligne.unitaireHt);
+    // LE TTC SUIT LE HT que le moteur vient de poser — même garde : on ne
+    // reprend pas cette case-là non plus si quelqu'un y écrit.
+    if (document.activeElement === puTtc) return;
+    puTtc.value = ligne.unitaireHt == null ? ''
+      : String(Math.round(ligne.unitaireHt * (1 + tauxEffectif()) * 100) / 100);
   };
 
   // REFAIRE LE PRIX — par la grille de la tasse, ou par le moteur du textile.
@@ -1962,6 +2066,22 @@ function rangeeArticle(ligne) {
     // négociation ne doit pas se faire écraser au prochain changement de
     // quantité ; « Recalculer » le rend au moteur quand on a fini.
     if (ligne.textile || ligne.tasse) ligne.puManuel = true;
+    // LE TTC SUIT LE HT qu'on vient de taper — c'est lui qui reste la valeur
+    // qui compte, le TTC n'en est que le reflet.
+    puTtc.value = ligne.unitaireHt == null ? ''
+      : String(Math.round(ligne.unitaireHt * (1 + tauxEffectif()) * 100) / 100);
+    rafraichirTete();
+    redessiner();
+  });
+  puTtc.addEventListener('input', () => {
+    // LE SENS INVERSE : on tape le TTC, le HT s'en déduit — c'est TOUJOURS lui
+    // qui repart vers `calculerDevis`, jamais le TTC directement.
+    const brutTtc = String(puTtc.value).trim();
+    const taux = tauxEffectif();
+    ligne.unitaireHt = brutTtc === '' ? null : Math.max(0, Math.round((Number(puTtc.value) || 0) / (1 + taux) * 100) / 100);
+    ligne.pleinHt = ligne.remise ? null : ligne.unitaireHt;
+    if (ligne.textile || ligne.tasse) ligne.puManuel = true;
+    pu.value = ligne.unitaireHt == null ? '' : String(ligne.unitaireHt);
     rafraichirTete();
     redessiner();
   });

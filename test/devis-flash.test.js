@@ -675,16 +675,17 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
   assert.strictEqual(pistes.length, 1, 'les colonnes du tableau sont déclarées une seule fois');
   assert.ok(/\.dvf-tab__tete,\n\.dvf-tab__rang \{[^}]*grid-template-columns: var\(--dvf-cols\)/.test(FEUILLE),
     'l’en-tête et la rangée lisent la même déclaration, dans la même règle');
-  // CINQ COLONNES : ce qu'on vend, combien, à quel prix, le total, la corbeille.
-  // Référence, couleur, marquage, note et tailles sont SOUS la ligne — les huit
-  // colonnes du départ demandaient 772 px là où la colonne de saisie en fait
-  // 574, et à six la référence sortait à 50 px avec son intitulé chevauchant
-  // celui de « Qté » (mesuré au rendu le 02/09).
+  // SIX COLONNES : ce qu'on vend, combien, à quel prix HT, à quel prix TTC, le
+  // total, la corbeille. Référence, couleur, marquage, note et tailles sont
+  // SOUS la ligne — les huit colonnes du départ demandaient 772 px là où la
+  // colonne de saisie en fait 574, et à six la référence sortait à 50 px avec
+  // son intitulé chevauchant celui de « Qté » (mesuré au rendu le 02/09). Le PU
+  // TTC (03/09) s'est ajouté à ce compte, pas retranché d'une autre colonne.
   const colonnes = ECRAN.match(/const COLONNES = \[([^\]]*)\]/);
   assert.ok(colonnes, 'les intitulés de colonne sont une liste, écrite une fois');
-  assert.strictEqual(colonnes[1].split(',').length, 5, 'cinq colonnes, pas une de plus');
-  assert.ok(/rangee\.append\(design, qte, pu, total, sup\)/.test(ECRAN),
-    'la rangée remplit les cinq colonnes dans l’ordre de l’en-tête');
+  assert.strictEqual(colonnes[1].split(',').length, 6, 'six colonnes, pas une de plus');
+  assert.ok(/rangee\.append\(design, qte, pu, puTtc, total, sup\)/.test(ECRAN),
+    'la rangée remplit les six colonnes dans l’ordre de l’en-tête');
   // ⚠ ON COMPTE DES PISTES, PAS DES MOTS : `minmax(0, 1fr)` en fait deux si on
   // découpe sur l'espace. Les parenthèses se replient d'abord.
   const pistes5 = FEUILLE.match(/--dvf-cols:([^;]*);/);
@@ -694,12 +695,12 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
     'la feuille déclare exactement autant de pistes que l’en-tête a d’intitulés');
   // LE MENU S'HABILLE APRÈS L'INSERTION : `menuPoser` remplace le champ dans la
   // page, et un champ habillé hors de la page perd sa peau à l'append suivant.
-  assert.ok(ECRAN.indexOf('rangee.append(design, qte, pu, total, sup)') < ECRAN.indexOf('menuPoser(design)'),
+  assert.ok(ECRAN.indexOf('rangee.append(design, qte, pu, puTtc, total, sup)') < ECRAN.indexOf('menuPoser(design)'),
     'la désignation entre dans la rangée AVANT d’être habillée par le menu');
   // UNE LIGNE SIMPLE S'ARRÊTE À SA RANGÉE : le transport n'a ni référence, ni
   // couleur, ni marquage, ni tailles — il sortait avec les trois rangées d'un
   // t-shirt, soit quatre fois la place de ce qu'il dit.
-  assert.ok(/if \(!ligne\.simple\) bloc\.append\(detail, detail2, libre, caseNote, cases\)/.test(ECRAN),
+  assert.ok(/if \(!ligne\.simple\) bloc\.append\(detail, detail2, libre, caseNote, cases, cadreLibres\)/.test(ECRAN),
     'une ligne simple ne porte pas le détail de production d’un article');
   assert.ok(/simple: true,/.test(ECRAN), '… et c’est le transport qui la demande');
   // L'en-tête se tait quand il n'y a rien dessous, et il se réveille au premier
@@ -709,16 +710,16 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
 }
 {
   // LES SIX TAILLES, de XS à 2XL, dans la grille de la fiche de production.
-  // « AUTRES » FERME LA GRILLE (02/09) : le bac de ce qui ne rentre pas dans
-  // les six — un 3XL, un enfant. Le comptoir l'a depuis toujours ; sans lui, ces
-  // pièces se saisissaient dans la quantité et sortaient de la répartition.
-  assert.ok(/const TAILLES = \['XS', 'S', 'M', 'L', 'XL', '2XL', 'Autres'\]/.test(ECRAN),
-    'XS, S, M, L, XL, 2XL puis Autres — et dans cet ordre');
+  // « AUTRES » A DISPARU (03/09) : remplacé par les tailles LIBRES (bulles
+  // nommées, testées plus bas) — un 3XL ou un enfant se nomme désormais,
+  // au lieu de se compter dans un bac générique.
+  assert.ok(/const TAILLES = \['XS', 'S', 'M', 'L', 'XL', '2XL'\]/.test(ECRAN),
+    'XS, S, M, L, XL, 2XL — et dans cet ordre, sans « Autres »');
   assert.ok(ECRAN.includes("el('div', 'fa-tailles')") && ECRAN.includes("'fa-lab fa-taille__k'"),
     'les cases de taille sont celles de la fiche de production, pas une grille qui leur ressemble');
   assert.ok(!/\.fa-tailles?\s*(,|\{)/.test(FEUILLE), 'devis-flash.css ne redéclare pas la grille des tailles');
   // LE TEXTE DU DEVIS EST DÉRIVÉ DES CASES — une seule source.
-  assert.ok(/ligne\.tailles = texteTailles\(ligne\.parTaille\)/.test(ECRAN),
+  assert.ok(/ligne\.tailles = texteTailles\(ligne\.parTaille, ligne\.taillesLibres\)/.test(ECRAN),
     'ce que le papier dit des tailles sort des cases, jamais d’un champ à part');
   assert.ok(/`\$\{Number\(parTaille\[t\]\)\} × \$\{t\}`/.test(ECRAN) && /\.join\(' · '\)/.test(ECRAN),
     'et c’est la grammaire de la maison : « 2 × S · 3 × M »');
@@ -953,5 +954,33 @@ assert.ok(/if \(p\.actif === false\) continue;/.test(ECRAN),
     'marquage, faces et couleur se relisent depuis la ligne après un changement de produit');
 }
 
+// --- PU TTC, lié au PU HT (03/09/2026) --------------------------------------
+// « tu fait les modif dans vente flash car ces 2 categorie sont lié » (Charlie)
+// — la même fonctionnalité que Vente Flash (test/vente-flash.test.js), dans
+// l’écran du devis.
+assert.ok(/COLONNES = \[.*'PU TTC'.*\]/.test(ECRAN), 'la colonne PU TTC doit exister dans l’en-tête du tableau');
+assert.ok(/const puTtc = entree/.test(ECRAN), 'le champ PU TTC doit exister sur chaque ligne');
+assert.ok(/tauxEffectif/.test(ECRAN), 'le taux effectif (régime + TGCA) doit servir à convertir HT ↔ TTC');
+assert.ok(/puTtc\.addEventListener\('input'/.test(ECRAN),
+  'éditer le TTC doit recalculer le HT — sinon le lien n’est que dans un sens');
+
+// --- Tailles libres, « Autres » retiré (03/09/2026) -------------------------
+assert.ok(!/TAILLES = \[[^\]]*'Autres'/.test(ECRAN), '« Autres » doit avoir disparu de la liste des tailles fixes');
+assert.ok(/taillesLibres/.test(ECRAN), 'les tailles libres (bulles nommées) doivent exister sur chaque ligne');
+assert.ok(/\+ Taille/.test(ECRAN), 'le bouton d’ajout d’une taille libre doit exister');
+
+// --- `[hidden]` DÉFAIT PAR `display` (piège déjà documenté du dépôt) -------
+// Trouvé en vérifiant Vente Flash au navigateur (03/09/2026) : `.dvf-libres-cadre`
+// et `.fa-tailles` portent toutes deux une règle `display` d'auteur qui bat le
+// `display: none` de l'agent utilisateur à spécificité égale — sans override
+// explicite, `cases.hidden`/`cadreLibres.hidden` ne masquent RIEN sur une
+// tasse. Le correctif vit dans la feuille PARTAGÉE (devis-flash.css) : ce
+// devis en bénéficie donc déjà, mais on le verrouille aussi depuis cet écran.
+assert.ok(/\.dvf-libres-cadre\[hidden\]\s*\{\s*display:\s*none/.test(FEUILLE),
+  '.dvf-libres-cadre[hidden] doit forcer display:none — sinon le hidden JS ne masque rien');
+assert.ok(/\.fa-tailles\[hidden\]\s*\{\s*display:\s*none/.test(FEUILLE),
+  '.fa-tailles[hidden] (scopé à ces deux écrans) doit forcer display:none — six cases fantômes sous une tasse, sinon');
+
 console.log('✓ devis : l’addition tombe juste sur trois arrondis, le papier tient son A4, '
-  + 'l’écran ne réinvente aucun composant, et les six tailles comptent la quantité');
+  + 'l’écran ne réinvente aucun composant, les six tailles comptent la quantité, '
+  + 'PU TTC lié, tailles libres, hidden/display');
