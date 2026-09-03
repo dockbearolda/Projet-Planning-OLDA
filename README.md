@@ -254,6 +254,7 @@ personne sur place n'a de raison de deviner qu'il faudrait recharger. Depuis le
 | PATCH | `/api/requests/:id` | Met à jour un ou plusieurs champs. |
 | PATCH | `/api/requests/:id/fiche` | **Corrige la fiche** : le récapitulatif du comptoir par **position** (`{ client: [], details: [] }` — les libellés viennent du parcours et ne se réécrivent pas ; une case non remplie n'est pas touchée, donc deux postes qui corrigent deux articles ne s'effacent pas), l'heure de retrait, le secteur de production, la **consigne pour l'atelier** (`atelier`, 500 caractères) et le **numéro du papier remis au client** (`refTicket`). La ligne est prise `FOR UPDATE` le temps de la relire et de la réécrire. `fiche.ref` n'est **jamais** modifiable par cette porte. |
 | DELETE | `/api/requests/:id` | **Archive** la demande — elle ne s'efface pas. La ligne quitte tous les écrans (`deleted_at`), garde son journal et ses PDF, et se retrouve dans la corbeille des Réglages, d'où elle revient à sa famille et à sa sous-étape. |
+| GET | `/api/agenda` | **L'agenda des retraits** : `{ lignes: [{ id, stage, sub_stage, billing_company, client_type, quantity, product, deadline, flag, flag_reason, heure }], sansDate }`, du plus proche au plus lointain. Ne rend que ce qu'il reste à **remettre au client** — tout sauf « Paiement & clôture » (le dossier est parti), « Commande récupérée » (il vient d'être remis), Fiverr (sous-traitance) et l'archive. `heure` sort de `fiche.heureSouhaitee` (`retrait_creneau` est mesurée vide sur les 205 dossiers de production). **Aucun prix ne voyage** : l'écran n'en affiche pas, et cette liste repart à chaque évènement temps réel vers chaque poste. Les dossiers sans date ne sont pas rendus — ils ne se rangent sous aucun jour — mais ils sont **comptés** (`sansDate`), parce que les taire ferait lire l'agenda comme complet. |
 | GET | `/api/requests/recherche?q=…` | **La recherche globale**, faite par le serveur (une page de résultats, pas tout le planning). Tous les jetons doivent apparaître, sans distinction de casse ni d'accent. Cherche dans le dossier, le référent, la description, les contacts, l'alerte — **et le numéro du ticket** (`fiche.ref`, plus `fiche.refTicket` quand le papier remis au client porte un autre numéro) : c'est le seul repère que le client rapporte au comptoir. |
 | GET | `/api/requests/:id/journal` | Ce qui a changé sur cette commande (étape, état, prix, échéance, priorité, pilote, référent, payé), du plus récent au plus ancien. La `position` en est exclue : un seul glisser en réécrit une dizaine. |
 | GET | `/api/ordre-manuel` | `[<slugÉtape>, ...]` — les étapes rangées à la main. |
@@ -430,6 +431,84 @@ et **déjà corrigeable**, champ par champ, avec le cadre « Pour l'atelier » e
 bas. Un **point** sur la pastille signale qu'une consigne y a été écrite. Sur le
 tableau, le ticket a sa propre **colonne**, réglable depuis le rail.
 
+### L'agenda des retraits — le planning par JOUR (03/09/2026)
+
+Demande de Charlie : « un agenda par jours, avec juste les noms des clients et
+les jours de retrait, pour que ma vendeuse en 1 regard puisse voir qui vient
+chercher quoi pour aujourd'hui, demain… ».
+
+Le rail range le planning par **étape** — où en est le travail. L'agenda le
+range par **jour** — qui passe le prendre, et quand. C'est la même liste vue par
+l'autre bout : aucune donnée propre, aucune saisie. Sa porte est **en tête du
+rail**, là où la vendeuse choisit déjà ses listes, et son adresse est `#agenda`.
+
+**Deux vues, une seule liste derrière.** La bascule `[Jour] [Mois]` est dans
+l'en-tête de l'écran, et le choix suit l'appareil (`olda.agenda-vue`) : passer
+de l'une à l'autre ne coûte pas une requête et ne peut pas afficher deux
+vérités.
+
+### Au jour — l'écran du matin
+
+| | Ce qu'une rangée dit |
+|---|---|
+| **Quand** | l'heure du retrait (`fiche.heureSouhaitee`) — vide veut dire « dans la journée », et la colonne se tait plutôt que d'aligner des tirets |
+| **Qui** | le nom du dossier, en capitales pour un particulier |
+| **Quoi** | `25 × T-shirts blancs DTF` — la quantité colle à l'article, c'est ce qu'on vérifie en le donnant |
+| **Est-ce prêt** | la **sous-étape** en « Facturation & remise » (à facturer / client à prévenir / client prévenu), la **famille** partout ailleurs. Sur une commande bloquée, le **motif** prend sa place : sans lui, on promet un retrait qui n'aura pas lieu |
+
+Un bloc par jour, dans l'ordre du calendrier, et rien pour les jours sans
+retrait. « Aujourd'hui » et « Demain » sont nommés et datés ; les autres jours
+se datent. **Le retard est un seul bloc, en tête** — un bloc par jour passé
+donnerait dix en-têtes avant « Aujourd'hui », et le mettre en bas reviendrait à
+ranger sous le tapis les clients qui attendent depuis le plus longtemps ; ses
+rangées portent leur **date** à la place de leur heure. L'en-tête d'une journée
+reste **sous les yeux** pendant qu'on parcourt ses lignes.
+
+Le compteur de l'écran dit aussi combien de dossiers **n'ont pas de date de
+retrait** : ils ne peuvent se ranger sous aucun jour, mais les taire ferait lire
+l'agenda comme complet.
+
+### Au mois — le calendrier, et rien que les noms
+
+Sept colonnes (lundi d'abord), les semaines l'une sous l'autre, et dans chaque
+journée **la liste des noms de clients** — pas l'heure, pas l'article, pas
+l'état. Cette vue répond à « à quoi ressemble la fin du mois ? », pas à « qui
+passe dans l'heure ? ». **Tout le reste est au survol** du nom : heure, article
+et état, exactement ce qu'une rangée de la vue au jour porte.
+
+- **Le nom s'enroule, il ne se coupe pas.** Une colonne fait 123 px, soit ~15
+  signes en 14 px : sur une seule ligne avec des points de suspension, la moitié
+  de la grille devenait illisible. Sur les 87 entreprises de la base semée, la
+  plus longue fait 27 signes et 85 en font 26 ou moins — deux lignes suffisent
+  donc presque toujours, et rien n'est jamais caché derrière un « + 3 ».
+- **Aujourd'hui** porte une pastille pleine. Un **jour passé qui tient encore
+  des noms** est un retard : son numéro passe au rouge, et lui seul — peindre la
+  case entière ferait une page rouge au premier mois chargé.
+- Les **jours du mois d'à côté** complètent la grille, en gris, et ne portent
+  aucun nom : leur mois est à un clic.
+- `‹ septembre 2026 ›` navigue ; **« Revenir à ce mois-ci »** n'apparaît que
+  quand on l'a quitté — même règle que l'ordre manuel du planning : une sortie
+  qui n'existe que quand il y a quelque chose à quitter. Rouvrir la vue au mois
+  repart toujours du mois en cours.
+- Le compteur de l'en-tête porte alors sur **le mois affiché** : annoncer
+  25 retraits au-dessus d'un mois qui en montre 12, ce serait deux chiffres
+  justes sur un écran faux.
+
+**Mesuré à 1 280 × 800** : un mois ordinaire tient sans défiler ; sur un mois où
+23 retraits tombent en deux semaines, la grille demande **91 px de plus que la
+fenêtre** et défile d'autant. C'est le prix de noms entiers, et c'est assumé.
+
+Un clic sur une rangée **ouvre la fiche**, par-dessus l'agenda : ce qu'on veut
+d'un dossier depuis cette liste, c'est le dossier — appeler le client, corriger
+l'heure, passer la commande en « récupérée ». Elle quitte alors l'agenda toute
+seule, sans qu'il y ait la moindre liste à part à tenir à jour.
+
+**Le jour civil est celui de l'atelier** (`America/Marigot`), jamais celui de la
+machine : le conteneur tourne en UTC, et dès 20 h locales « Aujourd'hui » se
+viderait tout seul — à l'heure des derniers retraits. L'écran suit le temps réel
+comme le reste, et repeint au **changement de jour** : un poste ne se recharge
+jamais, et passé minuit ses étiquettes désigneraient la veille.
+
 ### Le rail « Colonnes » — le tableau complet est rangé, pas perdu
 
 Le bouton **« Colonnes »** ouvre un rail à droite. Sur les fiches, toutes les
@@ -474,10 +553,16 @@ rien : ni requête, ni réaffichage, ni saisie perdue. Une commande à moitié
 remplie survit à un aller-retour vers le planning.
 
 Le **hash de l'URL est l'unique pilote** : `#planning`, `#dashboard`,
-`#nouveau-projet`, `#clients`, `#reglages`, plus `#fiverr` et `#a-commander`. La
+`#nouveau-projet`, `#clients`, `#reglages`, `#agenda`, plus `#fiverr` et
+`#a-commander`. La
 navigation, dans la barre du haut, n'est faite que de liens — cliquer change le
 hash, le hash change la vue. Chaque écran est donc partageable par son URL et le
 bouton « Retour » du navigateur fonctionne.
+`#agenda` est le seul écran dont la porte n'est PAS dans cette barre : elle est
+pleine (mesuré le 03/09 à 1 280 px — 868 px de rangée pour 868 disponibles, et
+déjà resserrée), et un onglet qu'on ne voit pas est un écran qui n'existe pas.
+Son entrée est **en tête du rail des étapes**, qui est de toute façon la
+navigation propre au planning — et l'agenda EST le planning, rangé par jour.
 `#fiverr` et `#a-commander` restent des vues de **planning** : même grille, même
 en-tête, seule la catégorie est imposée et le rail s'efface (l'onglet le
 remplace). Revenir sur `#planning` depuis l'une d'elles repart du début du
@@ -981,6 +1066,8 @@ Deux exceptions assumées :
 │   ├── poste.js      le prénom choisi une fois par appareil (olda.qui)
 │   ├── dashboard.js  le Point du jour + dashboard.css · priority.js le classement
 │   ├── montravail.js « Mon travail » + montravail.css
+│   ├── agenda.js     L'AGENDA DES RETRAITS + agenda.css : le planning rangé par
+│   │                 JOUR — qui vient chercher quoi aujourd'hui, demain, après
 │   ├── pilotage.js   la marge, réservée à la Direction, + pilotage.css
 │   ├── tailles-logos.js  le tableau de l'atelier + tailles-logos.css
 │   ├── fiche-atelier.js  le dossier ouvert en grand + fiche-atelier.css

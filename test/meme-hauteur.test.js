@@ -280,7 +280,8 @@ console.log('✓ fiche atelier : la boîte de l’app, et deux colonnes au même
 
   // ET TOUS LE CONSTRUISENT PAR LE MÊME MODULE : une forme partagée avec six
   // markups redevient six en-têtes le jour où l'un d'eux ajoute une ligne.
-  for (const f of ['montravail', 'pilotage', 'dashboard', 'clients', 'reglages', 'tailles-logos']) {
+  for (const f of ['montravail', 'pilotage', 'dashboard', 'clients', 'reglages', 'tailles-logos',
+    'agenda']) {
     const js = fs.readFileSync(path.join(RACINE, `public/${f}.js`), 'utf8');
     assert.match(js, /import \{ ecranTete \} from '\.\/ecran-tete\.js'/,
       `public/${f}.js doit bâtir son en-tête avec celui de la charte`);

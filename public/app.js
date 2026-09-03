@@ -597,8 +597,44 @@ function poignéeDeZone(famille, plieee) {
   return b;
 }
 
+// L'AGENDA DES RETRAITS, EN TÊTE DU RAIL (03/09/2026)
+// ---------------------------------------------------------------------------
+// Le rail range le planning par ÉTAPE — où en est le travail. L'agenda le range
+// par JOUR — qui passe le prendre, et quand. C'est la même liste vue par
+// l'autre bout, donc sa porte est ici, là où la vendeuse choisit déjà ses
+// listes, et pas dans la barre du haut (pleine, voir HASH_AGENDA).
+//
+// ELLE PREND LE GABARIT D'UNE ÉTAPE — même boîte, même rembourrage, même
+// arrondi — parce que le rail doit garder UN rythme : deux hauteurs dans la
+// même colonne se voient tout de suite. Mais elle n'en est pas une, et elle le
+// dit : ni puce, ni compteur, et surtout PAS de `data-slug`, sans quoi elle
+// deviendrait cible de dépôt et une commande lâchée dessus partirait en PATCH
+// `stage: undefined` (le piège que la ligne de repli a déjà payé).
+//
+// C'EST UN LIEN, pas un bouton : il mène à une adresse, donc il s'ouvre dans un
+// nouvel onglet à la molette comme les huit autres écrans.
+function entreeAgenda() {
+  const bloc = document.createElement('div');
+  bloc.className = 'stage-epingle';
+  const a = document.createElement('a');
+  a.className = 'stage stage--agenda';
+  a.href = HASH_AGENDA;
+  const label = document.createElement('span');
+  label.className = 'stage-label';
+  label.textContent = 'Agenda des retraits';
+  a.append(label);
+  if (viewMode === 'agenda') {
+    a.classList.add('active');
+    a.setAttribute('aria-current', 'page');
+  }
+  attachTip(a, 'Qui vient chercher quoi — aujourd’hui, demain, après');
+  bloc.append(a);
+  return bloc;
+}
+
 function renderSidebar() {
   $stages.replaceChildren();
+  $stages.appendChild(entreeAgenda());
   // Chaque FAMILLE est une ZONE : un grand titre (en-tête) qui coiffe ses
   // sous-catégories. On enveloppe le tout dans un bloc pour que l'œil isole d'un
   // coup une zone de la suivante (miroir de la « Vue Étapes » du CRM : total
@@ -691,9 +727,16 @@ function clearGrid() {
 }
 
 // Surbrillance du rail : une seule entrée active à la fois (famille OU sous-cat).
+//
+// `[data-slug]` ET PAS `.stage` : deux entrées du rail portent la classe sans
+// être des étapes — la ligne de repli et l'agenda des retraits. Prises dans
+// cette boucle, elles se faisaient ÉTEINDRE à chaque repeinture (leur slug
+// valant `undefined`, aucune ne correspond jamais à l'étape courante) : l'agenda
+// perdait sa surbrillance dès le premier rafraîchissement, alors qu'il est
+// l'écran affiché.
 function paintSidebarActive() {
   let active = null;
-  document.querySelectorAll('.stage').forEach((el) => {
+  document.querySelectorAll('.stage[data-slug]').forEach((el) => {
     const isSub = el.dataset.sub != null;
     const on = isSub
       ? (el.dataset.slug === currentStage && el.dataset.sub === currentSub)
@@ -869,7 +912,11 @@ function marquerEnAttente(on) {
 // --- Chargement données ----------------------------------------------------
 async function loadCounts() {
   counts = await api('GET', '/api/counts');
-  document.querySelectorAll('.stage').forEach((el) => {
+  // `[data-slug]` : la ligne de repli et l'agenda des retraits empruntent la
+  // classe `.stage` sans être des étapes. Comptées ici, elles héritaient d'un
+  // « 0 » — donc de la teinte « étape vide » — et d'un nom accessible qui
+  // annonçait « Agenda des retraits — 0 commandes ».
+  document.querySelectorAll('.stage[data-slug]').forEach((el) => {
     // Sous-catégorie → compteur par sous-slug ; famille → total famille.
     const key = el.dataset.sub != null ? el.dataset.sub : el.dataset.slug;
     const n = counts[key] ?? 0;
@@ -3247,12 +3294,18 @@ let ligneHorsListe = null;
 
 
 // Va chercher UNE commande et ouvre sa fiche, sans toucher à la grille.
-async function ouvrirFicheHorsListe(id) {
+//
+// C'EST L'APPELANT QUI DIT D'OÙ L'ON VIENT, s'il y a quelque chose à dire. Le
+// message « ouverte depuis la recherche » était écrit ICI en dur : l'agenda des
+// retraits, qui ouvre ses dossiers par la même porte, l'aurait affiché à chaque
+// clic — en nommant une recherche que personne n'avait faite. Depuis l'agenda,
+// une fiche qui s'ouvre n'a rien d'étonnant : il n'y a rien à annoncer.
+async function ouvrirFicheHorsListe(id, message) {
   const ligne = await api('GET', `/api/requests/${id}`);
   ligneHorsListe = ligne;
   memoriserFiche(ligne);        // la réponse porte déjà la fiche complète
   openLigneDetail(ligne.id);
-  showToast('Commande hors de la liste affichée — ouverte depuis la recherche.');
+  if (message) showToast(message);
 }
 
 
@@ -5347,13 +5400,17 @@ function onDragMove(e) {
 // Les familles sans sous-catégorie (Demande, Attente Client, Archivé) et Fiverr
 // restent des cibles directes — il n'y a rien de plus fin où viser.
 function stageAcceptsDrop(stageEl, r) {
-  // LA LIGNE DE REPLI N'EST PAS UNE ÉTAPE. Elle emprunte la classe `.stage`
-  // pour garder le rythme du rail, donc `closest('.stage')` la ramasse — et
-  // sans ce refus elle passait le test (son `data-slug` étant `undefined`, il
-  // « diffère » de l'étape de la ligne), devenait cible, et la dépose partait
-  // en PATCH `stage: undefined`. Elle OUVRE la phase au survol, elle ne
-  // reçoit rien (voir ouvrirAuGlisser).
-  if (stageEl.classList.contains('stage-repli')) return false;
+  // CE QUI N'A PAS DE `data-slug` N'EST PAS UNE ÉTAPE, ET NE REÇOIT RIEN.
+  // Deux entrées du rail empruntent la classe `.stage` pour en garder le
+  // rythme sans en être : la ligne de repli (« + 4 étapes vides ») et l'agenda
+  // des retraits. `closest('.stage')` les ramasse toutes les deux — et sans ce
+  // refus elles passaient le test, leur `data-slug` valant `undefined`, il
+  // « diffère » donc de l'étape de la ligne : elles devenaient cibles, et la
+  // dépose partait en PATCH `stage: undefined`.
+  // LA GARDE PORTE SUR L'ABSENCE DE SLUG, plus sur le nom d'une classe : la
+  // première écriture nommait `.stage-repli`, et l'agenda serait passé à
+  // travers en silence le jour où il est arrivé.
+  if (!stageEl.dataset.slug) return false;
   const slug = stageEl.dataset.slug;
   const isSub = stageEl.dataset.sub != null;
   if (!isSub && familyHasSub(slug)) return false;          // en-tête de zone : verrouillé
@@ -6501,7 +6558,15 @@ const TICK_TEMPS_MS = 60000;
 let dernierJourRendu = new Date().toDateString();
 
 function rafraichirTemps() {
-  if (document.hidden || !booted) return;
+  if (document.hidden) return;
+  // L'AGENDA SUIT L'HORLOGE, LUI AUSSI. « Aujourd'hui » et « Demain » sont des
+  // étiquettes RELATIVES, et un poste d'atelier ne se recharge jamais : passé
+  // minuit, un agenda resté ouvert désignerait la veille. Il se repeint au
+  // changement de jour civil, et seulement là (voir `tick`, agenda.js).
+  // Avant la garde `booted` : le planning peut ne pas avoir fini de charger,
+  // l'heure, elle, avance quand même.
+  if (agModule) agModule.tick();
+  if (!booted) return;
   if (isInteracting()) return;
 
   // MINUIT : les échéances changent de bande (« 1 j » devient « Aujourd'hui »,
@@ -6687,6 +6752,11 @@ function onStreamChange(e) {
     // doit relire la configuration du patron ou se contenter de sa synthèse
     // incrémentale.
     dashboard.notifyChange(natures);
+    // L'AGENDA NE SE RELIT QUE S'IL EST À L'ÉCRAN (voir `notifyChange`,
+    // agenda.js) : il n'a ni badge ni compteur qui vivent ailleurs que sur lui,
+    // et une commande déplacée à l'atelier n'a pas à coûter une requête à
+    // chaque poste resté sur le planning.
+    if (agModule) agModule.notifyChange();
     // LA GRILLE NE SE RELIT QUE SI LA FAMILLE AFFICHÉE EST CONCERNÉE. Le
     // serveur nomme les étapes touchées ; on ne les lisait pas, et un simple
     // glisser en Production faisait retélécharger sa liste entière au poste qui
@@ -6751,13 +6821,16 @@ function startRealtime() {
     fluxVivant: () => streamAlive,
   });
   // filet de sécurité : si le flux est coupé, on revient à un poll lent
-  setInterval(() => { if (!streamAlive) { poll(); dashboard.notifyChange(); } }, POLL_MS);
+  setInterval(() => {
+    if (!streamAlive) { poll(); dashboard.notifyChange(); if (agModule) agModule.notifyChange(); }
+  }, POLL_MS);
   // les délais affichés suivent l'horloge, pas seulement les données
   setInterval(rafraichirTemps, TICK_TEMPS_MS);
   // rafraîchit immédiatement quand on revient sur l'onglet / réveille la tablette
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     poll(); rafraichirTemps(); dashboard.notifyChange();
+    if (agModule) agModule.notifyChange();
     // On reprend la tablette en main : c'est le moment de retrouver le temps
     // réel tout de suite, sans attendre la fin de l'espacement.
     if (!streamAlive && stream && stream.readyState === EventSource.CLOSED) {
@@ -7527,6 +7600,7 @@ const $pilotage = document.getElementById('pilotage');
 const $tailleslogos = document.getElementById('tailleslogos');
 const $devisflash = document.getElementById('devis-flash');
 const $venteflash = document.getElementById('vente-flash');
+const $agenda = document.getElementById('agenda');
 // « VENTE » ET « DEVIS » SONT DEUX ONGLETS (29/08/2026, Charlie : « je veux
 // retrouver directement vente et devis, ils doivent être cliquables direct »).
 // Il y avait un onglet « Nouveau Projet » qui ne menait nulle part : il
@@ -7604,7 +7678,7 @@ async function ouvrirCommandeAuPlanning({ id, stage, sub }, forcerRelecture = fa
   // ensuite. Or ce que l'employé veut, quand il ouvre un vieux dossier depuis la
   // recherche, c'est LE DOSSIER : on ouvre sa fiche, tout de suite, et on le dit.
   try {
-    await ouvrirFicheHorsListe(id);
+    await ouvrirFicheHorsListe(id, 'Commande hors de la liste affichée — ouverte depuis la recherche.');
     return;
   } catch (_) { /* la commande n'existe plus, ou le réseau est tombé */ }
   // Introuvable même en la demandant nommément : elle vient d'être supprimée par
@@ -7837,6 +7911,49 @@ function mountMonTravail() {
   }
 }
 
+// L'AGENDA DES RETRAITS — le planning rangé par JOUR (03/09/2026).
+// Même montage que les six autres écrans : sa feuille et son JS arrivent au
+// premier passage, jamais à l'ouverture d'un poste.
+//
+// IL OUVRE LA FICHE, IL NE SAUTE PAS AU PLANNING. Depuis l'agenda, ce qu'on
+// veut d'un dossier c'est le dossier — appeler le client, corriger l'heure,
+// passer la commande en « récupérée ». Renvoyer vers son étape ferait perdre la
+// place dans la journée qu'on est en train de lire, pour un détour.
+let agLoading = null;
+let agModule = null;
+function mountAgenda() {
+  if (!$agenda) return;
+  if (!agLoading) {
+    agLoading = Promise.all([poserFeuille('agenda.css'), import('./agenda.js')])
+      .then(([, m]) => {
+        agModule = m.createAgenda({
+          root: $agenda,
+          STAGE_LABEL,
+          SUB_LABEL,
+          // LA BULLE DE L'APPLICATION, pas celle de Chrome : `title` ouvre
+          // l'infobulle système — grise, hors charte, lente à venir puis longue
+          // à partir. La vue au mois n'affiche que des noms, tout le reste vit
+          // dans cette bulle : elle n'est pas un ornement, c'est la moitié de
+          // l'écran.
+          attachTip,
+          ouvrirDossier: (id) => ouvrirFicheHorsListe(id).catch(() => {
+            showToast('Cette commande n’existe plus — elle vient d’être supprimée.');
+          }),
+        });
+        agModule.start();
+        agModule.show();
+        return agModule;
+      })
+      .catch((err) => {
+        agLoading = null;                     // rechargeable au prochain essai
+        agModule = null;
+        reportError(err);
+      });
+  } else if (agModule) {
+    agModule.show();
+  }
+}
+
 let reglagesLoading = null;
 let reglagesModule = null;
 function mountReglages() {
@@ -8008,6 +8125,17 @@ function setViewMode(mode) {
   if ($viewTaillesLogos) $viewTaillesLogos.classList.toggle('active', mode === 'tailleslogos');
   if ($viewDevisFlash) $viewDevisFlash.classList.toggle('active', mode === 'devisflash');
   if ($viewVenteFlash) $viewVenteFlash.classList.toggle('active', mode === 'venteflash');
+  // L'AGENDA S'ALLUME DANS LE RAIL, pas dans la barre du haut. Le rail n'est
+  // reconstruit qu'au changement des étapes vides : sans cette ligne, son
+  // entrée resterait éteinte pendant qu'on lit l'agenda, ou allumée après
+  // l'avoir quitté. Elle est ICI, avant le retour anticipé quelques lignes plus
+  // bas — les onglets se repeignent même quand la vue ne change pas.
+  const entree = document.querySelector('.stage--agenda');
+  if (entree) {
+    entree.classList.toggle('active', mode === 'agenda');
+    if (mode === 'agenda') entree.setAttribute('aria-current', 'page');
+    else entree.removeAttribute('aria-current');
+  }
   // Deux onglets pour une seule vue : c'est le HASH qui dit lequel est allumé.
   if ($viewVente) $viewVente.classList.toggle('active', mode === 'projet' && location.hash === HASH_VENTE);
   if ($viewDevis) $viewDevis.classList.toggle('active', mode === 'projet' && location.hash === HASH_DEVIS);
@@ -8030,6 +8158,7 @@ function setViewMode(mode) {
   const tailleslogos = mode === 'tailleslogos';
   const devisflash = mode === 'devisflash';
   const venteflash = mode === 'venteflash';
+  const agenda = mode === 'agenda';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($clients) $clients.hidden = !clients;
@@ -8039,6 +8168,7 @@ function setViewMode(mode) {
   if ($tailleslogos) $tailleslogos.hidden = !tailleslogos;
   if ($devisflash) $devisflash.hidden = !devisflash;
   if ($venteflash) $venteflash.hidden = !venteflash;
+  if ($agenda) $agenda.hidden = !agenda;
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
@@ -8059,6 +8189,7 @@ function setViewMode(mode) {
   if (tailleslogos) mountTaillesLogos();
   if (devisflash) mountDevisFlash();
   if (venteflash) mountVenteFlash();
+  if (agenda) mountAgenda(); else if (agModule) agModule.hide();
   if (projet) mountProjet();
 
   jouerBasculeDeVue();
@@ -8083,6 +8214,16 @@ const HASH_CLIENTS = '#clients';
 const HASH_VENTE = '#vente';
 const HASH_DEVIS = '#devis';
 const PARCOURS_PAR_HASH = { [HASH_VENTE]: 'vente', [HASH_DEVIS]: 'devis' };
+// L'AGENDA A UNE ADRESSE, comme les huit autres écrans — c'est ce qui lui
+// permet de s'ouvrir dans un second onglet à la molette, de revenir par le
+// bouton « précédent », et de rester à l'écran après un rechargement. Il n'a
+// pas d'onglet dans la barre du haut pour autant : celle-ci est PLEINE (mesuré
+// le 03/09 à 1 280 px, 868 px de rangée pour 868 disponibles, déjà resserrée),
+// et le neuvième mot n'y tiendrait qu'en poussant le dernier hors de l'écran —
+// un onglet qu'on ne voit pas est un écran qui n'existe pas. Sa porte est donc
+// dans le RAIL, qui est la navigation propre au planning et qui reste à
+// l'écran sur toutes les vues depuis le 24/08.
+const HASH_AGENDA = '#agenda';
 const VIEWS = {
   '#dashboard': 'dashboard',
   '#nouveau-projet': 'projet',
@@ -8092,6 +8233,7 @@ const VIEWS = {
   '#tailles-logos': 'tailleslogos',
   '#devis-flash': 'devisflash',
   '#vente-flash': 'venteflash',
+  [HASH_AGENDA]: 'agenda',
   ...Object.fromEntries(PROMOTED.map((p) => [p.hash, p.view])),
 };
 function applyHash() {

@@ -56,6 +56,8 @@ const COQUILLE = [
   '/pilotage.css',
   // La feuille du DEVIS (01/09), posee avec son ecran comme les cinq du dessus.
   '/devis-flash.css',
+  // L'AGENDA DES RETRAITS (03/09), posé avec son écran comme les six du dessus.
+  '/agenda.css',
   '/app.js',
   '/dashboard.js',
   '/priority.js',
@@ -118,6 +120,11 @@ const COQUILLE = [
   '/nouveau-projet.js',
   '/clients.js',
   '/reglages.js',
+  // L'AGENDA DES RETRAITS (03/09). C'est le premier écran de la vendeuse le
+  // matin : hors ligne il ne pourra pas relire sa liste, mais il doit OUVRIR et
+  // le dire. Absent de la coquille, son import échoue et le clic ne fait
+  // strictement rien — ce qui se lit « personne ne vient aujourd'hui ».
+  '/agenda.js',
   // L'ECRAN DU DEVIS ET SON PAPIER (01/09). Le devis se compose DEVANT le
   // client : c'est exactement le moment ou l'on ne peut pas attendre que le
   // reseau revienne. Sans `devis.js` dans la coquille, l'ecran s'ouvrirait sans

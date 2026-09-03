@@ -418,6 +418,12 @@
              (dashboard.render) ; masqué tant qu'on est sur le Planning. -->
         <section class="dashboard" id="dashboard" hidden aria-label="Tableau de bord"></section>
 
+        <!-- Onglet Agenda : le planning rangé par JOUR au lieu de par étape —
+             qui vient chercher quoi aujourd'hui, demain, après. Il s'ouvre
+             depuis le rail des étapes, où la vendeuse choisit déjà ses listes.
+             Rendu par agenda.js, chargé au premier affichage. -->
+        <section class="agenda" id="agenda" hidden aria-label="Agenda des retraits"></section>
+
         <!-- Onglet Base clients : le CRM pro. Liste + fiche éditable + notes,
              entièrement rendu par clients.js (chargé au premier affichage). -->
         <section class="clients" id="clients" hidden aria-label="Base clients"></section>

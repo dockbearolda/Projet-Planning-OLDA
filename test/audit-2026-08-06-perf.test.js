@@ -505,7 +505,11 @@ function bloc(src, signature) {
   // Et il ne charge PLUS l'archive entière pour montrer une ligne : il ouvre la
   // fiche. Monter mille deux cents commandes pour en faire clignoter une, c'est
   // exactement ce qui laissait le planning lourd pour le reste de la journée.
-  assert.match(saut, /await ouvrirFicheHorsListe\(id\)/, 'la commande hors liste s’ouvre par sa fiche');
+  // `\(id[,)]` et non `\(id\)` : depuis le 03/09 l'appelant passe AUSSI la
+  // phrase à afficher — l'agenda des retraits ouvre ses dossiers par la même
+  // porte, et « ouverte depuis la recherche » y nommerait une recherche que
+  // personne n'a faite. Ce qui est tenu ici est inchangé : on ouvre la fiche.
+  assert.match(saut, /await ouvrirFicheHorsListe\(id[,)]/, 'la commande hors liste s’ouvre par sa fiche');
   assert.ok(
     !/toutAfficher/.test(saut) && !/loadRows\(\)/.test(saut),
     'le saut ne relit plus l’étape sans plafond',
