@@ -442,6 +442,13 @@ range par **jour** — qui passe le prendre, et quand. C'est la même liste vue 
 l'autre bout : aucune donnée propre, aucune saisie. Sa porte est **en tête du
 rail**, là où la vendeuse choisit déjà ses listes, et son adresse est `#agenda`.
 
+**Deux vues, une seule liste derrière.** La bascule `[Jour] [Mois]` est dans
+l'en-tête de l'écran, et le choix suit l'appareil (`olda.agenda-vue`) : passer
+de l'une à l'autre ne coûte pas une requête et ne peut pas afficher deux
+vérités.
+
+### Au jour — l'écran du matin
+
 | | Ce qu'une rangée dit |
 |---|---|
 | **Quand** | l'heure du retrait (`fiche.heureSouhaitee`) — vide veut dire « dans la journée », et la colonne se tait plutôt que d'aligner des tirets |
@@ -460,6 +467,36 @@ reste **sous les yeux** pendant qu'on parcourt ses lignes.
 Le compteur de l'écran dit aussi combien de dossiers **n'ont pas de date de
 retrait** : ils ne peuvent se ranger sous aucun jour, mais les taire ferait lire
 l'agenda comme complet.
+
+### Au mois — le calendrier, et rien que les noms
+
+Sept colonnes (lundi d'abord), les semaines l'une sous l'autre, et dans chaque
+journée **la liste des noms de clients** — pas l'heure, pas l'article, pas
+l'état. Cette vue répond à « à quoi ressemble la fin du mois ? », pas à « qui
+passe dans l'heure ? ». **Tout le reste est au survol** du nom : heure, article
+et état, exactement ce qu'une rangée de la vue au jour porte.
+
+- **Le nom s'enroule, il ne se coupe pas.** Une colonne fait 123 px, soit ~15
+  signes en 14 px : sur une seule ligne avec des points de suspension, la moitié
+  de la grille devenait illisible. Sur les 87 entreprises de la base semée, la
+  plus longue fait 27 signes et 85 en font 26 ou moins — deux lignes suffisent
+  donc presque toujours, et rien n'est jamais caché derrière un « + 3 ».
+- **Aujourd'hui** porte une pastille pleine. Un **jour passé qui tient encore
+  des noms** est un retard : son numéro passe au rouge, et lui seul — peindre la
+  case entière ferait une page rouge au premier mois chargé.
+- Les **jours du mois d'à côté** complètent la grille, en gris, et ne portent
+  aucun nom : leur mois est à un clic.
+- `‹ septembre 2026 ›` navigue ; **« Revenir à ce mois-ci »** n'apparaît que
+  quand on l'a quitté — même règle que l'ordre manuel du planning : une sortie
+  qui n'existe que quand il y a quelque chose à quitter. Rouvrir la vue au mois
+  repart toujours du mois en cours.
+- Le compteur de l'en-tête porte alors sur **le mois affiché** : annoncer
+  25 retraits au-dessus d'un mois qui en montre 12, ce serait deux chiffres
+  justes sur un écran faux.
+
+**Mesuré à 1 280 × 800** : un mois ordinaire tient sans défiler ; sur un mois où
+23 retraits tombent en deux semaines, la grille demande **91 px de plus que la
+fenêtre** et défile d'autant. C'est le prix de noms entiers, et c'est assumé.
 
 Un clic sur une rangée **ouvre la fiche**, par-dessus l'agenda : ce qu'on veut
 d'un dossier depuis cette liste, c'est le dossier — appeler le client, corriger

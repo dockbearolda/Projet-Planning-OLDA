@@ -2310,7 +2310,14 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .colbar-reset[hidden] { display: none; }
 
 /* Le bouton d'en-tête montre l'état du rail : enfoncé = rail ouvert. */
-.colbar-open[aria-expanded="true"] { background: var(--primary-soft); border-color: var(--primary-soft); color: var(--text-1); }
+/* L'ÉTAT ALLUMÉ D'UN BOUTON D'EN-TÊTE, UNE SEULE ÉCRITURE (03/09/2026).
+   « Colonnes » le porte sur `aria-expanded` (un panneau est ouvert ou fermé),
+   la bascule Jour / Mois de l'agenda sur `aria-pressed` (une vue est choisie ou
+   non). Deux attributs parce que ce ne sont pas les mêmes objets — mais UN SEUL
+   dessin : deux boutons de la même barre qui s'allumeraient différemment, c'est
+   exactement l'écart qu'on ne voit qu'en comparant deux écrans. */
+.colbar-open[aria-expanded="true"],
+.help-btn[aria-pressed="true"] { background: var(--primary-soft); border-color: var(--primary-soft); color: var(--text-1); }
 
 /* Tablette portrait et téléphone : le rail des colonnes devient un PANNEAU
    POSÉ SUR la grille, ancré en bas, et non plus un bandeau empilé dessous.

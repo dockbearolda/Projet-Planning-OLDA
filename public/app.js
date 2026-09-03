@@ -7930,6 +7930,12 @@ function mountAgenda() {
           root: $agenda,
           STAGE_LABEL,
           SUB_LABEL,
+          // LA BULLE DE L'APPLICATION, pas celle de Chrome : `title` ouvre
+          // l'infobulle système — grise, hors charte, lente à venir puis longue
+          // à partir. La vue au mois n'affiche que des noms, tout le reste vit
+          // dans cette bulle : elle n'est pas un ornement, c'est la moitié de
+          // l'écran.
+          attachTip,
           ouvrirDossier: (id) => ouvrirFicheHorsListe(id).catch(() => {
             showToast('Cette commande n’existe plus — elle vient d’être supprimée.');
           }),

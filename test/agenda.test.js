@@ -165,9 +165,10 @@ assert.match(CSS_NU, /@container \(max-width: 780px\) \{\s*\.ag-page \{ --ag-qua
 
 // UN SEUL GABARIT POUR TOUTES LES JOURNÉES : écrit bloc par bloc, chaque `fr`
 // se résoudrait sur le contenu de SA grille et les noms de clients ne
-// tomberaient plus sur le même axe d'un jour à l'autre.
-assert.strictEqual((CSS_NU.match(/grid-template-columns/g) || []).length, 1,
-  'les colonnes sont déclarées UNE fois : deux écritures redeviennent deux axes');
+// tomberaient plus sur le même axe d'un jour à l'autre. La vue au jour n'en
+// déclare donc qu'un, sur la rangée.
+assert.strictEqual((CSS_NU.match(/\.ag-ligne \{[^}]*grid-template-columns/g) || []).length, 1,
+  'les colonnes de la vue au jour sont déclarées UNE fois : deux écritures redeviennent deux axes');
 
 // --- Aucun prix sur cet écran -----------------------------------------------
 assert.ok(!/project_value|acompte|paye\b|eur\(/.test(AGENDA),
@@ -254,6 +255,156 @@ assert.ok(!/project_value|acompte|paye\b|eur\(/.test(AGENDA),
   assert.strictEqual(bac.libelleArticle({ product: 'T-shirt', quantity: 25 }), '25 × T-shirt');
   assert.strictEqual(bac.libelleArticle({ product: 'T-shirt', quantity: 1 }), 'T-shirt');
   assert.strictEqual(bac.libelleArticle({ product: null }), 'Sans description');
+}
+
+// ===========================================================================
+// PARTIE B bis — LA VUE AU MOIS (03/09/2026)
+// ===========================================================================
+// Charlie : « l'agenda doit avoir une vue au mois avec uniquement les noms des
+// clients en liste dans les jours ».
+//
+// LA CASE NE PORTE QUE DES NOMS. C'est la demande, mot pour mot, et c'est aussi
+// la seule façon de tenir douze journées de front : l'heure, l'article et l'état
+// vivent dans la bulle du nom, pas à l'écran.
+assert.match(AGENDA, /function rendreMois\(/, 'la vue au mois existe');
+assert.match(AGENDA, /function nomDuClient\(l\)/, '… et sa case n’aligne que des noms');
+{
+  const nom = AGENDA.match(/function nomDuClient\(l\) \{[\s\S]*?\n {2}\}/)[0];
+  assert.ok(!/libelleArticle\(l\)[^;]*textContent|textContent = .*(heure|article)/.test(nom),
+    'rien d’autre que le nom ne s’écrit dans la case');
+  assert.match(nom, /attachTip\(b, detail\)/,
+    '… le reste est au SURVOL : la case reste une liste de noms, et on ne perd rien');
+  assert.match(nom, /ouvrirDossier/,
+    '… et un nom ouvre le dossier, comme une rangée de la vue au jour : même geste sur les deux vues');
+}
+
+// LES DEUX GRILLES DU MOIS DÉCLARENT LES MÊMES SEPT COLONNES. Écrites
+// différemment, les intitulés (« Lun. », « Mar. »…) ne tomberaient plus sur les
+// journées qu'ils coiffent — l'écart d'un pixel qui ne se voit qu'en comparant
+// deux rangées.
+{
+  const sept = (sel) => {
+    const m = CSS_NU.match(new RegExp(`\\${sel} \\{[^}]*grid-template-columns:\\s*([^;]+);`));
+    return m ? m[1].trim() : null;
+  };
+  const tete = sept('.ag-mois__tete');
+  const corps = sept('.ag-mois__corps');
+  assert.ok(tete && corps, 'les deux grilles du mois déclarent leurs colonnes');
+  assert.strictEqual(tete, corps,
+    'l’en-tête des jours et le corps du mois prennent EXACTEMENT les mêmes colonnes');
+  assert.match(tete, /repeat\(7, minmax\(0, 1fr\)\)/, '… et il y en a sept, égales');
+  // Le filet de 1 px des cases compte dans leur boîte : sans le même pixel
+  // RÉSERVÉ sur les intitulés, les sept titres tombent un pixel à gauche.
+  assert.match(CSS_NU, /\.ag-mois__jour \{[^}]*border-left: var\(--trait-reserve\)/,
+    'les intitulés réservent le pixel du filet des cases');
+}
+
+// LA RANGÉE GRANDIT AVEC SON CONTENU, et sa hauteur plancher est un JETON.
+assert.match(CSS_NU, /grid-auto-rows: minmax\(var\(--ag-case-h\), auto\)/,
+  'une journée chargée s’allonge : rien n’est caché derrière un « + 3 »');
+assert.match(CSS_NU, /--ag-case-h: \d+px;/,
+  '… et son plancher est un jeton, pas un nombre recopié dans la règle');
+
+// LE NOM S'ENROULE. Mesuré sur les 87 entreprises de `clients-seed.json` : la
+// plus longue fait 27 signes, et une colonne en tient ~15. Sur une seule ligne,
+// la moitié de la grille se lisait « SARL BEACH… ».
+{
+  const regle = CSS_NU.match(/\.ag-nom \{([^}]*)\}/);
+  assert.ok(regle, 'le nom du client a sa règle');
+  assert.match(regle[1], /white-space: normal/,
+    'le nom s’enroule : c’est le contenu de cet écran, l’abréger c’est le vider');
+  assert.ok(!/text-overflow: ellipsis/.test(regle[1]),
+    '… et il ne se coupe pas');
+  const noms = require('../clients-seed.json').map((c) => c.entreprise).filter(Boolean);
+  const long = Math.max(...noms.map((n) => n.length));
+  assert.ok(long <= 30,
+    `la plus longue raison sociale de la base fait ${long} signes : au-delà de 30, deux lignes ne suffiraient plus`);
+}
+
+// LA BASCULE EST UN BOUTON DÉJÀ DESSINÉ. Le CRM porte deux rangées d'onglets
+// (la barre du haut, le Point du jour) et aucune ne vit dans la charte : en
+// inventer une troisième pour deux mots, c'est le défaut que le dépôt nomme en
+// toutes lettres. Les deux vues sont des `.help-btn` — le bouton « Colonnes »
+// du planning, à un clic d'ici — et son état allumé n'a qu'UNE écriture.
+assert.match(AGENDA, /el\('button', 'help-btn', libelle\)/,
+  'les deux vues prennent le bouton d’en-tête de l’application');
+assert.match(CSS,
+  /\.colbar-open\[aria-expanded="true"\],\s*\n\.help-btn\[aria-pressed="true"\] \{/,
+  'l’état allumé d’un bouton d’en-tête n’a qu’UNE règle : deux boutons de la même barre ne s’allument pas autrement');
+assert.ok(!/\.ag-vues [^}]*font-size|\.ag-vues [^}]*min-height/.test(CSS_NU),
+  '… et le groupe des deux vues ne pose aucune forme à lui');
+
+// LES DEUX CHEVRONS SONT DESSINÉS. La police est un sous-ensemble figé de
+// 91 ligatures : elle porte `chevron_right` et PAS `chevron_left`, et un nom
+// absent s'affiche en texte réduit à sa première lettre, sans erreur.
+assert.match(AGENDA, /function chevron\(vers\)/, 'les chevrons du mois sont dessinés');
+// Sur le CODE, jamais sur les commentaires : celui du chevron NOMME les
+// ligatures absentes pour dire pourquoi il dessine, et la garde se
+// déclencherait sur son propre récit.
+const AGENDA_NU = AGENDA.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+assert.ok(!/chevron_left|navigate_before|calendar_month/.test(AGENDA_NU),
+  '… et aucun nom d’icône absent de la police n’est écrit');
+
+// LA VUE CHOISIE SUIT L'APPAREIL, et un stockage refusé ne casse rien.
+assert.match(AGENDA, /const CLE_VUE = 'olda\.agenda-vue';/,
+  'la vue choisie se retrouve le lendemain matin');
+assert.match(AGENDA, /catch \(_\) \{ return 'jour'; \}/,
+  '… et un localStorage refusé (navigation privée) retombe sur la vue au jour');
+
+// LE CALENDRIER, SUR LE VRAI CODE — c'est le calcul qui se paie cher : un mois
+// qui commence un jeudi, une année bissextile, décembre + 1 qui doit donner
+// janvier de l'année SUIVANTE.
+{
+  const bac = { Intl, Date, Array, Map };
+  vm.createContext(bac);
+  const morceaux = [
+    AGENDA.match(/const enJour = [\s\S]*?\n\};/)[0],
+    AGENDA.match(/const enTemps = [^\n]*\n/)[0],
+    AGENDA.match(/const ecartJours = [^\n]*\n/)[0],
+    AGENDA.match(/const JOUR_SEMAINE = [^\n]*\n/)[0],
+    AGENDA.match(/const majuscule = [^\n]*\n/)[0],
+    AGENDA.match(/const JOURS_SEMAINE = [\s\S]*?\n {2}\(_, i\)[^\n]*\n/)[0],
+    AGENDA.match(/const moisDe = [^\n]*\n/)[0],
+    AGENDA.match(/const moisDecale = [\s\S]*?\n\};/)[0],
+    AGENDA.match(/const premierDuMois = [\s\S]*?\n\};/)[0],
+    AGENDA.match(/const joursDuMois = [\s\S]*?\n\};/)[0],
+    AGENDA.match(/ {2}function casesDuMois\(cible, parJour, jour\) \{[\s\S]*?\n {2}\}/)[0],
+  ];
+  vm.runInContext(`${morceaux.join('\n')}
+    globalThis.casesDuMois = casesDuMois;
+    globalThis.moisDecale = moisDecale;
+    globalThis.joursDuMois = joursDuMois;
+    globalThis.JOURS_SEMAINE = JOURS_SEMAINE;`, bac);
+
+  assert.deepStrictEqual(Array.from(bac.JOURS_SEMAINE),
+    ['Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.', 'Dim.'],
+    'la semaine commence le LUNDI, et ses sept noms viennent d’une date connue — pas d’une liste tapée');
+
+  // Décembre + 1 = janvier de l'ANNÉE SUIVANTE. C'est le report qu'on écrit de
+  // travers une fois sur deux, et il ne se voit qu'au 31 décembre.
+  assert.strictEqual(bac.moisDecale('2026-12', 1), '2027-01');
+  assert.strictEqual(bac.moisDecale('2026-01', -1), '2025-12');
+  // Février bissextile : le calcul ne connaît aucune règle, il demande la date.
+  assert.strictEqual(bac.joursDuMois('2028-02'), 29);
+  assert.strictEqual(bac.joursDuMois('2026-02'), 28);
+
+  // Septembre 2026 commence un MARDI : la grille doit poser un bouche-trou
+  // (le 31 août) avant le 1er, sans quoi toute la semaine glisse d’une colonne.
+  const parJour = new Map([['2026-09-03', [{ id: 'a' }]], ['2026-09-01', [{ id: 'b' }]]]);
+  const cases = Array.from(bac.casesDuMois('2026-09', parJour, '2026-09-03'));
+  assert.strictEqual(cases.length % 7, 0,
+    'la grille se ferme sur des semaines entières : une rangée à moitié laisse un trou sans bordure');
+  assert.strictEqual(cases[0].n, 31, 'le lundi 31 août complète la première semaine');
+  assert.strictEqual(cases[0].hors, true, '… et c’est un bouche-trou');
+  assert.deepStrictEqual(Array.from(cases[0].lignes), [],
+    'un jour d’un autre mois ne porte AUCUN nom : son mois est à un clic');
+  assert.strictEqual(cases[1].n, 1, 'le 1er septembre tombe donc un mardi');
+  assert.strictEqual(cases[1].jour, '2026-09-01');
+  assert.strictEqual(cases[1].ecart, -2, '… et il est passé de deux jours');
+  assert.strictEqual(cases[3].ecart, 0, 'le 3 septembre est aujourd’hui');
+  assert.strictEqual(cases[3].lignes.length, 1, '… et il porte son retrait');
+  assert.strictEqual(cases.filter((c) => !c.hors).length, 30,
+    'les trente jours de septembre y sont, et rien de plus');
 }
 
 // ===========================================================================

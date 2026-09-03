@@ -5,13 +5,15 @@
    autres feuilles d'écran : un poste qui ne quitte jamais le planning ne
    télécharge pas l'habillage de l'agenda.
 
-   TROIS CRANS DE TEXTE, PAS UN DE PLUS — 21 pour le jour, 17 pour ce qui se
-   lit sur la ligne, 14 pour l'état. La hiérarchie se fait à la GRAISSE et à la
-   COULEUR, jamais à une quatrième taille.
+   DEUX CRANS DE TEXTE, PAS UN DE PLUS — 17 pour ce qui se lit sur une rangée
+   (le nom du jour, le client, l'article), 14 pour ce qui se consulte (l'état,
+   les compteurs, la grille du mois). Le cran de 21 px appartient au NOM DE
+   L'ÉCRAN, et à lui seul : il est déclaré une fois, dans la charte. La
+   hiérarchie se fait à la GRAISSE et à la COULEUR, jamais à une taille de plus.
 
-   LA COULEUR NE DIT QU'UN ÉTAT, et il n'y en a que deux ici : c'est prêt
-   (succès), c'est bloqué (danger). Une ligne ordinaire est grise comme le
-   reste de l'application.
+   LA COULEUR NE DIT QU'UN ÉTAT, et il n'y en a que trois ici : c'est prêt
+   (succès), c'est bloqué (danger), c'est en retard (danger). Une ligne
+   ordinaire est grise comme le reste de l'application.
 
    L'en-tête d'écran vit dans la charte (`.ecran-tete`) : il n'est pas réécrit
    ici, et il ne doit jamais l'être.
@@ -28,6 +30,10 @@
 .agenda {
   --ag-quand: 72px;
   --ag-etat: 210px;
+  /* La hauteur d'une journée du calendrier : de quoi poser le numéro du jour et
+     DEUX noms sans que la case grandisse. C'est un plancher, pas un plafond —
+     au-delà, la case s'allonge (voir plus bas), elle ne cache rien. */
+  --ag-case-h: 80px;
 }
 /* `:not([hidden])` : posé nu, `display` défait `hidden` et l'écran resterait
    affiché ET focusable par-dessus le planning. Piège maison, déjà payé.
@@ -53,8 +59,17 @@
   overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  padding: var(--pas-3) var(--ecran-pad-x) 40px;
+  /* AUCUN REMBOURRAGE EN HAUT, et c'est ce qui fait tenir les titres collants.
+     Chrome cale un `position: sticky` sur la BOÎTE DE REMBOURRAGE du conteneur
+     qui défile : avec 16 px en haut, l'en-tête d'une journée (ou la rangée des
+     sept jours du mois) se figeait 16 px trop bas, et le contenu défilé
+     continuait de passer dans la bande au-dessus — mesuré au rendu, une lisière
+     de noms coupés au ras du titre de l'écran.
+     L'air du haut est donc posé sur le CONTENU (`.ag-page > *`) : il défile
+     avec lui, au lieu de réserver une bande où rien ne peut se cacher. */
+  padding: 0 var(--ecran-pad-x) 40px;
 }
+.ag-page > * { margin-top: var(--pas-3); }
 
 .ag-vide {
   margin: 0;
@@ -215,6 +230,150 @@
 }
 .ag-ligne__etat.is-pret { color: var(--success); font-weight: var(--graisse-note); }
 .ag-ligne__etat.is-bloque { color: var(--danger); font-weight: var(--graisse-note); }
+
+/* ===========================================================================
+   LA VUE AU MOIS — sept colonnes, et rien que des noms (03/09/2026)
+   ---------------------------------------------------------------------------
+   « une vue au mois avec uniquement les noms des clients en liste dans les
+   jours ». Ce que la vue au jour détaille, celle-ci résume : la case ne porte
+   que des noms, tout le reste (heure, article, état) est dans la bulle du nom.
+   =========================================================================== */
+
+/* Les commandes de l'en-tête. Elles ne posent AUCUNE forme à elles : les deux
+   vues sont des `.help-btn` — le même bouton que « Colonnes » sur le planning,
+   à un clic d'ici — et les deux chevrons des `.icon-btn`, ceux de la barre du
+   haut. Trois objets déjà dessinés, zéro quatrième. */
+.ag-vues { display: flex; align-items: center; gap: var(--pas-1); }
+.ag-nav { display: flex; align-items: center; gap: var(--pas-1); }
+.ag-nav[hidden] { display: none; }
+.ag-mois-nom {
+  min-width: 0;
+  padding: 0 var(--pas-1);
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-forte);
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.ag-mois { display: flex; flex-direction: column; min-width: 0; }
+
+/* LES INTITULÉS DE COLONNE RESTENT SOUS LES YEUX : sur un mois chargé qui
+   défile, sans eux on ne sait plus laquelle des sept colonnes est samedi. */
+.ag-mois__tete {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-soft);
+}
+.ag-mois__jour {
+  /* LE TRAIT RÉSERVÉ, ET IL N'EST PAS DÉCORATIF : les cases du corps portent un
+     filet de 1 px à gauche, qui compte dans leur boîte. Sans le même pixel ici,
+     les sept intitulés tomberaient un pixel à gauche de leurs colonnes — le
+     genre d'écart qu'on ne voit qu'en comparant deux rangées. */
+  border-left: var(--trait-reserve);
+  padding: var(--pas-1) var(--pas-2);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  color: var(--text-2);
+}
+
+.ag-mois__corps {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* LA RANGÉE GRANDIT AVEC SON CONTENU. Un « + 3 » qui cache trois noms
+     coûterait un clic à l'endroit précis où l'on est venu LIRE des noms ; le
+     mois d'un atelier normal tient sans défiler, et un mois chargé défile
+     plutôt que de mentir. */
+  grid-auto-rows: minmax(var(--ag-case-h), auto);
+}
+.ag-case {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--pas-1);
+  border-left: 1px solid var(--row-line);
+  border-bottom: 1px solid var(--row-line);
+}
+/* Le filet de la première colonne tomberait au bord de la page : il s'efface,
+   mais SA PLACE RESTE — sinon la colonne du lundi décalerait d'un pixel. */
+.ag-case:nth-child(7n + 1) { border-left-color: transparent; }
+
+/* Les jours du mois d'à côté : ils complètent la grille et ne portent aucun
+   nom. Leur mois est à un clic — les remplir ici ferait deux mois sur un
+   écran qui en annonce un. */
+.ag-case.is-hors { background: var(--bg); }
+
+.ag-case__jour {
+  align-self: flex-start;
+  min-width: 22px;
+  padding: 0 var(--pas-1);
+  border-radius: var(--pilule);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  line-height: var(--ligne-texte);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+/* Un numéro de jour hors du mois est un REPÈRE, pas du texte qu'on lit : c'est
+   l'emploi que la charte réserve à son gris atténué. */
+.ag-case.is-hors .ag-case__jour { color: var(--text-3); }
+/* AUJOURD'HUI se voit sans être cherché : c'est la seule case qu'on vise. */
+.ag-case.is-aujourdhui .ag-case__jour {
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: var(--graisse-forte);
+}
+/* Un jour passé qui porte encore des noms est un RETARD — un état, donc une
+   couleur. Elle ne tient qu'au NUMÉRO : peindre la case entière ferait une
+   page rouge au premier mois chargé, et une alerte permanente n'alerte plus. */
+.ag-case.is-retard .ag-case__jour { color: var(--danger); font-weight: var(--graisse-forte); }
+
+.ag-case__noms { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+/* UN NOM, ET RIEN D'AUTRE. C'est un vrai bouton : il ouvre le dossier, comme
+   une rangée de la vue au jour — même geste sur les deux vues. Il n'a pas la
+   boîte de l'application et c'est voulu : ce n'est pas une commande de barre,
+   c'est une ligne de liste, et sept colonnes de boutons de 50 px feraient un
+   mois de trois écrans de haut. Sa hauteur sort de son texte, comme celle
+   d'une ligne de tableau. */
+.ag-nom {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 1px 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--taille-note);
+  line-height: var(--ligne-serre);
+  text-align: left;
+  /* LE NOM S'ENROULE, IL NE SE COUPE PAS. Mesuré au rendu : une colonne fait
+     123 px, soit ~15 signes en 14 px — « SARL BEACH BAR » tient tout juste,
+     « ÉCOLE SAINT-JOSEPH » et « TRANSPORT CARAÏBES » non. Sur une seule ligne
+     avec des points de suspension, la moitié de la grille devenait illisible :
+     c'est un écran dont le nom du client EST le contenu, l'abréger c'est le
+     vider.
+     ET PAS DE PLAFOND À DEUX LIGNES NON PLUS, quoique l'idée soit tentante :
+     sur les 87 entreprises de la base semée, la plus longue fait 27 signes et
+     85 en font 26 ou moins. Deux lignes sont donc déjà la hauteur RÉELLE de
+     presque toutes les cases — un `line-clamp` n'aurait rogné que deux noms
+     sur 87, en échange d'un nœud de plus par nom et d'un texte caché. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.ag-nom:hover { background: var(--row-hover); }
+.ag-nom:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+/* Une commande bloquée ne se remet pas : le nom le dit là où il est lu. */
+.ag-nom.is-bloque { color: var(--danger); font-weight: var(--graisse-note); }
 
 /* ------------------------------------------------- Quand la place se resserre
    Le plancher de travail est 1 280 px de fenêtre, rail des étapes déployé —
