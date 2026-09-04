@@ -34,7 +34,7 @@
 import {
   APPROS, APPRO_DEFAUT, ARRONDIS, REGIMES, AJUSTEMENT_UNITES, VEDETTES,
   calculerDevis, modeleDevis, dessinerDevis, CSS_DEVIS, jourAtelier, jourPlus,
-  SANS_PRIX,
+  SANS_PRIX, pdfDevis,
   // LES SIX TAILLES ET LA TRADUCTION VERS LE DOSSIER viennent du module que
   // les deux ecrans partagent deja : ecrites ici, elles seraient deux listes
   // et deux traductions le jour ou l'une gagne une taille.
@@ -45,7 +45,7 @@ import {
 // TOUS LES INPUTS avec un menu déroulant ». Il a déménagé de `pont.js` pour
 // qu'il n'en existe qu'UN — voir l'en-tête de `menu-recherche.js`.
 import { menuPoser, menuRafraichir, poserStyleMenu } from './menu-recherche.js';
-import { api } from './reseau.js';
+import { api, deposerPapier } from './reseau.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT && ROOT.querySelector(sel);
@@ -2495,6 +2495,11 @@ async function enregistrer() {
     dossierId = r && r.id ? r.id : null;
     if (r && r.numero) saisie.numero = r.numero;
     if (r && r.version) version = r.version;
+    // LES LIGNES DU DEVIS, TOUTES. Un devis de trois articles ouvre trois
+    // lignes depuis le 04/09 : le papier est LE MÊME pour les trois — c'est un
+    // seul document, celui que le client tient.
+    const lignesDuDevis = (r && r.lot && Array.isArray(r.lot.ids) && r.lot.ids.length)
+      ? r.lot.ids : (dossierId ? [dossierId] : []);
     // La reprise est FAITE : un second clic ne doit pas fabriquer une V3 de la
     // même modification.
     repriseDe = null;
@@ -2513,6 +2518,21 @@ async function enregistrer() {
         : `Devis enregistré — dans « À trier »${combien}`),
     'is-ok');
     peindre();
+
+    // LE PAPIER SE DÉPOSE SUR LA LIGNE. Charlie, 04/09 : « la ligne créée
+    // contienne automatiquement le devis à l'intérieur ». Jusqu'ici l'écran
+    // imprimait et la pastille restait vide.
+    //
+    // ⚠ SANS BLOQUER : le devis est déjà au planning. Un dépôt qui échoue ne
+    // doit pas transformer un enregistrement réussi en échec — il se DIT, et on
+    // redépose à la main depuis la ligne.
+    if (lignesDuDevis.length) {
+      const rate = () => dire('Devis enregistré — le PDF n’a pas pu être joint à la ligne', 'is-ko');
+      pdfDevis(modeleDevis(saisie, entreprise))
+        .then(({ bytes, nom }) => deposerPapier(lignesDuDevis, 'devis', bytes, nom))
+        .then(({ deposes, total }) => { if (deposes < total) rate(); })
+        .catch(rate);
+    }
   } catch (err) {
     dire(err.message || 'Enregistrement impossible', 'is-ko');
   } finally {

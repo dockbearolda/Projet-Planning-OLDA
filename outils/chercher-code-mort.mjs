@@ -126,6 +126,23 @@ for (const f of codePublic) {
       if (nom) importesNommement.add(`${cible}|${nom}`);
     }
   }
+  // UN IMPORT PARESSEUX QU'ON DÉBALLE TOUT DE SUITE :
+  //     const { ecrirePapierPdf } = await import('./papier-pdf.js');
+  // La règle du `.nom` plus bas ne l'attrape pas — il n'y a pas d'objet, les
+  // noms sortent directement. La sonde donnait donc pour morte une fonction
+  // appelée à chaque facture émise. C'est la forme qu'on écrit dès qu'une
+  // bibliothèque lourde ne doit partir du serveur qu'au moment de servir.
+  // ⚠ ANCRÉE SUR LA DÉCLARATION, et sans accolade dans la capture. Sans les
+  // deux, le `{` trouvé remontait à celui du corps de la fonction : le premier
+  // nom déballé partait avec « const { » collé devant, et restait porté pour
+  // mort. Vu en comparant deux exports du MÊME `import()`, dont un seul passait.
+  for (const m of s.matchAll(/(?:const|let|var)\s*\{([^{}]+)\}\s*=\s*await\s+import\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+    const cible = path.resolve(path.dirname(f), m[2]);
+    for (const brut of m[1].split(',')) {
+      const nom = brut.trim().split(':')[0].trim();
+      if (nom) importesNommement.add(`${cible}|${nom}`);
+    }
+  }
 }
 
 for (const f of modules) {

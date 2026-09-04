@@ -155,6 +155,27 @@ export function modeleFacture(saisie, entreprise) {
   };
 }
 
+// LE MÊME DOCUMENT, EN PDF — pour le déposer sur la ligne et l'envoyer.
+// ---------------------------------------------------------------------------
+// TROISIÈME CONSOMMATEUR DU MÊME MODÈLE, et rien de plus : `modeleFacture` a
+// déjà tranché tous les montants et toutes les phrases, `dessinerFacture` les
+// met en HTML, celui-ci les met en PDF. Aucune règle ne se réécrit ici — sinon
+// les deux rendus finiraient par dire deux choses.
+//
+// L'IMPORT EST PARESSEUX : pdf-lib pèse 511 Ko, et la plupart des ouvertures de
+// l'écran n'émettent aucune facture. Il ne part du serveur qu'au moment où l'on
+// en fabrique une.
+export async function pdfFacture(t) {
+  const { ecrirePapierPdf, nomDuPapier } = await import('./papier-pdf.js');
+  // LE RÈGLEMENT EST PROPRE À CE DOCUMENT : un mode de paiement n'est pas un
+  // acompte. C'est pour ça que la phrase se compose ici et pas dans le rendu.
+  const r = t.reglement;
+  const reglement = r
+    ? [r.titre, r.montant, r.mode ? `par ${r.mode}` : ''].filter(Boolean).join(' — ')
+    : '';
+  return { bytes: await ecrirePapierPdf(t, { reglement }), nom: nomDuPapier(t) };
+}
+
 // ===========================================================================
 // LA FEUILLE — A4 portrait, autonome
 // ===========================================================================

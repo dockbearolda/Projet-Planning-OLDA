@@ -507,6 +507,22 @@ export function modeleDevis(saisie, entreprise) {
 //   --dv-cle    ce qui identifie : le titre, le numéro, le nom du client, la
 //               maison, l'intitulé d'une section.
 //   --dv-texte  tout le corps.
+// LE MÊME DOCUMENT, EN PDF — pour le déposer sur la ligne et l'envoyer.
+// Troisième consommateur du même modèle : voir l'en-tête de `papier-pdf.js`.
+// L'import est PARESSEUX (pdf-lib pèse 511 Ko, et composer un devis n'est pas
+// l'imprimer).
+export async function pdfDevis(t) {
+  const { ecrirePapierPdf, nomDuPapier } = await import('./papier-pdf.js');
+  // L'ACOMPTE EST PROPRE AU DEVIS, comme le mode de règlement l'est à la
+  // facture : la phrase se compose donc ici, où le modèle est connu.
+  const r = t.reglement;
+  const reglement = r
+    ? `ACOMPTE ${r.pourcent} % — ${r.montant} a la commande, solde ${r.solde}`
+      + (r.reference ? ` — reference ${r.reference}` : '')
+    : '';
+  return { bytes: await ecrirePapierPdf(t, { reglement }), nom: nomDuPapier(t) };
+}
+
 export const CSS_DEVIS = SOCLE_PAPIER + `
   .dv {${JETONS_PAPIER}
        --dv-geant: 30px; --dv-cle: 17px; --dv-texte: 13px;

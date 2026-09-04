@@ -44,14 +44,14 @@ import {
   TAILLES, prodDeLigne, referencesDuCatalogue,
 } from './devis.js';
 import {
-  MODES_PAIEMENT, modeleFacture, dessinerFacture, CSS_FACTURE,
+  MODES_PAIEMENT, modeleFacture, dessinerFacture, CSS_FACTURE, pdfFacture,
 } from './facture.js';
 // LE MENU DÉROULANT AVEC RECHERCHE, celui des deux écrans du comptoir. Charlie,
 // 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
 // TOUS LES INPUTS avec un menu déroulant ». Il a déménagé de `pont.js` pour
 // qu'il n'en existe qu'UN — voir l'en-tête de `menu-recherche.js`.
 import { menuPoser, menuRafraichir, poserStyleMenu } from './menu-recherche.js';
-import { api } from './reseau.js';
+import { api, deposerPapier } from './reseau.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT && ROOT.querySelector(sel);
@@ -213,6 +213,9 @@ let dossierId = null;
 // avec le même identifiant termine la vente au lieu d'ouvrir un second dossier
 // pour le même client.
 let numeroFacture = '';
+// Les lignes que ce dossier a ouvertes — c'est sur TOUTES que le papier se
+// dépose (voir `deposerPapier`).
+let lignesDuDossier = [];
 
 // LE BROUILLON EST PAR APPAREIL. Une vente se compose devant le client, en
 // quelques minutes, et un poste qui se ferme au milieu ne doit pas faire tout
@@ -2396,6 +2399,12 @@ async function emettreFacture() {
       });
       dossierId = rDossier && rDossier.id ? rDossier.id : null;
       if (!dossierId) throw new Error('Le dossier n’a pas pu être créé');
+      // LES LIGNES DU TICKET, TOUTES. Un panier de trois articles ouvre trois
+      // lignes : la facture est LA MÊME pour les trois — c'est un seul
+      // document, celui que le client tient — et la déposer sur la première
+      // seulement laisserait deux lignes vides sur le même dossier.
+      lignesDuDossier = (rDossier.lot && Array.isArray(rDossier.lot.ids) && rDossier.lot.ids.length)
+        ? rDossier.lot.ids : [dossierId];
     }
 
     // --- 2. La facture, immuable --------------------------------------------
@@ -2435,6 +2444,19 @@ async function emettreFacture() {
 
     dire(`Facture ${t.numero} émise`, 'is-ok');
     peindre();
+
+    // --- 4. LE PAPIER SE DÉPOSE SUR LA LIGNE -------------------------------
+    // Charlie, 04/09 : « la ligne créée contienne automatiquement la facture à
+    // l'intérieur ». Jusqu'ici l'écran imprimait et la pastille restait vide.
+    //
+    // ⚠ APRÈS L'IMPRESSION, ET SANS BLOQUER. La facture est déjà émise et
+    // archivée : un dépôt qui échoue ne doit pas transformer une vente réussie
+    // en échec. Il se DIT, et on redépose à la main depuis la ligne.
+    const rate = () => dire(`Facture ${t.numero} émise — le PDF n’a pas pu être joint à la ligne`, 'is-ko');
+    pdfFacture(t)
+      .then(({ bytes, nom }) => deposerPapier(lignesDuDossier, 'facture', bytes, nom))
+      .then(({ deposes, total }) => { if (deposes < total) rate(); })
+      .catch(rate);
   } catch (err) {
     dire(err.message || 'Émission impossible', 'is-ko');
   } finally {
@@ -2450,6 +2472,7 @@ function repartirDeZero() {
   saisie = saisieNeuve();
   dossierId = null;
   numeroFacture = '';
+  lignesDuDossier = [];
   for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-adresse', ''],
     ['#dvf-cl-ville', ''],
     ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cl-wa', ''],
