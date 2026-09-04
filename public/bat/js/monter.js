@@ -84,8 +84,10 @@ const MODULES = [
   'js/producttype.js', 'js/mockup.js', 'js/mockuppixels.js', 'js/batlayout.js',
 ];
 
-// Les quatre écrans, tels que `app.go()` les nomme et tels que l'ossature les
-// pose (`#screen-<id>`). Écrit ici parce que c'est ici que l'hôte les nomme.
+// Les écrans, tels que `app.go()` les nomme et tels que l'ossature les pose
+// (`#screen-<id>`). Écrit ici parce que c'est ici que l'hôte les nomme — et
+// cette liste EST le contrat : elle en portait quatre jusqu'à la PR #209, elle
+// en porte deux, et `options.ecran` refuse tout nom qui n'y figure pas.
 const ECRANS = new Set(['bat', 'produits']);
 
 function precharger(base) {
@@ -121,14 +123,19 @@ function poserFeuilles(base) {
  * @param {string}  [options.requestId]  la fiche du CRM sur laquelle on travaille
  * @param {string}  [options.client]     nom du client, si la fiche le porte
  * @param {string}  [options.projet]     intitulé du projet, si la fiche le porte
+ * @param {object}  [options.prod]       ce qu'il y a à produire, tel que la ligne
+ *                                       le porte : `{refFournisseur, couleur,
+ *                                       tailles: [{t, n}], faces: [nom…]}`. De
+ *                                       quoi ouvrir un BAT déjà rempli.
  * @param {boolean} [options.chrome]     `false` masque la barre d'onglets : l'hôte
  *                                       a déjà sa navigation. L'état de sauvegarde
  *                                       reste visible, en coin.
  * @param {'bat'|'produits'} [options.ecran]
  *                                       l'écran sur lequel ouvrir. Défaut : `bat`.
  *                                       C'est ce qui permet de monter LE MÊME code
- *                                       à trois endroits du CRM — la fiche, et deux
- *                                       pages de réglages — sans le dupliquer.
+ *                                       à plusieurs endroits du CRM — la feuille sur
+ *                                       une fiche, le catalogue ailleurs — sans le
+ *                                       dupliquer. La liste fait foi : `ECRANS`.
  * @param {string}  [options.base]       racine des ressources (défaut : ce module)
  * @returns {Promise<{app: object, demonter: () => void}>}
  */
@@ -213,6 +220,9 @@ export async function monterBatStudio(conteneur, options = {}) {
     if (id) contexteOuverture.requestId = id;
     if (options.client) contexteOuverture.client = String(options.client);
     if (options.projet) contexteOuverture.projet = String(options.projet);
+    // CE QU'IL Y A A PRODUIRE : de quoi ouvrir un BAT DEJA REMPLI plutot qu'un
+    // vierge qu'il faudrait ressaisir sous les yeux du client.
+    if (options.prod) contexteOuverture.prod = options.prod;
   }
 
   // LE THÈME EST CELUI DU CRM, ET IL N'Y EN A QU'UN. `theme.js` est parti avec
@@ -227,8 +237,38 @@ export async function monterBatStudio(conteneur, options = {}) {
   const { demarrer, app } = await import('./app.js');
   await demarrer();
 
+  // OUVRIR LE BAT D'UNE AUTRE FICHE SANS REMONTER L'ECRAN (04/09/2026).
+  // Le CRM garde son onglet monte : passer d'une ligne a une autre ne doit ni
+  // recharger 5,4 Mo de bibliotheques, ni fermer le projet en cours d'edition.
+  // `ouvrirPourFiche` sait deja retrouver LE BAT d'une fiche ou en creer un ;
+  // ce qui manquait, c'etait une prise pour l'appeler de l'exterieur.
+  const { ouvrirPourFiche } = await import('./projects.js');
+  const { contexteOuverture, nettoyerId: propre } = await import('./crm.js');
+
   return {
     app,
+    /**
+     * Bascule l'ecran sur le BAT de CETTE fiche du CRM.
+     * @param {string} requestId
+     * @param {{client?: string, projet?: string}} [quoi] ce que la ligne sait
+     *        du client et du projet, pour un BAT qui naitrait ici.
+     */
+    async ouvrirPourFiche(requestId, quoi = {}) {
+      const id = propre(requestId);
+      if (!id) return false;
+      // Le contexte suit la fiche COURANTE : c'est lui que `attacherContexte`
+      // lit quand un projet vierge se voit coller sa fiche.
+      contexteOuverture.requestId = id;
+      if (quoi.client) contexteOuverture.client = String(quoi.client);
+      if (quoi.projet) contexteOuverture.projet = String(quoi.projet);
+      // ⚠ ON REMPLACE, MEME PAR `null` : le contexte suit la ligne COURANTE.
+      // Garder celui d'avant remplirait le BAT d'un dossier avec les tailles
+      // d'un autre — et personne ne le verrait avant la production.
+      contexteOuverture.prod = quoi.prod || null;
+      await app.go('bat');
+      await ouvrirPourFiche(id);
+      return true;
+    },
     // Démonter rend la page à l'hôte : l'éditeur relâche ses écouteurs de
     // fenêtre et ses images, et le conteneur redevient un div ordinaire.
     demonter() {

@@ -203,8 +203,8 @@ Statuts : **Actif** (utilisé par un écran ou un outil), **Mort** (aucun écran
 | Argent d'une commande (`/api/argent/:id`) | Ce qui reste à encaisser | **Mort** (aucun écran) | `server.js:2105` |
 | Barème « dans 5 / 10 / 15 jours » de la vente directe | Un script qui cherche des boutons retirés le 27/08 | **Mort** (les éléments n'existent plus dans la page) | `public/comptoir/vente-directe.html:2367-2458`, `public/comptoir/vente-directe.css:631-649` |
 | Deux recherches serveur | `/api/requests/recherche` (filtre du planning) et `/api/recherche` (palette) | **Doublon** assumé et commenté, les deux sont appelées | `server.js:1724`, `server.js:2744` |
-| Cinq copies de l'appel réseau `api()` | La même fonction recopiée dans cinq écrans | **Doublon** | `public/app.js:376`, `public/clients.js:203`, `public/reglages.js:33`, `public/tailles-logos.js:32`, `public/devis-flash.js:59` |
-| Taux de TGCA | Un réglage lu par l'application… sauf par le bon de commande, qui garde 0,04 en dur | **Doublon** | `public/bureau.js:64` contre `public/app.js:275-280`, `public/devis-flash.js:231` |
+| ~~Cinq copies de l'appel réseau `api()`~~ | ✅ **Corrigé le 01/09** — `public/reseau.js` en porte UNE, que les huit écrans importent. Ce qui manquait aux copies (délai, signature `X-Qui`) vaut donc partout | Résolu | `public/reseau.js:76` |
+| ~~Taux de TGCA en dur~~ | ✅ **Corrigé** — `bureau.js` lit le taux passé et ne garde `TGCA_REPLI` que comme valeur de secours | Résolu | `public/bureau.js:71` |
 | Redirection `/fiche` | L'ancienne adresse renvoie sur Nouveau projet | Actif (compatibilité) | `server.js:5446` |
 | Lancement local en un clic | Double-clic, base en mémoire sans `DATABASE_URL` | Actif | `Lancer Atelier OLDA.command`, `db.js:165-234` |
 
@@ -257,8 +257,8 @@ Attention avant tout retrait d'`export` : plusieurs tests lisent le **source** e
 
 ### 4.2 Doublons (deux façons de faire la même chose)
 
-- **Cinq `api()`** — [public/app.js:376](public/app.js:376), [public/clients.js:203](public/clients.js:203), [public/reglages.js:33](public/reglages.js:33), [public/tailles-logos.js:32](public/tailles-logos.js:32), [public/devis-flash.js:59](public/devis-flash.js:59). Les trois du milieu sont identiques au mot près. Celle de `devis-flash.js` appelle `fetch` nu : **pas de délai** (`fetchBorne` de `reseau.js`, utilisé partout ailleurs) et **pas d'en-tête `X-Qui`** — les écritures du devis flash ne sont donc pas signées au journal, contrairement à celles de `app.js:390` et de `pont.js:125`.
-- **Le taux de TGCA** — `public/bureau.js:64` pose `const TGCA = 0.04` alors que `app.js:275-280`, `devis-flash.js:231` et le serveur (`server.js:4175`, `4502`, `5480`) lisent le réglage `tarifs-tasse/parametres`. Si le patron change le taux dans Réglages, le bon de commande continue de déduire son HT à 4 %.
+- ~~**Cinq `api()`**~~ — ✅ **corrigé le 01/09** : `public/reseau.js` en porte UNE ([reseau.js:76](public/reseau.js:76)), importée par `app.js`, `clients.js`, `reglages.js`, `tailles-logos.js`, `devis-flash.js`, `vente-flash.js`, `historique.js`. Ce qui manquait à la copie du devis flash — le délai et la signature `X-Qui` — vaut donc partout.
+- ~~**Le taux de TGCA**~~ — ✅ **corrigé** : `bureau.js` reçoit le taux et ne garde `TGCA_REPLI` ([bureau.js:71](public/bureau.js:71)) que comme valeur de secours quand aucun réglage n'est joignable.
 - **Les modes de paiement** — `catalog.json` (`paiementModes`, validé par le serveur) et sa copie à la main `PAIEMENT_MODES` dans [public/app.js:163-171](public/app.js:163). Le commentaire dit « miroir » : deux listes à tenir à jour.
 - **Deux recherches serveur** — [server.js:1724](server.js:1724) et [server.js:2744](server.js:2744) partagent `FOIN_RECHERCHE` mais sont deux routes. Le commentaire l. ≈2735 assume le choix (« on ne fusionne PAS les deux écrans »). Signalé, pas à nettoyer d'office.
 - **`require('crypto')` quatre fois** dans `server.js` — l. 15 (import de tête), puis l. 128, 1619, 4621 qui le re-demandent alors que la constante existe déjà.
@@ -446,8 +446,8 @@ de `docs/superpowers/` coiffés d’un bandeau « historique ».
 | 10 | `GET /api/stages` et `GET /api/commande/catalog` (zéro test) : suppression directe | faible à moyen | Deux portes de moins |
 | 11 | `/api/delais`, `/api/pipeline`, `/api/argent/:id`, les deux routes `/versions`, `/api/requests/:id/journal` : supprimer route **et** test associé (`bat-devis-et-suivi`, `destination-whatsapp`, `marge-et-pilotage`, `archivage-et-journal`, `planning-audit`, `audit-2026-08-05-soir`, `audit-2026-08-06-nuit`, `ticket-edition`) | moyen | Sept routes de moins ; une surface d'API qui dit ce que l'écran fait vraiment |
 | 12 | Le bloc `POST /api/projets` (l. 3727-4682) avec ses routes `/api/projets/:id`, la chaîne des zones (`db.js` : `getCommandeZones`, `getHiddenCommandeZones` ; deux clés `app_meta`), et réduire `catalog.json` à `paiementModes`. Garder les 17 aides partagées listées en 4.1. Dix fichiers de test à réécrire ou retirer | moyen | ≈ 900 lignes de `server.js`, `catalog.json` de 96 à ≈ 10 lignes, une source de prix en moins |
-| 13 | Un seul `api()` dans `public/reseau.js`, importé par les cinq écrans ; le devis flash gagne le délai et la signature `X-Qui` | moyen | Une correction se fait une fois ; le journal du devis flash dit enfin « qui » |
-| 14 | Le bon de commande lit le taux de TGCA du réglage au lieu de `0.04` (`bureau.js:64`) | moyen | Un seul taux dans l'application ; à faire valider sur papier par le patron, le HT imprimé peut changer |
+| ~~13~~ | ✅ **FAIT le 01/09** — un seul `api()` dans `public/reseau.js`, importé par les huit écrans | — | — |
+| ~~14~~ | ✅ **FAIT** — le bon de commande reçoit le taux ; `TGCA_REPLI` n'est plus qu'une valeur de secours | — | — |
 | 15 | Les modes de paiement : une seule liste (servie par le serveur ou constante partagée) au lieu de `catalog.json` + `app.js:163` | moyen | Plus de miroir à tenir |
 | 16 | Les quatre migrations de retrait (`statuses`, stock, `production_sectors`, colonne `status`) : vérifier sur la prod que tables et colonne ont disparu, puis retirer les fonctions et leurs gardes | moyen | Un `db.js` plus court, un démarrage qui ne cherche plus des tables d'il y a trois mois |
 | 17 | Les sept tests d'absence de fichiers supprimés : à garder ou à fondre en un seul test « aucun fichier hors liste dans `public/` » | faible à moyen | Moins de tests qui parlent du passé |
@@ -461,3 +461,47 @@ de `docs/superpowers/` coiffés d’un bandeau « historique ».
 | 20 | **Colonnes jamais écrites** (`provenance`, `date_prevue`, `retrait_creneau`, `projects.action_*`, `users.derniere_connexion`, `tasks.qte_prevue`) : compter les non-NULL en prod ; `DROP` seulement à zéro, sinon décider d'un écran | élevé | Un schéma qui ne promet pas ce que l'écran ne sait pas remplir |
 | 21 | **Tâches** : la pose d'une liste (`POST /api/requests/:id/taches`) et les modèles de Réglages n'ont pas d'écran — décider si Mon travail propose « poser les étapes » ou si le modèle quitte les Réglages | élevé | Une fonctionnalité entière au lieu d'une moitié |
 | 22 | `archives/comptoir-2026-08-27/` : ne supprimer que sur décision de Charlie ; l'étiquette git suffit à revenir | faible techniquement, décision humaine | 8 000 lignes de moins dans le dépôt |
+
+
+---
+
+## PARTIE 6 — Passe du 04/09/2026 : ce que l'entrée de BAT Studio a laissé
+
+L'audit ci-dessus date du 01/09. BAT Studio est entré dans le CRM le 04/09
+(PR #207 → #209), la facture et l'agenda les 03 et 04. Cette passe ne refait pas
+l'inventaire : elle relit **ce qui a changé depuis**, plus le chemin des trois
+documents d'une ligne. Suite complète verte (151 fichiers) avant et après.
+
+### ✅ Corrigé dans la foulée
+
+| Quoi | Ce qui se passait | Où |
+|---|---|---|
+| **`/bat/api/*` hors de la porte** | Comptes allumés, personne connecté : `PUT /api/requests/<id>/pdf/bat` → **401**, `PUT /bat/api/crm/bat/<id>` → **200** et le PDF entrait dans la fiche. `POST /bat/api/menage/mockups`, qui EFFACE des images, s'ouvrait de même. La porte de session ne testait que `/api/` ; `/bat/api/` ne commence pas par là | `server.js` (`PREFIXES_PROTEGES`), `test/porte-de-service-bat.test.js` |
+| **Aucune capacité sur les routes BAT** | `bat.js` n'avait aucun `exige(…)`, là où la route qu'il appelle en a un. Un opérateur pouvait écrire sur n'importe quelle fiche par `/bat` | `bat.js`, capacité `bat` (Direction, chef d'atelier, boutique) |
+| **La vente flash annonçait une facture qui n'existait pas** | L'émission passe par deux appels ; le second qui échoue laissait « Facture émise », le bouton grisé et un garde `if (dossierId) return` qui rendait muet tout nouveau clic | `public/vente-flash.js` (`numeroFacture`) |
+| **Trois commentaires sur les quatre onglets du BAT** | Il y en a **deux** depuis la PR #209 (Feuille, Produits) | `public/app.js`, `public/bat/js/monter.js` |
+| **Le message du cliquet de charte** | Il donnait `verifier-charte.mjs public` — sans `--exclure feuille`, soit une centaine de faux écarts venus de la feuille A4, hors charte par décision écrite | `test/charte-cliquet.test.js` |
+
+### ⚠ Trouvé, non corrigé — c'est la fonctionnalité, pas un défaut isolé
+
+Voir [le cahier du 04/09](docs/superpowers/specs/2026-09-04-documents-par-ligne-design.md).
+
+- **La chaîne « une fiche, un BAT » n'a pas d'allumage.** `ouvrirPourFiche`,
+  `batDeLaFiche`, `attacherContexte`, `deposerDansCrm` sont écrites et testées ;
+  personne ne passe `requestId` à `monterBatStudio`. Tout BAT composé dans le
+  CRM est donc orphelin.
+- **`fiche.prod` reste vide** (0/187 en prod le 29/08). La vente flash n'en
+  envoie que quatre champs plats — sans les tailles ni les faces que la vendeuse
+  vient de taper — et le devis flash n'en envoie aucun.
+- **Les deux écrans flash n'attachent jamais leur papier** : les trois pastilles
+  de la ligne sont des emplacements de dépôt manuel.
+- **Deux découpages** : une vente à 3 articles fait 3 lignes, un devis à 3
+  articles en fait 1.
+
+### ℹ Sans conséquence, mais à savoir
+
+- En mode local (pg-mem), l'onglet BAT ouvre sur un catalogue vide et quatre
+  404 : `catalogue-export.json` vit dans `bat_fichiers`, que la base en mémoire
+  ne sème pas. C'est attendu — la prod porte 5 111 fichiers de catalogue.
+- `outils/verifier-charte.mjs` rend 154 écarts sur 18 fichiers, tous sous les
+  plafonds du cliquet.

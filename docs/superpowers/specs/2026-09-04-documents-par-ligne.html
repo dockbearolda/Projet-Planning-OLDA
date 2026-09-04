@@ -1,0 +1,705 @@
+<title>Trois documents par ligne</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+  /* ── Registre : la feuille d'un bon à tirer. Gris de presse, encre cyan,
+       magenta pour ce qui cloche. Une seule fioriture : la barre de repérage. ── */
+  :root {
+    --ground:   #EDF0F3;
+    --sheet:    #FFFFFF;
+    --sheet-2:  #F5F7F9;
+    --ink:      #161A1F;
+    --ink-2:    #5C6672;
+    --ink-3:    #8994A1;
+    --rule:     #D3DAE1;
+    --rule-2:   #E5EAEF;
+    --accent:   #0A6E8A;
+    --accent-w: #E2F0F5;
+    --fail:     #A81E4D;
+    --fail-w:   #FBE9EF;
+    --ok:       #1D6A4A;
+    --ok-w:     #E4F2EB;
+    --warn:     #8F5210;
+    --warn-w:   #F8EEE1;
+    --shadow:   0 1px 2px rgba(22, 26, 31, .05), 0 8px 24px -12px rgba(22, 26, 31, .18);
+
+    --c-cyan:    #1BA3C6;
+    --c-magenta: #C7397A;
+    --c-yellow:  #E0B33C;
+    --c-black:   #2A3138;
+
+    --sans:  "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono:  "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+
+    --col: 68ch;
+    --pad: clamp(1.15rem, 4vw, 2.75rem);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0F1317;
+      --sheet:    #171C22;
+      --sheet-2:  #1D242B;
+      --ink:      #E3E8ED;
+      --ink-2:    #9AA5B1;
+      --ink-3:    #6E7A87;
+      --rule:     #2B333B;
+      --rule-2:   #232A31;
+      --accent:   #55BAD4;
+      --accent-w: #12313B;
+      --fail:     #EC7BA3;
+      --fail-w:   #3A1526;
+      --ok:       #55BE8D;
+      --ok-w:     #123326;
+      --warn:     #D9A055;
+      --warn-w:   #33240F;
+      --shadow:   0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+      --c-cyan:    #2FB8DC;
+      --c-magenta: #DB5B94;
+      --c-yellow:  #E6C158;
+      --c-black:   #7C8794;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:   #0F1317;
+    --sheet:    #171C22;
+    --sheet-2:  #1D242B;
+    --ink:      #E3E8ED;
+    --ink-2:    #9AA5B1;
+    --ink-3:    #6E7A87;
+    --rule:     #2B333B;
+    --rule-2:   #232A31;
+    --accent:   #55BAD4;
+    --accent-w: #12313B;
+    --fail:     #EC7BA3;
+    --fail-w:   #3A1526;
+    --ok:       #55BE8D;
+    --ok-w:     #123326;
+    --warn:     #D9A055;
+    --warn-w:   #33240F;
+    --shadow:   0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+    --c-cyan:    #2FB8DC;
+    --c-magenta: #DB5B94;
+    --c-yellow:  #E6C158;
+    --c-black:   #7C8794;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+  a { color: var(--accent); text-underline-offset: .18em; text-decoration-thickness: 1px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  /* ── Ossature ─────────────────────────────────────────────────── */
+  .feuille {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: 0 var(--pad) 5rem;
+  }
+  .corps {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+  @media (min-width: 62rem) {
+    .corps { grid-template-columns: 14.5rem minmax(0, 1fr); gap: 3.5rem; }
+    .sommaire { position: sticky; top: 2rem; }
+  }
+  .flux { min-width: 0; display: flex; flex-direction: column; gap: 3.25rem; }
+  .flux > section { scroll-margin-top: 1.5rem; }
+  .mesure { max-width: var(--col); }
+
+  /* ── Barre de repérage : le seul ornement, et il vient du sujet ── */
+  .reperage { display: flex; height: 5px; margin: 0 0 1.6rem; }
+  .reperage span { flex: 1; }
+  .reperage span:nth-child(1) { background: var(--c-cyan); }
+  .reperage span:nth-child(2) { background: var(--c-magenta); }
+  .reperage span:nth-child(3) { background: var(--c-yellow); }
+  .reperage span:nth-child(4) { background: var(--c-black); }
+
+  /* ── Bandeau ──────────────────────────────────────────────────── */
+  .tete { padding: clamp(2rem, 6vw, 3.5rem) 0 2.5rem; }
+  .surtitre {
+    font-family: var(--mono); font-size: .715rem; font-weight: 500;
+    letter-spacing: .13em; text-transform: uppercase; color: var(--ink-2);
+    margin: 0 0 .9rem;
+  }
+  h1 {
+    font-size: clamp(2.1rem, 5.6vw, 3.4rem);
+    line-height: 1.06; font-weight: 700; letter-spacing: -.022em;
+    margin: 0 0 1rem; text-wrap: balance; max-width: 20ch;
+  }
+  .chapo {
+    font-family: var(--serif); font-size: clamp(1.02rem, 2vw, 1.16rem);
+    line-height: 1.62; color: var(--ink-2); max-width: 54ch; margin: 0;
+  }
+  .etat {
+    display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.9rem 0 0; padding: 0; list-style: none;
+  }
+  .etat li {
+    font-family: var(--mono); font-size: .765rem; font-weight: 500;
+    padding: .34rem .66rem; border-radius: 3px; border: 1px solid var(--rule);
+    background: var(--sheet); color: var(--ink-2);
+  }
+  .etat li b { color: var(--ink); font-weight: 600; }
+  .etat li.t-ok   { border-color: color-mix(in srgb, var(--ok) 40%, transparent);   background: var(--ok-w);   color: var(--ok); }
+  .etat li.t-ok b { color: var(--ok); }
+  .etat li.t-warn { border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: var(--warn-w); color: var(--warn); }
+  .etat li.t-warn b { color: var(--warn); }
+
+  /* ── Sommaire ─────────────────────────────────────────────────── */
+  .sommaire nav { border-left: 2px solid var(--rule); }
+  .sommaire a {
+    display: block; padding: .34rem 0 .34rem 1rem; margin-left: -2px;
+    border-left: 2px solid transparent;
+    font-size: .875rem; color: var(--ink-2); text-decoration: none; line-height: 1.35;
+  }
+  .sommaire a:hover { color: var(--ink); border-left-color: var(--accent); }
+  .sommaire a .n {
+    font-family: var(--mono); font-size: .72rem; color: var(--ink-3);
+    margin-right: .5rem;
+  }
+
+  /* ── Titres de section ────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--mono); font-size: .7rem; font-weight: 500;
+    letter-spacing: .13em; text-transform: uppercase; color: var(--accent);
+    margin: 0 0 .55rem;
+  }
+  h2 {
+    font-size: clamp(1.42rem, 3.1vw, 1.85rem); line-height: 1.2; font-weight: 600;
+    letter-spacing: -.014em; margin: 0 0 .85rem; text-wrap: balance;
+  }
+  h3 {
+    font-size: 1.06rem; font-weight: 600; line-height: 1.35;
+    margin: 0 0 .4rem; letter-spacing: -.005em;
+  }
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+  code, .ref {
+    font-family: var(--mono); font-size: .875em;
+    background: var(--sheet-2); border: 1px solid var(--rule-2);
+    padding: .06em .34em; border-radius: 3px; white-space: nowrap;
+  }
+  strong { font-weight: 600; }
+
+  /* ── Constats : trois blocs, l'ossature de tout le reste ──────── */
+  .constats { display: grid; gap: 1rem; }
+  @media (min-width: 48rem) { .constats { grid-template-columns: repeat(3, 1fr); } }
+  .constat {
+    background: var(--sheet); border: 1px solid var(--rule);
+    border-top: 3px solid var(--fail);
+    border-radius: 4px; padding: 1.35rem 1.35rem 1.45rem;
+    display: flex; flex-direction: column; gap: .6rem;
+  }
+  .constat .chiffre {
+    font-family: var(--mono); font-size: 1.85rem; font-weight: 600;
+    line-height: 1; color: var(--fail); letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .constat .chiffre small {
+    display: block; font-size: .7rem; font-weight: 500; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-2); margin-top: .45rem;
+  }
+  .constat p { font-size: .915rem; line-height: 1.55; color: var(--ink-2); margin: 0; }
+  .constat p b { color: var(--ink); font-weight: 600; }
+
+  /* ── Tableaux ─────────────────────────────────────────────────── */
+  .large { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table {
+    width: 100%; border-collapse: collapse; font-size: .9rem;
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
+  }
+  th, td { text-align: left; padding: .68rem .85rem; border-bottom: 1px solid var(--rule-2); vertical-align: top; }
+  thead th {
+    font-family: var(--mono); font-size: .7rem; font-weight: 500;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2);
+    background: var(--sheet-2); border-bottom: 1px solid var(--rule); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .qui { font-family: var(--mono); font-size: .78rem; color: var(--ink-3); white-space: nowrap; }
+
+  .puce {
+    display: inline-block; font-family: var(--mono); font-size: .7rem; font-weight: 500;
+    padding: .1rem .45rem; border-radius: 3px; white-space: nowrap;
+    border: 1px solid currentColor;
+  }
+  .p-charlie { color: var(--accent); background: var(--accent-w); }
+  .p-ici     { color: var(--ink-2); background: var(--sheet-2); }
+
+  /* ── Citation : la voix de Charlie, en serif ──────────────────── */
+  blockquote {
+    margin: 0; padding: 1.15rem 0 1.15rem 1.5rem;
+    border-left: 3px solid var(--accent);
+    font-family: var(--serif); font-size: 1.05rem; line-height: 1.62; color: var(--ink);
+  }
+  blockquote p { margin: 0 0 .7rem; }
+  blockquote cite {
+    display: block; font-family: var(--mono); font-style: normal;
+    font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3);
+  }
+
+  /* ── Figures ──────────────────────────────────────────────────── */
+  figure {
+    margin: 0; background: var(--sheet); border: 1px solid var(--rule);
+    border-radius: 4px; padding: 1.4rem 1.4rem 1.1rem;
+  }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink); }
+  figcaption {
+    margin-top: 1rem; padding-top: .85rem; border-top: 1px solid var(--rule-2);
+    font-size: .85rem; line-height: 1.55; color: var(--ink-2);
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* ── Les lots : une vraie séquence, d'où la numérotation ──────── */
+  .lots { display: flex; flex-direction: column; gap: 0; counter-reset: lot; }
+  .lot {
+    display: grid; grid-template-columns: 3.25rem minmax(0, 1fr); gap: 0 1.15rem;
+    padding: 1.4rem 0; border-top: 1px solid var(--rule);
+  }
+  .lot:last-child { border-bottom: 1px solid var(--rule); }
+  .lot .rang {
+    font-family: var(--mono); font-size: .78rem; font-weight: 600; letter-spacing: .06em;
+    color: var(--accent); padding-top: .18rem;
+  }
+  .lot--fait .rang { color: var(--ok); }
+  .lot h3 { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  .etiq {
+    font-family: var(--mono); font-size: .66rem; font-weight: 500; letter-spacing: .1em;
+    text-transform: uppercase; padding: .1rem .42rem; border-radius: 3px;
+    border: 1px solid currentColor;
+  }
+  .etiq--fait   { color: var(--ok);   background: var(--ok-w); }
+  .etiq--reste  { color: var(--warn); background: var(--warn-w); }
+  .lot .rang::after { content: ""; display: block; width: 1px; height: calc(100% - .4rem); margin: .55rem 0 0 .55rem; background: var(--rule); }
+  .lot h3 { margin-bottom: .35rem; }
+  .lot p { font-size: .935rem; color: var(--ink-2); }
+  .lot p b { color: var(--ink); }
+  .lot .teste {
+    font-size: .855rem; color: var(--ink-2); margin-top: .7rem;
+    padding: .6rem .8rem; background: var(--sheet-2);
+    border-left: 2px solid var(--rule); border-radius: 0 3px 3px 0;
+  }
+  .lot .teste b {
+    font-family: var(--mono); font-size: .68rem; font-weight: 500; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3); display: block; margin-bottom: .15rem;
+  }
+
+  /* ── Pièges ───────────────────────────────────────────────────── */
+  .pieges { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
+  @media (min-width: 52rem) { .pieges { grid-template-columns: 1fr 1fr; } }
+  .pieges li {
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
+    padding: .95rem 1.1rem; font-size: .9rem; line-height: 1.52; color: var(--ink-2);
+  }
+  .pieges li b { color: var(--ink); font-weight: 600; display: block; margin-bottom: .18rem; }
+
+  /* ── L'audit ──────────────────────────────────────────────────── */
+  .corrige { display: flex; flex-direction: column; gap: 1rem; }
+  .fix {
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
+    border-left: 3px solid var(--ok); padding: 1.15rem 1.25rem;
+  }
+  .fix h3 { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  .fix .grav {
+    font-family: var(--mono); font-size: .66rem; font-weight: 500; letter-spacing: .1em;
+    text-transform: uppercase; padding: .12rem .42rem; border-radius: 3px;
+    border: 1px solid currentColor; color: var(--fail); background: var(--fail-w);
+  }
+  .fix .grav.mineur { color: var(--ink-3); background: var(--sheet-2); }
+  .fix p { font-size: .915rem; color: var(--ink-2); }
+  .avapres {
+    margin-top: .85rem; font-family: var(--mono); font-size: .805rem;
+    display: grid; gap: .28rem;
+  }
+  .avapres div { display: flex; gap: .7rem; align-items: baseline; flex-wrap: wrap; }
+  .avapres .rt { color: var(--ink-2); flex: 1 1 20ch; min-width: 0; overflow-wrap: anywhere; }
+  .avapres .av { color: var(--fail); font-weight: 500; white-space: nowrap; }
+  .avapres .ap { color: var(--ok);   font-weight: 500; white-space: nowrap; }
+
+  footer {
+    margin-top: 3.5rem; padding-top: 1.4rem; border-top: 1px solid var(--rule);
+    font-family: var(--mono); font-size: .765rem; color: var(--ink-3);
+    display: flex; flex-wrap: wrap; gap: .4rem 1.5rem;
+  }
+</style>
+
+<div class="feuille">
+
+  <header class="tete">
+    <div class="reperage" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <p class="surtitre">Planning OLDA · Cahier du 4 septembre 2026</p>
+    <h1>Trois documents par ligne</h1>
+    <p class="chapo">Chaque ligne du planning porte son bon à tirer, son devis et sa facture — et le BAT arrive pré-rempli avec les t-shirts que Mélina vient de saisir. Le cahier de construction, et où en est le chantier.</p>
+    <ul class="etat">
+      <li class="t-ok"><b>Les 5 lots</b> construits et vérifiés</li>
+      <li class="t-ok"><b>157</b> tests verts</li>
+      <li class="t-ok"><b>6</b> défauts corrigés</li>
+      <li><b>Rien</b> n'est parti sur Railway</li>
+    </ul>
+  </header>
+
+  <div class="corps">
+
+    <aside class="sommaire">
+      <nav aria-label="Sommaire">
+        <a href="#demande"><span class="n">01</span>La demande</a>
+        <a href="#constats"><span class="n">02</span>Les trois constats</a>
+        <a href="#tranche"><span class="n">03</span>Ce qui est tranché</a>
+        <a href="#jointure"><span class="n">04</span>Le pré-remplissage</a>
+        <a href="#perimetre"><span class="n">05</span>Qui a droit à un BAT</a>
+        <a href="#vie"><span class="n">06</span>La vie et la mort d'un BAT</a>
+        <a href="#lots"><span class="n">07</span>Les cinq lots</a>
+        <a href="#pieges"><span class="n">08</span>Les pièges déjà payés</a>
+        <a href="#audit"><span class="n">09</span>L'audit : ce qui est corrigé</a>
+      </nav>
+    </aside>
+
+    <main class="flux">
+
+      <!-- ─────────────────────────────────────────── 01 -->
+      <section id="demande">
+        <p class="eyebrow">01 · La demande</p>
+        <h2>Ce que Charlie a demandé</h2>
+        <blockquote>
+          <p>« Lorsque ma vendeuse crée une nouvelle ligne, que ce soit dans vente flash ou devis flash, la ligne créée contienne automatiquement le devis ou la facture à l'intérieur. À l'intérieur de chaque ligne je dois pouvoir rapidement créer un BAT, un devis ou une facture. Il faut de la simplicité et de l'efficacité. »</p>
+          <p>« Quand Mélina rentre les informations sur une commande de t-shirts, le BAT doit déjà être pré-rempli avec les t-shirts, la bonne couleur, etc., qu'on n'ait plus qu'à ajouter les logos, avant, arrière ou autre. »</p>
+          <cite>4 septembre 2026</cite>
+        </blockquote>
+        <p class="mesure" style="margin-top:1.4rem">Trois exigences, et elles ne coûtent pas la même chose. La ligne doit <strong>porter</strong> ses documents ; on doit pouvoir en <strong>créer un vite</strong> depuis la ligne ; et le BAT doit arriver <strong>déjà rempli</strong>. C'est la troisième qui commande tout : un BAT ne peut pas se pré-remplir avec des tailles et des couleurs que le dossier ne porte pas — et aujourd'hui, il ne les porte pas.</p>
+      </section>
+
+      <!-- ─────────────────────────────────────────── 02 -->
+      <section id="constats">
+        <p class="eyebrow">02 · L'état des lieux</p>
+        <h2>Les trois constats, mesurés</h2>
+        <p class="mesure">Rien de tout cela n'est une supposition : c'est ce que le code et la base de production disent aujourd'hui.</p>
+
+        <div class="constats" style="margin-top:1.5rem">
+          <article class="constat">
+            <span class="chiffre">0<small>écran passe l'identifiant de la ligne au BAT</small></span>
+            <p><b>La chaîne « une fiche, un BAT » est écrite, testée — et n'a aucun allumage.</b> <span class="ref">ouvrirPourFiche</span>, <span class="ref">batDeLaFiche</span>, <span class="ref">deposerDansCrm</span> fonctionnent. Mais personne ne passe <span class="ref">requestId</span> à <span class="ref">monterBatStudio</span>. Tout BAT composé dans le CRM est donc <b>orphelin</b> : au moment de le déposer, l'écran répond « Aucune fiche CRM associée à ce projet ».</p>
+          </article>
+          <article class="constat">
+            <span class="chiffre">0<span style="font-size:1rem;font-weight:500">&thinsp;/&thinsp;187</span><small>dossiers portent <span class="ref" style="font-size:.9em">fiche.prod</span></small></span>
+            <p><b>Ce que Mélina tape ne parvient pas au dossier.</b> La vente flash n'envoie que quatre champs plats — référence, couleur, marquage, encre — <b>sans les tailles ni les faces</b> qu'elle vient pourtant de remplir. Le devis flash n'en envoie aucun. Le détail survit sur le papier, en texte, jamais dans une forme que l'atelier ou le BAT sachent lire.</p>
+          </article>
+          <article class="constat">
+            <span class="chiffre">3<small>pastilles de dépôt manuel</small></span>
+            <p><b>Les deux écrans impriment et n'attachent rien.</b> Devis, facture, BAT : les trois emplacements sont déjà sur chaque ligne du planning, avec leur icône. Mais aucun écran n'y dépose quoi que ce soit. La vendeuse imprime, et la ligne reste vide.</p>
+          </article>
+        </div>
+
+        <p class="mesure" style="margin-top:1.5rem">Une quatrième chose, sans gravité mais qui décide de l'ordre des travaux : <strong>une vente à 3 articles crée 3 lignes, un devis à 3 articles n'en crée qu'une.</strong> Deux formes pour les mêmes faits.</p>
+      </section>
+
+      <!-- ─────────────────────────────────────────── 03 -->
+      <section id="tranche">
+        <p class="eyebrow">03 · Les décisions</p>
+        <h2>Ce qui est tranché</h2>
+        <p class="mesure">Plus aucune question ouverte : tout ce qui bloquait la construction a une réponse écrite.</p>
+        <div class="large" style="margin-top:1.3rem">
+          <table>
+            <thead>
+              <tr><th style="width:1%">#</th><th>Question</th><th>Réponse</th><th style="width:1%">Par</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="num">1</td><td>Granularité des lignes</td><td><strong>1 article = 1 ligne partout.</strong> Le devis flash découpe comme la vente flash. La reprise V2/V3 repart alors du <strong>numéro du devis</strong>, plus d'un identifiant de dossier.</td><td><span class="puce p-charlie">Charlie</span></td></tr>
+              <tr><td class="num">2</td><td>Ce que porte la ligne</td><td><strong>Le PDF <em>et</em> le modèle.</strong> Le PDF pour l'envoyer (WhatsApp, Dropbox) ; le modèle archivé pour le relire, le corriger, en faire une V2 ou un avoir.</td><td><span class="puce p-charlie">Charlie</span></td></tr>
+              <tr><td class="num">3</td><td>Naissance du BAT</td><td><strong>Automatique à la création de la ligne</strong>, et <strong>sur les lignes textile seulement</strong>. Le reste continue sur Illustrator.</td><td><span class="puce p-charlie">Charlie</span></td></tr>
+              <tr><td class="num">4</td><td>Fin de vie du BAT</td><td><strong>Modifiable autant qu'on veut.</strong> Il disparaît quand le dossier entre en « Paiement &amp; clôture ». Le PDF, lui, reste sur la ligne.</td><td><span class="puce p-charlie">Charlie</span></td></tr>
+              <tr><td class="num">5</td><td>Comment fabriquer le PDF</td><td><strong><span class="ref">pdf-lib</span>, déjà hébergé chez nous</strong>, en frère de rendu du même modèle. La facture d'abord, le devis ensuite.</td><td><span class="puce p-ici">ici</span></td></tr>
+              <tr><td class="num">6</td><td>Les devis déjà au planning</td><td><strong>On ne découpe pas le passé.</strong> Découper rétroactivement changerait des montants déjà annoncés à des clients.</td><td><span class="puce p-ici">ici</span></td></tr>
+              <tr><td class="num">7</td><td>Plafond des tailles par ligne</td><td><strong>12 → 24.</strong> Une commande de staff à 9 tailles et 6 emplacements existe, et le plafond d'aujourd'hui la tronquerait <em>en silence</em>.</td><td><span class="puce p-ici">ici</span></td></tr>
+              <tr><td class="num">8</td><td>Produit absent du catalogue BAT</td><td>On ouvre le BAT <strong>en nommant le manque</strong> et en proposant l'import TopTex. Jamais un BAT muet qui a l'air d'avoir marché.</td><td><span class="puce p-ici">ici</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────────────────── 04 -->
+      <section id="jointure">
+        <p class="eyebrow">04 · Le cœur du sujet</p>
+        <h2>Comment le BAT se remplit tout seul</h2>
+        <p class="mesure">Une fois que la ligne porte vraiment ce que Mélina a saisi, le BAT n'a plus qu'à aller le chercher. Quatre correspondances — et une seule est piégeuse.</p>
+
+        <figure style="margin-top:1.4rem">
+          <svg viewBox="0 0 880 336" role="img" aria-label="Les quatre champs de la ligne du CRM et leur correspondance dans le projet BAT ; la référence passe par le catalogue textile, qui donne la référence fournisseur TopTex.">
+            <defs>
+              <marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+              <marker id="fla" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"></path>
+              </marker>
+            </defs>
+
+            <text x="24" y="20" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="500" letter-spacing="1.4" fill="currentColor" opacity=".62">LA LIGNE DU CRM</text>
+            <text x="560" y="20" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="500" letter-spacing="1.4" fill="currentColor" opacity=".62">LE PROJET BAT</text>
+
+            <rect x="24" y="34" width="296" height="256" rx="4" fill="none" stroke="currentColor" stroke-opacity=".26"></rect>
+            <rect x="560" y="34" width="296" height="256" rx="4" fill="none" stroke="currentColor" stroke-opacity=".26"></rect>
+
+            <!-- ligne 1 : la référence, le piège -->
+            <text x="42" y="80"  font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">prod.ref</text>
+            <text x="42" y="98"  font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--accent)">« K3025 »</text>
+            <line x1="322" y1="88" x2="356" y2="88" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#fla)"></line>
+            <rect x="362" y="66" width="156" height="44" rx="4" fill="var(--accent-w)" stroke="var(--accent)" stroke-opacity=".55"></rect>
+            <text x="440" y="83" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="var(--accent)">catalogue textile</text>
+            <text x="440" y="99" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="600" fill="var(--accent)">toptex || ref</text>
+            <line x1="524" y1="88" x2="556" y2="88" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#fla)"></line>
+            <text x="578" y="80"  font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">productByRef</text>
+            <text x="578" y="98"  font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--accent)">« K3025IC »</text>
+
+            <line x1="24" y1="126" x2="856" y2="126" stroke="currentColor" stroke-opacity=".12"></line>
+
+            <!-- ligne 2 : la couleur -->
+            <text x="42" y="156" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">prod.couleur</text>
+            <text x="42" y="174" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="currentColor" opacity=".72">« Light Olive Green »</text>
+            <line x1="322" y1="164" x2="556" y2="164" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4" marker-end="url(#fl)"></line>
+            <text x="439" y="158" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity=".55">par le nom du coloris</text>
+            <text x="578" y="156" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">colors[].label</text>
+            <text x="578" y="174" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="currentColor" opacity=".72">le vêtement se teinte</text>
+
+            <line x1="24" y1="192" x2="856" y2="192" stroke="currentColor" stroke-opacity=".12"></line>
+
+            <!-- ligne 3 : les tailles -->
+            <text x="42" y="222" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">prod.tailles</text>
+            <text x="42" y="240" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="currentColor" opacity=".72">12 × M · 18 × L</text>
+            <line x1="322" y1="230" x2="556" y2="230" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4" marker-end="url(#fl)"></line>
+            <text x="439" y="224" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity=".55">tel quel</text>
+            <text x="578" y="222" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">article.sizes</text>
+            <text x="578" y="240" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="currentColor" opacity=".72">la grille est remplie</text>
+
+            <line x1="24" y1="258" x2="856" y2="258" stroke="currentColor" stroke-opacity=".12"></line>
+
+            <!-- ligne 4 : les faces -->
+            <text x="42" y="284" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">prod.logos</text>
+            <text x="42" y="302" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="currentColor" opacity=".72">Cœur · Dos</text>
+            <line x1="322" y1="292" x2="556" y2="292" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4" marker-end="url(#fl)"></line>
+            <text x="439" y="286" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity=".55">par le nom de la face</text>
+            <text x="578" y="284" font-family="IBM Plex Mono, monospace" font-size="12.5" fill="currentColor">article.placements</text>
+            <text x="578" y="302" font-family="IBM Plex Sans, sans-serif" font-size="13" fill="currentColor" opacity=".72">deux zones vides, à garnir</text>
+          </svg>
+          <figcaption><b>La référence n'est pas la même des deux côtés.</b> Le comptoir range <span class="ref">K3025</span> ; BAT Studio indexe sur la référence fournisseur, <span class="ref">K3025IC</span>. Chercher la référence seule marche sur NS300 et échoue sur K3025 — le BAT s'ouvre vide, et personne ne comprend pourquoi ça marche une fois sur deux. La clé est <span class="ref">toptex || ref</span>, jamais la référence seule.</figcaption>
+        </figure>
+
+        <p class="mesure" style="margin-top:1.4rem">Au bout de cette chaîne, le BAT s'ouvre sur le bon t-shirt, dans la bonne couleur, avec 12 M et 18 L déjà comptés et deux zones nommées Cœur et Dos — <strong>et aucun logo</strong>. Il ne reste qu'à les poser. C'est exactement ce qui a été demandé.</p>
+      </section>
+
+      <!-- ─────────────────────────────────────────── 05 -->
+      <section id="perimetre">
+        <p class="eyebrow">05 · Le périmètre</p>
+        <h2>Quelles lignes ont droit à un BAT</h2>
+        <blockquote style="margin-bottom:1.3rem">
+          <p>« Les BAT ne sont utiles que pour les textiles : casquette, t-shirt, sweat, pochette, sac, etc. Le reste, on fait encore les BAT sur Illustrator. »</p>
+          <cite>Charlie, 4 septembre</cite>
+        </blockquote>
+        <p class="mesure">Traduit en familles du catalogue, ça donne <strong>86 produits sur 220</strong>. Et il y a un piège : « mérite un BAT » n'est pas la même question que « chiffré au moteur V9 ».</p>
+        <div class="large" style="margin-top:1.3rem">
+          <table>
+            <thead><tr><th>Famille du catalogue</th><th class="num">Produits</th><th>BAT&nbsp;?</th></tr></thead>
+            <tbody>
+              <tr><td>Textile <span style="color:var(--ink-3)">— chiffré au moteur V9</span></td><td class="num">48</td><td style="color:var(--ok);font-weight:600">oui</td></tr>
+              <tr><td>Vêtements — Unisexe / Femme / Enfant <span style="color:var(--ink-3)">— t-shirts finis, prix magasin</span></td><td class="num">25</td><td style="color:var(--ok);font-weight:600">oui</td></tr>
+              <tr><td>Pochettes</td><td class="num">8</td><td style="color:var(--ok);font-weight:600">oui</td></tr>
+              <tr><td>Sacs</td><td class="num">4</td><td style="color:var(--ok);font-weight:600">oui</td></tr>
+              <tr><td>Casquettes</td><td class="num">1</td><td style="color:var(--ok);font-weight:600">oui</td></tr>
+              <tr><td>Tasses, gourdes, verres, papeterie, porte-clés, art de la table, voyage…</td><td class="num">134</td><td style="color:var(--ink-3)">non — Illustrator</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="mesure" style="margin-top:1.3rem">Le piège : tester simplement « la famille s'appelle Textile » — la tentation évidente, parce que c'est déjà le test que les deux écrans font pour l'onglet Textile / Boutique — <strong>priverait de BAT 25 des 86 produits concernés</strong>. Les « Vêtements — … » sont des t-shirts finis vendus au prix magasin : ils ne passent pas par le moteur V9, et on imprime dessus. La liste des familles à BAT est donc un <strong>réglage</strong>, pas une constante — une famille neuve ne doit pas demander un déploiement.</p>
+      </section>
+
+      <!-- ─────────────────────────────────────────── 06 -->
+      <section id="vie">
+        <p class="eyebrow">06 · Le cycle de vie</p>
+        <h2>La vie et la mort d'un BAT</h2>
+        <blockquote style="margin-bottom:1.4rem">
+          <p>« On doit pouvoir modifier le BAT tant qu'on le souhaite, mais dès que le dossier est dans paiement et clôture, le BAT est supprimé de la ligne, inutile de le conserver pour rien. »</p>
+          <cite>Charlie, 4 septembre</cite>
+        </blockquote>
+
+        <figure>
+          <svg viewBox="0 0 880 300" role="img" aria-label="Un BAT naît avec la ligne textile, se modifie et s'exporte autant de fois qu'on veut, puis est purgé avec ses images quand le dossier entre en Paiement et clôture ; le PDF déposé sur la ligne survit à la purge.">
+            <defs>
+              <marker id="fl2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+
+            <!-- A -->
+            <rect x="16" y="52" width="158" height="72" rx="4" fill="none" stroke="currentColor" stroke-opacity=".32"></rect>
+            <text x="95" y="80" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="currentColor">Ligne textile créée</text>
+            <text x="95" y="99" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity=".6">BAT pré-rempli,</text>
+            <text x="95" y="113" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity=".6">vide de logos</text>
+            <line x1="176" y1="88" x2="208" y2="88" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4" marker-end="url(#fl2)"></line>
+
+            <!-- B : la boucle -->
+            <rect x="212" y="40" width="212" height="96" rx="4" fill="none" stroke="currentColor" stroke-opacity=".32" stroke-dasharray="5 4"></rect>
+            <path d="M 246 40 C 246 16, 390 16, 390 40" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4" marker-end="url(#fl2)"></path>
+            <text x="318" y="14" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="currentColor" opacity=".6">autant de fois qu'on veut</text>
+            <text x="318" y="70" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="currentColor">Poser · Exporter</text>
+            <text x="318" y="90" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="currentColor">Corriger</text>
+            <text x="318" y="112" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity=".6">le client répond, on reprend</text>
+            <line x1="426" y1="88" x2="458" y2="88" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4" marker-end="url(#fl2)"></line>
+
+            <!-- C : le déclencheur -->
+            <rect x="462" y="52" width="158" height="72" rx="4" fill="var(--accent-w)" stroke="var(--accent)" stroke-opacity=".6"></rect>
+            <text x="541" y="80" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--accent)">Paiement &amp; clôture</text>
+            <text x="541" y="102" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--accent)">le dossier entre</text>
+            <line x1="622" y1="88" x2="654" y2="88" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#fl2)" style="color:var(--accent)"></line>
+
+            <!-- D : la purge -->
+            <rect x="658" y="52" width="206" height="72" rx="4" fill="none" stroke="currentColor" stroke-opacity=".32"></rect>
+            <text x="761" y="80" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="currentColor">Purge</text>
+            <text x="761" y="101" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity=".6">le projet et ses images —</text>
+            <text x="761" y="115" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity=".6">c'est là que le poids est</text>
+
+            <!-- descente vers le PDF -->
+            <line x1="318" y1="138" x2="318" y2="200" stroke="currentColor" stroke-opacity=".45" stroke-width="1.4" marker-end="url(#fl2)"></line>
+            <text x="332" y="172" font-family="IBM Plex Sans, sans-serif" font-size="11.5" fill="currentColor" opacity=".6">chaque export dépose son PDF</text>
+
+            <!-- E : ce qui survit -->
+            <rect x="16" y="206" width="848" height="74" rx="4" fill="none" stroke="currentColor" stroke-opacity=".32" stroke-dasharray="5 4"></rect>
+            <text x="40" y="234" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="500" letter-spacing="1.2" fill="currentColor" opacity=".55">CE QUI SURVIT</text>
+            <text x="40" y="258" font-family="IBM Plex Sans, sans-serif" font-size="13.5" fill="currentColor">Le PDF déposé sur la ligne, et toutes ses versions. La purge n'y touche jamais — c'est la trace, et c'est ce que le client a signé.</text>
+          </svg>
+          <figcaption><b>Le déclencheur est l'entrée dans la famille, pas l'export ni l'archivage.</b> Pas l'export, parce qu'un BAT existe pour être corrigé — « BAT&nbsp;— Modification demandée » est une sous-étape du pipeline. Pas l'archivage, parce qu'à « Paiement &amp; clôture » la commande est produite, remise et payée, et qu'un dossier peut ensuite dormir des mois. Et ce qu'il faut purger, ce n'est pas le fichier de travail — 85 projets pèsent 1,1&nbsp;Mo — ce sont les <b>images</b> qu'ils réclament : 845,6&nbsp;Mo de mockups sur un magasin déjà à 3,07&nbsp;Go sur 5.</figcaption>
+        </figure>
+      </section>
+
+      <!-- ─────────────────────────────────────────── 07 -->
+      <section id="lots">
+        <p class="eyebrow">07 · La construction</p>
+        <h2>Les cinq lots, dans l'ordre</h2>
+        <p class="mesure">L'ordre n'est pas négociable : chaque lot a besoin du précédent. <strong>Les cinq sont livrés</strong>, chacun vérifié dans le vrai navigateur — de la saisie au comptoir jusqu'à la feuille du BAT, et jusqu'au PDF déposé sur la ligne.</p>
+
+        <div class="lots" style="margin-top:1.5rem">
+
+          <article class="lot lot--fait">
+            <div class="rang">LOT 1</div>
+            <div>
+              <h3>La ligne porte enfin ce que Mélina a saisi <span class="etiq etiq--fait">Livré</span></h3>
+              <p>Les deux écrans flash envoient les <b>tailles</b> et les <b>faces</b> avec le reste. Aucun écran nouveau, aucune migration. C'est le socle : sans lui, rien ne peut se pré-remplir. Bénéfice immédiat et indépendant du BAT — la fiche atelier et le ticket cessent d'être vides sur les dossiers du comptoir.</p>
+              <p class="teste"><b>Ce qui se teste</b> Une vente à 3 articles, tailles et faces remplies → les 3 lignes les portent, et le ticket atelier les imprime.</p>
+            </div>
+          </article>
+
+          <article class="lot lot--fait">
+            <div class="rang">LOT 2</div>
+            <div>
+              <h3>Une seule fabrique de lignes — le devis découpe <span class="etiq etiq--fait">Livré</span></h3>
+              <p>La partie qui transforme des articles en lignes de planning est <b>extraite une fois</b>, et les deux écrans l'appellent. « 1 article = 1 ligne » devient vrai par construction, pas par deux implémentations qui se ressemblent. La reprise d'un devis repart du numéro : un article retiré en V2 archive sa ligne, un article ajouté en crée une. <b>On ne découpe pas le passé.</b></p>
+              <p class="teste"><b>Ce qui se teste</b> Un devis à 3 articles → 3 lignes, somme exacte du TTC. Une V2 qui retire un article → 2 lignes vivantes, 1 archivée, 0 doublon. Deux postes qui enregistrent en même temps → 3 lignes, pas 6.</p>
+            </div>
+          </article>
+
+          <article class="lot lot--fait">
+            <div class="rang">LOT 3</div>
+            <div>
+              <h3>Le PDF se dépose tout seul <span class="etiq etiq--fait">Livré</span></h3>
+              <p><b>Le lot le plus cher, et il faut le dire.</b> Les écrans impriment ; ils ne fabriquent aucun octet de PDF. La solution retenue : un <b>troisième rendu du même modèle</b> — le devis existe déjà comme objet pur, mis en HTML pour l'écran ; on ajoute une mise en PDF. La grammaire du papier ne se réécrit nulle part. L'outil est déjà là, hébergé chez nous, et c'est celui du BAT. La facture d'abord : elle est plus simple, et c'est elle qui part chez un comptable.</p>
+              <p class="teste"><b>Ce qui se teste</b> Émettre une facture → la pastille de chaque ligne est remplie, le PDF s'ouvre, et son total est celui du papier imprimé. Un test compare les deux rendus sur le même modèle, pour qu'ils ne divergent jamais.</p>
+            </div>
+          </article>
+
+          <article class="lot lot--fait">
+            <div class="rang">LOT 4</div>
+            <div>
+              <h3>La ligne ouvre son BAT <span class="etiq etiq--fait">Livré</span></h3>
+              <p>Le bouton apparaît sur les lignes textile, et il ouvre <b>le</b> BAT de cette ligne — pas un nouveau. Toute la mécanique existe déjà et attend son allumage ; ce lot est le plus court des cinq.</p>
+              <p class="teste"><b>Ce qui se teste</b> Deux passages sur la même ligne ouvrent le même projet — c'est précisément le défaut que le code existant a été écrit pour éviter. Une ligne de tasses n'a pas de bouton.</p>
+            </div>
+          </article>
+
+          <article class="lot lot--fait">
+            <div class="rang">LOT 5</div>
+            <div>
+              <h3>Le pré-remplissage, et la fin de vie <span class="etiq etiq--fait">Livré</span></h3>
+              <p>La jointure du §04, la création automatique sur une ligne textile, et la purge à l'entrée en « Paiement &amp; clôture ». La purge est un confort : un magasin qui tousse ne doit jamais empêcher de solder une commande.</p>
+              <p class="teste"><b>Ce qui se teste</b> 30 t-shirts K3025 Light Olive Green, 12 M / 18 L, Cœur + Dos → le BAT s'ouvre sur le bon produit, la bonne couleur, les bonnes quantités, deux zones nommées, aucun logo. Un dossier soldé ne laisse plus ni projet ni images orphelines, et garde son PDF.</p>
+            </div>
+          </article>
+
+        </div>
+      </section>
+
+      <!-- ─────────────────────────────────────────── 08 -->
+      <section id="pieges">
+        <p class="eyebrow">08 · Mémoire</p>
+        <h2>Les pièges déjà payés une fois</h2>
+        <p class="mesure">Chacun a coûté une erreur réelle sur ce dépôt. Ils sont écrits pour ne pas être repayés.</p>
+        <ul class="pieges" style="margin-top:1.3rem">
+          <li><b>La référence seule ne joint pas</b> <span class="ref">toptex || ref</span> — K3025 s'appelle K3025IC chez le fournisseur.</li>
+          <li><b>La face porte la cote par son nom</b> Un Cœur fait 60-70&nbsp;mm, un Dos 240-320&nbsp;mm sur le même vêtement. Une clé de face générique donne la même largeur aux deux.</li>
+          <li><b>« Pas de prix » n'est pas « prix zéro »</b> Une demande garde un prix vide ; un article resté à chiffrer ne doit jamais redevenir un article offert.</li>
+          <li><b>Un identifiant de dossier est une chaîne</b> Le convertir en nombre donne NaN, la reprise passe pour absente, et l'écran ouvre un second dossier pour le même client.</li>
+          <li><b>La base locale n'a pas tous les opérateurs</b> La fusion des fiches se fait en JavaScript, jamais en SQL — sinon ça marche en production et casse là où le patron valide.</li>
+          <li><b>La couleur ne dit qu'un état</b> Une pastille pleine veut dire « le document existe », une pastille vide « il manque ». Jamais une décoration.</li>
+          <li><b>Tout ce qui peut être à la même hauteur l'est</b> Les trois pastilles et le futur bouton BAT sont la même famille : une seule règle, une hauteur en jeton, jamais un nombre recopié.</li>
+          <li><b>On vérifie en comparant les écrans</b> La ligne du planning, la fiche atelier et l'onglet BAT portent le même composant. Contrôler chaque écran isolément laisse passer deux hauteurs différentes.</li>
+        </ul>
+      </section>
+
+      <!-- ─────────────────────────────────────────── 09 -->
+      <section id="audit">
+        <p class="eyebrow">09 · L'audit</p>
+        <h2>Ce qui a été corrigé en préparant ce cahier</h2>
+        <p class="mesure">Trois défauts trouvés en faisant l'état des lieux. Corrigés, vérifiés, et tenus par des tests.</p>
+
+        <div class="corrige" style="margin-top:1.4rem">
+
+          <article class="fix">
+            <h3>La porte de service <span class="grav">Sécurité</span></h3>
+            <p>BAT Studio est entré dans le CRM sous son propre chemin, <span class="ref">/bat</span>. Les deux gardes du serveur raisonnent sur le chemin, et toutes deux le manquaient. Comptes allumés et personne de connecté, mesuré :</p>
+            <div class="avapres">
+              <div><span class="rt">déposer un PDF par la fiche</span><span class="av">401 refusé</span><span class="ap">401 refusé</span></div>
+              <div><span class="rt">déposer le même PDF par BAT Studio</span><span class="av">200 — le PDF entrait</span><span class="ap">401 refusé</span></div>
+              <div><span class="rt">lancer le ménage, qui efface des images</span><span class="av">200 — ouvert</span><span class="ap">401 refusé</span></div>
+            </div>
+            <p style="margin-top:.9rem">Une capacité <span class="ref">bat</span> a été créée plutôt que réutiliser celle des clients : « Préparation du BAT » est une sous-étape de l'atelier, donc le chef d'atelier doit pouvoir composer son bon à tirer. Le lui refuser l'aurait renvoyé à faire cliquer quelqu'un d'autre — ce que personne ne fait, et on rouvre alors la porte qu'on vient de fermer.</p>
+          </article>
+
+          <article class="fix">
+            <h3>L'écran qui annonçait une facture qui n'existait pas <span class="grav">Perte de vente</span></h3>
+            <p>L'émission passe par deux appels : le dossier, puis la facture. Si le second échouait — le réseau, une seconde d'inattention du serveur — l'écran affichait tout de même <b>« Facture émise »</b>, grisait le bouton, et rendait muet tout nouveau clic. Mélina repartait convaincue d'avoir facturé, sans document et sans moyen de reprendre.</p>
+            <div class="avapres">
+              <div><span class="rt">après un échec réseau</span><span class="av">« Facture émise », bouton mort</span><span class="ap">« Reprendre l'émission »</span></div>
+              <div><span class="rt">le compteur de l'écran</span><span class="av">2 états</span><span class="ap">3 états, dont « dossier ouvert »</span></div>
+            </div>
+            <p style="margin-top:.9rem">Vérifié au navigateur en coupant l'appel puis en le rétablissant : la reprise termine la vente et ne crée <b>pas</b> de second dossier pour le même client.</p>
+          </article>
+
+          <article class="fix">
+            <h3>Des commentaires qui décrivaient un écran disparu <span class="grav mineur">Entretien</span></h3>
+            <p>Trois commentaires annonçaient les quatre onglets de BAT Studio ; il y en a deux depuis la simplification. Un commentaire qui décrit un écran supprimé se relit comme une spécification. Le message du garde-fou de la charte donnait aussi une commande incomplète, qui noyait la vraie ligne sous une centaine de faux écarts.</p>
+          </article>
+
+        </div>
+      </section>
+
+      <footer>
+        <span>Planning OLDA · 4 septembre 2026</span>
+        <span>151 fichiers de test verts</span>
+        <span>Rien n'est parti sur Railway</span>
+      </footer>
+
+    </main>
+  </div>
+</div>

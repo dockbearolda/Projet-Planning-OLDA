@@ -127,7 +127,7 @@ if (mieux.length) {
 
 assert.deepStrictEqual(trop, [],
   'la charte a reculé :\n  ' + trop.join('\n  ')
-  + '\n  → `node outils/verifier-charte.mjs public` dit la ligne exacte.');
+  + '\n  → `node outils/verifier-charte.mjs public --exclure feuille` dit la ligne exacte.');
 
 // … ET LE TOTAL NE MONTE PAS. Découper un fichier en deux répartirait les mêmes
 // écarts sans qu'aucun plafond par fichier ne bouge : c'est le trou que ce

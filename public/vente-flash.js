@@ -38,16 +38,20 @@
 import {
   ARRONDIS, REGIMES, AJUSTEMENT_UNITES, VEDETTES,
   calculerDevis, jourAtelier, SANS_PRIX,
+  // LES SIX TAILLES ET LA TRADUCTION VERS LE DOSSIER viennent du module que
+  // les deux ecrans partagent deja : ecrites ici, elles seraient deux listes
+  // et deux traductions le jour ou l'une gagne une taille.
+  TAILLES, prodDeLigne, referencesDuCatalogue,
 } from './devis.js';
 import {
-  MODES_PAIEMENT, modeleFacture, dessinerFacture, CSS_FACTURE,
+  MODES_PAIEMENT, modeleFacture, dessinerFacture, CSS_FACTURE, pdfFacture,
 } from './facture.js';
 // LE MENU DÉROULANT AVEC RECHERCHE, celui des deux écrans du comptoir. Charlie,
 // 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
 // TOUS LES INPUTS avec un menu déroulant ». Il a déménagé de `pont.js` pour
 // qu'il n'en existe qu'UN — voir l'en-tête de `menu-recherche.js`.
 import { menuPoser, menuRafraichir, poserStyleMenu } from './menu-recherche.js';
-import { api } from './reseau.js';
+import { api, deposerPapier } from './reseau.js';
 
 let ROOT = null;
 const $ = (sel) => ROOT && ROOT.querySelector(sel);
@@ -138,7 +142,6 @@ function saisieNeuve() {
 // papier ne disait plus lequel. Remplacé par les TAILLES LIBRES ci-dessous :
 // Charlie voulait pouvoir « créer sa bulle » et lui donner un nom (« 4XL »),
 // autant de fois que nécessaire sur une même ligne.
-const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
 
 // CE QUE LES TAILLES DISENT SUR LE DEVIS : « 2 × S · 3 × M · 3 × 4XL ». C'est
 // la grammaire de toute la maison — la fiche de production et le ticket de
@@ -195,6 +198,24 @@ let transports = {};
 // emettreFacture). PAS DE REPRISE/VERSION ICI, contrairement au devis flash —
 // une facture est immuable, une nouvelle vente est un nouveau dossier.
 let dossierId = null;
+// ⚠ DEUX FAITS, DEUX DRAPEAUX (04/09/2026). `dossierId` disait à lui seul
+// « facture émise », et il mentait sur le seul cas qui compte : l'émission
+// passe par DEUX appels (le dossier, puis la facture) et le second peut
+// échouer. Le dossier existait alors, `dossierId` était posé — donc l'écran
+// annonçait « Facture émise », le bouton se grisait, et le garde
+// `if (dossierId) return` en tête d'`emettreFacture` rendait tout nouveau clic
+// muet. La vendeuse repartait convaincue d'avoir facturé, sans document et
+// sans moyen de reprendre. `numeroFacture` ne se pose qu'au retour de
+// `POST /api/factures` : c'est LUI qui dit qu'une facture existe.
+//
+// GARDER `dossierId` MALGRÉ L'ÉCHEC EST VOULU : la route de la facture est
+// idempotente sur le dossier (server.js, `dossier_id UNIQUE`), donc reprendre
+// avec le même identifiant termine la vente au lieu d'ouvrir un second dossier
+// pour le même client.
+let numeroFacture = '';
+// Les lignes que ce dossier a ouvertes — c'est sur TOUTES que le papier se
+// dépose (voir `deposerPapier`).
+let lignesDuDossier = [];
 
 // LE BROUILLON EST PAR APPAREIL. Une vente se compose devant le client, en
 // quelques minutes, et un poste qui se ferme au milieu ne doit pas faire tout
@@ -208,7 +229,7 @@ let dossierId = null;
 // devis), et l'inverse au retour. Deux écrans, deux brouillons.
 const CLE_BROUILLON = 'olda.vente.brouillon';
 function garderBrouillon() {
-  try { localStorage.setItem(CLE_BROUILLON, JSON.stringify({ saisie, dossierId, replis })); } catch (_) { /* plein ou refusé */ }
+  try { localStorage.setItem(CLE_BROUILLON, JSON.stringify({ saisie, dossierId, numeroFacture, replis })); } catch (_) { /* plein ou refusé */ }
 }
 function relireBrouillon() {
   try {
@@ -226,6 +247,7 @@ function relireBrouillon() {
       if (!Array.isArray(l.taillesLibres)) l.taillesLibres = [];
     }
     dossierId = d.dossierId || null;
+    numeroFacture = typeof d.numeroFacture === 'string' ? d.numeroFacture : '';
     replis = d.replis && typeof d.replis === 'object' ? d.replis : {};
   } catch (_) { /* un brouillon illisible vaut pas de brouillon */ }
 }
@@ -933,6 +955,13 @@ function remplirCatalogue() {
   // que les rangées posées à l'instant.
   for (const n of ROOT.querySelectorAll(
     `input[list="${ID_PRODUITS}"], input[data-menu-liste="${ID_PRODUITS}"]`)) menuRafraichir(n);
+  // LA LISTE DES REFERENCES SUIT LE MEME CHEMIN, et pour la meme raison : le
+  // catalogue arrive APRES l'ecran, et une rangee ouverte entre-temps resterait
+  // sur un champ Reference sans propositions.
+  if (poserListeRefs()) {
+    for (const n of ROOT.querySelectorAll(
+      `input[list="${ID_REFS}"], input[data-menu-liste="${ID_REFS}"]`)) menuRafraichir(n);
+  }
 }
 
 // ===========================================================================
@@ -1026,6 +1055,9 @@ const ID_MARQUAGES = 'vf-marquages';
 // décident du rendu, pas du prix), les faces du tableau des tailles de logo,
 // qui les déclare par famille : c'est la source de la fiche de l'atelier et du
 // ticket, pas une liste réécrite ici.
+// LA LISTE DES REFERENCES — celle qui manquait. Voir
+// `referencesDuCatalogue` (devis.js) pour ce qu'une option porte.
+const ID_REFS = 'vf-refs';
 const ID_ENCRES = 'vf-encres';
 const ID_FACES = 'vf-faces';
 function poserListe(id, valeurs) {
@@ -1044,11 +1076,49 @@ function poserListe(id, valeurs) {
   }
   return true;
 }
+// LA LISTE DES REFERENCES SE POSE A PART : ses options portent un TEXTE
+// distinct de leur valeur (la designation se LIT, la reference se RANGE), un
+// jeton et un foin de recherche. `poserListe` ne sait poser que des valeurs
+// nues — c'est tout ce que les encres et les faces demandent.
+function poserListeRefs() {
+  const lignes = referencesDuCatalogue(catalogue, FAMILLE_TEXTILE);
+  if (!lignes.length) return false;
+  let liste = document.getElementById(ID_REFS);
+  if (!liste) {
+    liste = el('datalist');
+    liste.id = ID_REFS;
+    ROOT.append(liste);
+  }
+  const frag = document.createDocumentFragment();
+  for (const r of lignes) {
+    const o = el('option');
+    o.value = r.valeur;
+    o.textContent = r.texte;
+    o.dataset.ref = r.jeton;
+    o.dataset.cherche = r.cherche;
+    o.dataset.onglet = r.onglet;
+    frag.append(o);
+  }
+  liste.replaceChildren(frag);
+  return true;
+}
+
+// LA MEME REDUCTION QUE LA RECHERCHE : lettres et chiffres, rien d'autre. La
+// casse, les accents, les espaces, les tirets et les points ne veulent rien
+// dire dans un code — « NS-300 », « ns 300 » et « NS300 » sont la meme
+// reference. C'est la regle de `menuReduire` (menu-recherche.js), tenue ici
+// aussi pour que le champ RECONNAISSE ce que la liste a propose.
+const cleReference = (v) => String(v == null ? '' : v).trim().toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
+
 // Habiller un champ APRÈS coup : le composant remplace le champ dans la page,
 // il faut donc qu'il y soit déjà — et une seule fois, sinon on empile les peaux.
 function habiller(champLa, id, valeurs) {
   if (!champLa || champLa.dataset.menuListe === id) return;
-  if (!poserListe(id, valeurs)) return;
+  // `valeurs === null` : la liste est deja posee par ailleurs (les references,
+  // dont les options portent un texte et un jeton que `poserListe` ne sait pas
+  // ecrire). On habille sans la reconstruire.
+  if (valeurs !== null && !poserListe(id, valeurs)) return;
   champLa.setAttribute('list', id);
   menuPoser(champLa);
 }
@@ -1828,6 +1898,31 @@ function rangeeArticle(ligne) {
     n2.addEventListener('input', () => { ligne[cle] = n2.value; rafraichirTete(); redessiner(); });
   }
 
+  // CHOISIR UNE REFERENCE DANS LA LISTE, C'EST CHOISIR L'ARTICLE. Deux portes,
+  // un seul resultat : la designation, le prix, le coloris et le moteur suivent
+  // exactement comme si on l'avait pris par la Designation. Sans ca, la
+  // reference et l'article se contrediraient sur la meme rangee.
+  //
+  // ⚠ SEULEMENT SUR UN CHOIX DE LA LISTE (`change`), jamais a la frappe : une
+  // reference tapee a moitie ne doit pas remplacer l'article sous les doigts.
+  // Et une reference qui n'est PAS au catalogue reste ce qu'elle est — c'est
+  // une reference libre, elle se chiffre.
+  refe.addEventListener('change', () => {
+    const cle = cleReference(refe.value);
+    if (!cle) return;
+    for (const [nom, p] of parNom) {
+      if (cleReference(p.reference) !== cle) continue;
+      if (design.value === nom) return;          // deja cet article : rien a refaire
+      design.value = nom;
+      // ⚠ ON RELANCE LE GESTE DE LA DESIGNATION, on ne le recopie pas. Choisir
+      // un article, c'est trente lignes — le prix, le coloris, les emplacements
+      // du moteur, les puces de la tasse, la famille. Ecrites une seconde fois
+      // ici, elles seraient deux comportements le jour ou l'une bouge.
+      design.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+  });
+
   // UNE CASE DE TAILLE ÉCRIT TROIS CHOSES : sa part, le texte du devis, et la
   // quantité. Le prix suit, parce que le coefficient est dégressif — dix
   // t-shirts et cent t-shirts n'ont pas le même prix à la pièce.
@@ -2004,6 +2099,24 @@ function rangeeArticle(ligne) {
   // de produit, contrairement aux emplacements de marquage. Les faces peuvent
   // manquer (tableau des tailles de logo injoignable) — le champ reste alors une
   // saisie libre, ce qui est exactement ce qu'il faut.
+  // ⚠ LA REFERENCE S'HABILLE ICI, ET PAS A SA CREATION (04/09/2026). Le
+  // composant SORT le champ de sa place pour lui poser sa peau
+  // (`hote.replaceWith(peau); peau.append(hote)`) ; `champ()`, appele juste
+  // apres, le remettait dans SA boite — le champ quittait la peau, l'attribut
+  // restait, et le menu ne s'ouvrait jamais. Trouve au navigateur : le champ
+  // portait bien `data-menu-liste`, et rien ne se deroulait.
+  //
+  // Elle etait une saisie LIBRE jusqu'ici : ni liste, ni proposition, pendant
+  // que la Designation, juste a cote, cherchait deja dans tout le catalogue.
+  // On tapait « k3025 » et il ne se passait rien.
+  // CE QUE LE FILTRE PROMET, IL DOIT LE TENIR. Il annoncait « couleur » : les
+  // textiles n'en portent pas dans `catalogue_produits` (leurs coloris viennent
+  // du catalogue textile, par reference), donc chercher « olive » ne rendait
+  // rien. Un champ qui promet ce qu'il ne fait pas coute une hesitation par
+  // recherche.
+  refe.dataset.menuFiltre = 'Reference ou designation…';
+  if (poserListeRefs()) habiller(refe, ID_REFS, null);
+
   habiller(faces, ID_FACES, facesConnues);
   moteurTextile()
     .then((TE) => habiller(encre, ID_ENCRES, Object.keys(TE.DB.markingColorsHex || {})))
@@ -2128,7 +2241,11 @@ function peindre() {
   const compteur = $('#dvf-compte');
   if (compteur) {
     const n = saisie.lignes.length;
-    const etatDevis = dossierId ? 'facture émise' : 'brouillon local';
+    // TROIS ÉTATS, PAS DEUX. « Dossier ouvert » est celui qu'on ne voyait
+    // jamais et qui coûtait le plus cher : le dossier est au planning, la
+    // facture ne l'est pas, et il reste un clic à faire.
+    const etatDevis = numeroFacture ? `facture ${numeroFacture} émise`
+      : (dossierId ? 'dossier ouvert — facture à émettre' : 'brouillon local');
     // CE QUI MANQUE SE COMPTE ICI, une fois pour toute la vente. Une ligne « à
     // chiffrer » se voit dans le tableau — mais le tableau se replie, et
     // c'est justement replié qu'on clique « Émettre ». Le compte, lui, est
@@ -2163,11 +2280,14 @@ function peindre() {
     // ⚠ DEUX CONDITIONS DE PLUS QUE LE DEVIS : un mode de règlement choisi,
     // et AUCUNE ligne sans prix — une facture émise connaît tous ses prix
     // (§4 du spec), là où un devis peut sortir avec des lignes « à chiffrer ».
-    bSave.disabled = !!dossierId || !saisie.lignes.length
+    bSave.disabled = !!numeroFacture || !saisie.lignes.length
       || !String(saisie.client.nom || '').trim()
       || !saisie.mode
       || compte.lignes.some((l) => l.sansPrix);
-    bSave.textContent = dossierId ? 'Facture émise' : 'Émettre la facture';
+    // ET SON INTITULÉ DIT CE QUE LE CLIC VA FAIRE : reprendre là où
+    // l'émission s'est arrêtée n'est pas la commencer.
+    bSave.textContent = numeroFacture ? 'Facture émise'
+      : (dossierId ? 'Reprendre l’émission' : 'Émettre la facture');
   }
 
   const feuille = $('#dvf-feuille');
@@ -2195,7 +2315,7 @@ function peindre() {
 // vente déjà décidée.
 let emissionEnCours = false;
 async function emettreFacture() {
-  if (emissionEnCours || dossierId) return;
+  if (emissionEnCours || numeroFacture) return;
   const nom = String(saisie.client.nom || '').trim();
   if (!nom) return dire('Le nom du client est requis', 'is-ko');
   if (!saisie.lignes.length) return dire('Une vente sans article ne s’émet pas', 'is-ko');
@@ -2208,6 +2328,12 @@ async function emettreFacture() {
   if (bouton) bouton.disabled = true;
   try {
     // --- 1. Le dossier, par la route du comptoir --------------------------
+    // ⚠ ON NE LE REFAIT PAS S'IL EXISTE DÉJÀ. Une reprise après un échec de
+    // l'étape 2 doit terminer CETTE vente, pas en ouvrir une seconde pour le
+    // même client — la route du comptoir est idempotente par empreinte, mais
+    // une empreinte se calcule sur une saisie qui a pu bouger entre-temps.
+    // L'identifiant qu'on tient déjà, lui, ne bouge pas.
+    //
     // TOUT EST EN TTC ICI, PAS EN HT. `partsDuTicket` (server.js) compare la
     // somme des `amount` d'articles au montant TTC du dossier (voir
     // `rDossier` plus bas, `amount: compte.ttc`) — un article envoyé en HT
@@ -2215,57 +2341,71 @@ async function emettreFacture() {
     // taux effectif vient de `compte.tauxTgca` (déjà résolu par
     // `calculerDevis` selon le régime — 0 sur Revente/Export), jamais de
     // `saisie.tauxTgca` brut qui ignorerait le régime.
-    const articles = compte.lignes.map((l) => ({
-      label: l.designation,
-      qty: l.quantite,
-      amount: Math.round(l.totalHt * (1 + compte.tauxTgca) * 100) / 100,
-      prod: { ref: l.reference, couleur: l.couleur, marquage: l.marquage, encre: l.encre },
-      // MOTEUR « UNITAIRE » : le prix est déjà tranché à l'émission (par le
-      // moteur V9 ou le catalogue), on l'archive tel quel plutôt que de
-      // rejouer une chiffrage textile complexe server-side pour ce lot. Une
-      // correction de quantité plus tard au planning recalcule linéairement
-      // sur ce prix — pas le dégressif V9 d'origine. Limite connue, acceptée
-      // pour ce lot (voir spec).
-      chiffrage: {
-        moteur: 'unitaire',
-        unitTTC: Math.round(l.unitaireHt * (1 + compte.tauxTgca) * 100) / 100,
-        rate: 0,
-      },
-      detail: l.note || null,
-    }));
-    const rDossier = await api('POST', '/api/comptoir/projet', {
-      source: 'Vente directe',
-      clientObj: {
-        name: saisie.client.nom, company: saisie.client.nom, type: saisie.client.type,
-      },
-      amount: compte.ttc,
-      // `name`/`quantity` NE SERVENT QUE SUR UN PANIER D'UN SEUL ARTICLE :
-      // server.js (POST /api/comptoir/projet) ne construit un « lot » multi-
-      // lignes qu'à partir de deux articles ou plus — sur un seul, il retombe
-      // sur CES DEUX CHAMPS RACINE pour la désignation et la quantité, et
-      // ignore `articles[0].label`/`articles[0].qty` pour ça (seuls
-      // `articles[0].prod`/`articles[0].chiffrage` sont repris dans ce cas).
-      // Les poser inconditionnellement est sans effet quand il y a plusieurs
-      // articles (le serveur les ignore alors).
-      name: articles.length === 1 ? articles[0].label : `${articles.length} articles`,
-      quantity: articles.length === 1 ? articles[0].qty : undefined,
-      articles,
-      paiement: { mode: saisie.mode },
-      dueDate: saisie.dueDate, dueTime: saisie.dueHeure,
-      comment: saisie.noteInterne,
-      client_info: [
-        ['Client', saisie.client.nom], ['Type de client', saisie.client.type === 'perso' ? 'Particulier' : 'Professionnel'],
-        ['Adresse', saisie.client.adresse],
-        ['Ville', saisie.client.ville], ['Téléphone', saisie.client.tel], ['E-mail', saisie.client.email],
-      ].filter(([, v]) => v),
-      details: articles.flatMap((a, i) => [
-        [`Article ${i + 1} — Désignation`, a.label],
-        a.prod.couleur ? [`Article ${i + 1} — Couleur`, a.prod.couleur] : null,
-        a.prod.marquage ? [`Article ${i + 1} — Marquage`, a.prod.marquage] : null,
-      ].filter(Boolean)),
-    });
-    dossierId = rDossier && rDossier.id ? rDossier.id : null;
-    if (!dossierId) throw new Error('Le dossier n’a pas pu être créé');
+    if (!dossierId) {
+      const articles = compte.lignes.map((l) => ({
+        label: l.designation,
+        qty: l.quantite,
+        amount: Math.round(l.totalHt * (1 + compte.tauxTgca) * 100) / 100,
+        // CE QU'IL Y A A PRODUIRE, EN ENTIER (04/09/2026). Il n'y avait ici que
+        // quatre champs plats : les six cases de taille, les bulles creees a la
+        // main et les faces a marquer restaient a l'ecran. `prodDeLigne`
+        // (devis.js) les traduit dans la forme que la fiche atelier, le ticket,
+        // le bon de commande et le BAT lisent tous — `prodDuComptoir` decide
+        // ensuite, cote serveur, si la ligne porte assez pour valoir un `prod`.
+        prod: prodDeLigne(l),
+        // MOTEUR « UNITAIRE » : le prix est déjà tranché à l'émission (par le
+        // moteur V9 ou le catalogue), on l'archive tel quel plutôt que de
+        // rejouer une chiffrage textile complexe server-side pour ce lot. Une
+        // correction de quantité plus tard au planning recalcule linéairement
+        // sur ce prix — pas le dégressif V9 d'origine. Limite connue, acceptée
+        // pour ce lot (voir spec).
+        chiffrage: {
+          moteur: 'unitaire',
+          unitTTC: Math.round(l.unitaireHt * (1 + compte.tauxTgca) * 100) / 100,
+          rate: 0,
+        },
+        detail: l.note || null,
+      }));
+      const rDossier = await api('POST', '/api/comptoir/projet', {
+        source: 'Vente directe',
+        clientObj: {
+          name: saisie.client.nom, company: saisie.client.nom, type: saisie.client.type,
+        },
+        amount: compte.ttc,
+        // `name`/`quantity` NE SERVENT QUE SUR UN PANIER D'UN SEUL ARTICLE :
+        // server.js (POST /api/comptoir/projet) ne construit un « lot » multi-
+        // lignes qu'à partir de deux articles ou plus — sur un seul, il retombe
+        // sur CES DEUX CHAMPS RACINE pour la désignation et la quantité, et
+        // ignore `articles[0].label`/`articles[0].qty` pour ça (seuls
+        // `articles[0].prod`/`articles[0].chiffrage` sont repris dans ce cas).
+        // Les poser inconditionnellement est sans effet quand il y a plusieurs
+        // articles (le serveur les ignore alors).
+        name: articles.length === 1 ? articles[0].label : `${articles.length} articles`,
+        quantity: articles.length === 1 ? articles[0].qty : undefined,
+        articles,
+        paiement: { mode: saisie.mode },
+        dueDate: saisie.dueDate, dueTime: saisie.dueHeure,
+        comment: saisie.noteInterne,
+        client_info: [
+          ['Client', saisie.client.nom], ['Type de client', saisie.client.type === 'perso' ? 'Particulier' : 'Professionnel'],
+          ['Adresse', saisie.client.adresse],
+          ['Ville', saisie.client.ville], ['Téléphone', saisie.client.tel], ['E-mail', saisie.client.email],
+        ].filter(([, v]) => v),
+        details: articles.flatMap((a, i) => [
+          [`Article ${i + 1} — Désignation`, a.label],
+          a.prod.couleur ? [`Article ${i + 1} — Couleur`, a.prod.couleur] : null,
+          a.prod.marquage ? [`Article ${i + 1} — Marquage`, a.prod.marquage] : null,
+        ].filter(Boolean)),
+      });
+      dossierId = rDossier && rDossier.id ? rDossier.id : null;
+      if (!dossierId) throw new Error('Le dossier n’a pas pu être créé');
+      // LES LIGNES DU TICKET, TOUTES. Un panier de trois articles ouvre trois
+      // lignes : la facture est LA MÊME pour les trois — c'est un seul
+      // document, celui que le client tient — et la déposer sur la première
+      // seulement laisserait deux lignes vides sur le même dossier.
+      lignesDuDossier = (rDossier.lot && Array.isArray(rDossier.lot.ids) && rDossier.lot.ids.length)
+        ? rDossier.lot.ids : [dossierId];
+    }
 
     // --- 2. La facture, immuable --------------------------------------------
     const rFacture = await api('POST', '/api/factures', {
@@ -2282,6 +2422,9 @@ async function emettreFacture() {
       jour: jourAtelier(),
     });
     saisie.numero = (rFacture && rFacture.numero) || '';
+    // C'EST ICI, ET NULLE PART AVANT, QU'UNE FACTURE EXISTE. Tant que cette
+    // ligne n'a pas été atteinte, l'écran doit dire qu'il reste un clic à faire.
+    numeroFacture = saisie.numero;
 
     // --- 3. Impression automatique -------------------------------------------
     const t = modeleFacture(saisie, entreprise);
@@ -2301,6 +2444,19 @@ async function emettreFacture() {
 
     dire(`Facture ${t.numero} émise`, 'is-ok');
     peindre();
+
+    // --- 4. LE PAPIER SE DÉPOSE SUR LA LIGNE -------------------------------
+    // Charlie, 04/09 : « la ligne créée contienne automatiquement la facture à
+    // l'intérieur ». Jusqu'ici l'écran imprimait et la pastille restait vide.
+    //
+    // ⚠ APRÈS L'IMPRESSION, ET SANS BLOQUER. La facture est déjà émise et
+    // archivée : un dépôt qui échoue ne doit pas transformer une vente réussie
+    // en échec. Il se DIT, et on redépose à la main depuis la ligne.
+    const rate = () => dire(`Facture ${t.numero} émise — le PDF n’a pas pu être joint à la ligne`, 'is-ko');
+    pdfFacture(t)
+      .then(({ bytes, nom }) => deposerPapier(lignesDuDossier, 'facture', bytes, nom))
+      .then(({ deposes, total }) => { if (deposes < total) rate(); })
+      .catch(rate);
   } catch (err) {
     dire(err.message || 'Émission impossible', 'is-ko');
   } finally {
@@ -2311,10 +2467,12 @@ async function emettreFacture() {
 function repartirDeZero() {
   // ON NE VIDE PAS UNE VENTE QU'ON N'A PAS ÉMISE SANS LE DIRE. Un brouillon
   // perdu, c'est un client qu'on fait attendre pendant qu'on retape.
-  if (!dossierId && saisie.lignes.length
+  if (!numeroFacture && saisie.lignes.length
     && !window.confirm('Cette vente n’a pas été facturée. La remplacer par une vente vierge ?')) return;
   saisie = saisieNeuve();
   dossierId = null;
+  numeroFacture = '';
+  lignesDuDossier = [];
   for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-adresse', ''],
     ['#dvf-cl-ville', ''],
     ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cl-wa', ''],

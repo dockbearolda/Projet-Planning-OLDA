@@ -23,6 +23,9 @@ const chiffrage = require('./chiffrage');
 // BAT STUDIO — l'onglet « BAT » de la barre. Tout son serveur tient là-dedans ;
 // son front est servi tel quel depuis `public/bat/`. Voir l'entête de bat.js.
 const { monterBat } = require('./bat');
+// Le magasin de BAT Studio : la purge d'un dossier soldé y efface son projet et
+// les logos que plus personne ne réclame (voir `purgerBatDuDossier`).
+const { batLire, batEcrire, batSupprimer } = require('./db');
 const {
   pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS, ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
@@ -38,6 +41,7 @@ const {
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,
+  getFamillesBat,
   getEntreprise, setEntreprise,
   getMentionsRegime, setMentionsRegime,
   getTaillesLogo, majTailleLogo, compterTaillesLogo,
@@ -560,10 +564,21 @@ const oublierFlags = () => { flagsCache = null; };
 //   marge      : voir les coûts et la marge
 //   forcer     : débloquer, passer outre une étape
 //   reglages   : tout ce qui vaut pour tous les postes
+//   bat        : composer un bon à tirer et le déposer sur une fiche
+//
+// POURQUOI `bat` N'EST PAS `clients` (04/09/2026). Le dépôt d'un PDF sur une
+// fiche passe par `exige('clients')` — la boutique et la Direction, pas
+// l'atelier. Or « Préparation du BAT » est une sous-étape de l'ATELIER : le
+// chef d'atelier est précisément celui qui compose le bon à tirer. Lui refuser
+// l'écran l'aurait renvoyé à demander à quelqu'un d'autre de cliquer, ce que
+// personne ne fait — on rouvre alors la porte de service qu'on vient de
+// fermer. Une capacité à part dit la règle sans mentir : composer un BAT n'est
+// pas gérer un client, et ce n'est pas non plus « travailler » (l'opérateur
+// exécute, il ne s'engage pas auprès du client).
 const CAPACITES = {
-  direction: ['travailler', 'production', 'clients', 'argent', 'marge', 'forcer', 'reglages'],
-  chef_atelier: ['travailler', 'production'],
-  boutique: ['travailler', 'clients', 'argent'],
+  direction: ['travailler', 'production', 'clients', 'argent', 'marge', 'forcer', 'reglages', 'bat'],
+  chef_atelier: ['travailler', 'production', 'bat'],
+  boutique: ['travailler', 'clients', 'argent', 'bat'],
   operateur: ['travailler'],
 };
 
@@ -683,9 +698,21 @@ const MOTIFS_BLOCAGE = [
 // connecter, celle par où l'on se connecte, et le numéro de version (la bulle
 // « mise à jour disponible » interroge celle-là en boucle, y compris sur un
 // poste au repos).
+//
+// ⚠ ELLE COUVRE AUSSI `/bat/api/` (04/09/2026). BAT Studio est monté sous son
+// propre préfixe : ses routes ne commencent donc PAS par `/api/`, et la porte
+// les laissait toutes passer. Mesuré, comptes allumés et personne de connecté :
+// `PUT /api/requests/<id>/pdf/bat` répondait 401 pendant que
+// `PUT /bat/api/crm/bat/<id>` déposait le PDF et répondait 200 — la même
+// écriture, sur la même fiche, par la porte de service. `POST
+// /bat/api/menage/mockups`, qui EFFACE des images, était ouvert de la même
+// façon. Un préfixe n'est pas une frontière de sécurité : la liste des
+// préfixes protégés l'est, et elle s'écrit ici.
+const PREFIXES_PROTEGES = ['/api/', '/bat/api/'];
 const PORTE_OUVERTE = new Set(['/api/session', '/api/version']);
 app.use((req, res, next) => {
-  if (!req.path.startsWith('/api/')) return next();   // le site, ses pages, ses polices
+  // le site, ses pages, ses polices, et tout le statique de `/bat`
+  if (!PREFIXES_PROTEGES.some((p) => req.path.startsWith(p))) return next();
   if (PORTE_OUVERTE.has(req.path)) return next();
   flags().then((f) => {
     if (!f.comptes || req.moi) return next();
@@ -1201,6 +1228,53 @@ app.put('/api/settings/whatsapp', exige('reglages'), asyncH(async (req, res) => 
 // GET → réglages · PUT { … } → fusionne avec l'existant, diffusé en SSE.
 app.get('/api/settings/textile', asyncH(async (req, res) => {
   res.json(await getReglagesTextile());
+}));
+
+// CE QUI PERMET AU PLANNING DE SAVOIR SI UNE LIGNE MÉRITE UN BAT, sans lui
+// faire porter les 220 produits du catalogue.
+//
+// C'EST LA SEULE PORTE, ET ELLE EST EN LECTURE. La liste des familles est un
+// réglage (`app_meta.familles_bat`, voir `getFamillesBat` dans db.js) : elle se
+// change sans déploiement. Elle n'a PAS d'écran ni de route d'écriture, et ce
+// n'est pas un oubli — une liste qui bouge deux fois par an ne justifie pas un
+// panneau de plus dans les Réglages tant que personne n'a eu besoin de la
+// changer. Le jour où ça arrive, la fonction d'écriture s'écrit en trois
+// lignes ; d'ici là, une route que personne n'appelle est une porte de plus à
+// tenir.
+//
+// La ligne ne connaît pas sa famille : elle porte une RÉFÉRENCE
+// (`fiche.prod.ref`) et une DÉSIGNATION (`product`). Le rapprochement se fait
+// donc sur ces deux clés, réduites sans casse ni accent — la règle de
+// rapprochement de noms du reste de l'application. Les DEUX, parce qu'une
+// vendeuse peut taper une désignation sans choisir au catalogue : sans elle,
+// un t-shirt saisi à la main n'aurait pas de bouton.
+//
+// Mesuré le 04/09 : 86 produits sur 220, soit moins de 4 Ko sur le fil, lus une
+// fois par poste. Envoyer le catalogue entier en pèserait cinquante.
+const cleBat = (v) => String(v == null ? '' : v).trim().toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+app.get('/api/settings/bat-produits', asyncH(async (req, res) => {
+  const familles = await getFamillesBat();
+  const voulues = new Set(familles.map(cleBat));
+  const cles = new Set();
+  for (const p of await getCatalogueProduits()) {
+    if (!voulues.has(cleBat(p.famille))) continue;
+    for (const k of [p.reference, p.designation, p.label]) {
+      const c = cleBat(k);
+      if (c) cles.add(c);
+    }
+  }
+  // ⚠ ET LA RÉFÉRENCE DU FOURNISSEUR, qui n'est pas la nôtre. Le comptoir range
+  // « K3025 » ; le catalogue de BAT Studio indexe sur `refSupplier`, soit
+  // « K3025IC ». Huit références sur quarante-neuf sont dans ce cas. Sans cette
+  // table, le pré-remplissage du BAT marcherait sur NS300 et échouerait sur
+  // K3025 — une fois sur deux, sans un message nulle part.
+  const brut = chiffrage.refsFournisseur();
+  const fournisseur = {};
+  for (const [ref, sup] of Object.entries(brut)) {
+    if (cleBat(ref) !== cleBat(sup)) fournisseur[cleBat(ref)] = sup;
+  }
+  res.json({ familles, cles: [...cles], fournisseur });
 }));
 
 app.put('/api/settings/textile', exige('reglages'), asyncH(async (req, res) => {
@@ -2810,6 +2884,27 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   const etapes = [...new Set([avant[0].stage, rows[0].stage])];
   broadcast({ kind: 'update', stages: etapes });
 
+  // LE BAT D'UN DOSSIER SOLDÉ N'A PLUS RIEN À DIRE (04/09/2026). Voir
+  // `purgerBatDuDossier` : le déclencheur est l'ENTRÉE dans « Paiement &
+  // clôture », et le PDF déposé sur la ligne n'est jamais touché.
+  //
+  // ⚠ APRÈS LE `broadcast`, ET SANS `await`. La purge est un CONFORT : un
+  // magasin qui tousse ne doit pas empêcher de solder une commande. Elle ne
+  // peut donc ni retarder la réponse, ni la faire échouer.
+  //
+  // ⚠ ET SEULEMENT SUR LA TRANSITION. Un dossier qu'on corrige alors qu'il est
+  // DÉJÀ à `paiement` ne relance pas un balayage complet du magasin à chaque
+  // frappe — on ne purge qu'au passage de la porte.
+  if (rows[0].stage === 'paiement' && avant[0].stage !== 'paiement') {
+    purgerBatDuDossier(req.params.id)
+      .then((n) => {
+        if (n.projets) {
+          console.log(`BAT purgé (dossier soldé) : ${n.projets} projet(s), ${n.logos} logo(s) libéré(s).`);
+        }
+      })
+      .catch((err) => console.error('purge du BAT :', err.message));
+  }
+
   // ALERTE MARGE FAIBLE (§13). « Si un commercial descend sous la marge
   // minimum : afficher une alerte. La Direction peut néanmoins forcer le prix. »
   //
@@ -3448,7 +3543,17 @@ async function deposerPdf({ id, kind, buf, nom, qui }) {
 }
 
 // PUT /api/requests/:id/pdf/:kind  (corps = PDF brut, ?name=<nom de fichier>)
-app.put('/api/requests/:id/pdf/:kind', exige('clients'),
+//
+// LA CAPACITÉ SUIT LE DOCUMENT, PAS LA ROUTE (04/09/2026). Les trois
+// emplacements passaient par `exige('clients')` — la boutique et la Direction.
+// Le BAT n'est pourtant pas un document de client : « Préparation du BAT » est
+// une sous-étape de l'ATELIER, et le chef d'atelier se voyait refuser la
+// pastille de sa propre étape (403) alors que le même dépôt lui était ouvert
+// par `PUT /bat/api/crm/bat/:id`. Une même écriture, deux réponses selon la
+// porte empruntée : c'est la porte qu'on répare, pas l'utilisateur.
+const capacitePdf = (req, res, next) =>
+  (req.params.kind === 'bat' ? exige('bat') : exige('clients'))(req, res, next);
+app.put('/api/requests/:id/pdf/:kind', capacitePdf,
   express.raw({ type: () => true, limit: '12mb' }),
   asyncH(async (req, res) => {
     const { statut, corps } = await deposerPdf({
@@ -3458,11 +3563,92 @@ app.put('/api/requests/:id/pdf/:kind', exige('clients'),
     res.status(statut).json(corps);
   }));
 
+// ---------------------------------------------------------------------------
+// LE BAT D'UN DOSSIER SOLDE N'A PLUS RIEN A DIRE
+// ---------------------------------------------------------------------------
+// Charlie, 04/09/2026 : « on doit pouvoir modifier le BAT tant qu'on le
+// souhaite, mais des que le dossier est dans paiement et cloture, le BAT est
+// supprime de la ligne, inutile de le conserver pour rien ».
+//
+// LE DECLENCHEUR EST L'ENTREE DANS LA FAMILLE, ni l'export, ni l'archivage.
+//   · pas l'export : un BAT existe pour etre CORRIGE — « BAT – Modification
+//     demandee » est une sous-etape du pipeline, et effacer a l'export
+//     obligerait a repartir d'une feuille blanche a chaque aller-retour client.
+//   · pas l'archivage : a `paiement`, la commande est produite, remise et
+//     payee. Le dossier peut ensuite dormir des mois avant qu'on y touche, et
+//     attendre coute de la place pour rien.
+//
+// LE PDF N'EST JAMAIS TOUCHE. C'est la trace, et c'est ce que le client a
+// signe : il reste sur la ligne, avec ses versions.
+//
+// ⚠ CE QUI PESE N'EST PAS LE FICHIER DE TRAVAIL. Mesure sur le volume en ligne
+// le 04/09 : 85 projets = 1,1 Mo, mais leurs logos 170,9 Mo. Effacer le seul
+// JSON rendrait treize kilo-octets et donnerait le sentiment d'avoir nettoye.
+// On retire donc aussi les logos que PLUS AUCUN projet vivant ne reclame — les
+// logos sont dedupliques par empreinte, un meme fichier peut servir a dix
+// dossiers, et c'est pour ca qu'on compte avant d'effacer.
+const CHEMIN_INDEX = 'projects-index.json';
+
+async function batLireJson(rel) {
+  const f = await batLire(rel);
+  if (!f) return null;
+  try { return JSON.parse(f.octets.toString('utf8')); } catch (_) { return null; }
+}
+
+// Les empreintes de logos qu'un projet pose, toutes faces confondues.
+function logosDuProjet(projet) {
+  const out = new Set();
+  for (const a of (projet && projet.articles) || []) {
+    for (const face of Object.values((a && a.faces) || {})) {
+      for (const l of (face && face.logos) || []) {
+        if (l && l.hash) out.add(`${l.hash}.${l.type || 'pdf'}`);
+      }
+    }
+  }
+  return out;
+}
+
+async function purgerBatDuDossier(requestId) {
+  const index = await batLireJson(CHEMIN_INDEX);
+  if (!Array.isArray(index)) return { projets: 0, logos: 0 };
+  const aJeter = index.filter((e) => e && e.crmRequestId === requestId).map((e) => e.id);
+  if (!aJeter.length) return { projets: 0, logos: 0 };
+
+  // Ce que les projets condamnes posaient, et ce que les SURVIVANTS reclament
+  // encore. On ne lit les fichiers qu'a ce moment-la : c'est le seul endroit ou
+  // le compte doit etre juste, et ca ne se produit qu'a la cloture d'un dossier.
+  const condamnes = new Set();
+  for (const id of aJeter) {
+    for (const l of logosDuProjet(await batLireJson(`projects/${id}.json`))) condamnes.add(l);
+  }
+  const gardes = new Set();
+  for (const e of index) {
+    if (!e || aJeter.includes(e.id)) continue;
+    for (const l of logosDuProjet(await batLireJson(`projects/${e.id}.json`))) gardes.add(l);
+  }
+
+  for (const id of aJeter) await batSupprimer(`projects/${id}.json`);
+  await batEcrire(CHEMIN_INDEX, Buffer.from(
+    JSON.stringify(index.filter((e) => !aJeter.includes(e.id))), 'utf8',
+  ));
+
+  let logos = 0;
+  for (const l of condamnes) {
+    if (gardes.has(l)) continue;
+    try { await batSupprimer(`logos/${l}`); logos += 1; } catch (_) { /* deja parti */ }
+  }
+  return { projets: aJeter.length, logos };
+}
+
 // BAT STUDIO, MONTÉ ICI ET PAS AILLEURS : juste derrière `deposerPdf`, qui est
 // la seule chose que le CRM lui prête. Tout ce qui est sous `/bat/api` lui
 // appartient ; le reste de `/bat` (js, css, polices, vendor) est du statique
 // ordinaire, servi par `express.static` comme le reste de `public/`.
-monterBat(app, { deposerPdf, asyncH, quiDemande });
+// `exige` PART AVEC LE RESTE, et ce n'est pas décoratif : sans lui, les routes
+// d'écriture de BAT Studio n'avaient AUCUN contrôle de capacité, là où la route
+// qu'elles appellent (`PUT /api/requests/:id/pdf/:kind`) en a un. Deux chemins
+// vers la même écriture, un seul gardé.
+monterBat(app, { deposerPdf, asyncH, quiDemande, exige });
 
 // Range la version COURANTE à l'historique, avant qu'on l'écrase.
 async function archiverVersion(id, kind, qui, essai = 0) {
@@ -3539,7 +3725,10 @@ app.get('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
 }));
 
 // DELETE /api/requests/:id/pdf/:kind
-app.delete('/api/requests/:id/pdf/:kind', exige('clients'), asyncH(async (req, res) => {
+// MÊME RÈGLE QU'AU DÉPÔT (`capacitePdf`) : qui peut poser le BAT peut le
+// retirer. Deux capacités différentes pour poser et pour reprendre, ce serait
+// une pastille qu'on remplit sans jamais pouvoir la vider.
+app.delete('/api/requests/:id/pdf/:kind', capacitePdf, asyncH(async (req, res) => {
   const { id, kind } = req.params;
   if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
   const { rowCount } = await pool.query(
@@ -4510,7 +4699,14 @@ function articlesDuComptoir(brut) {
 // vers chaque poste à chaque rafraîchissement du planning, comme le numéro de
 // ticket. Une largeur de logo tient en trois chiffres, une taille en trois
 // signes — ce qui déborde n'est pas une mesure, c'est une faute de frappe.
-const PROD_ENTREES_MAX = 12;        // 6 tailles, 6 emplacements : le compte y est
+// ⚠ RELEVE DE 12 A 24 LE 04/09/2026. Le compte « 6 tailles, 6 emplacements »
+// ne tenait que tant que les tailles etaient les six du tableau. Depuis le
+// 03/09 la vendeuse cree ses propres bulles (`taillesLibres`) : une commande de
+// staff a neuf tailles ET six emplacements existe, et le plafond la tronquait
+// EN SILENCE — des pieces disparaissaient du dossier sans un message nulle
+// part. 24 reste borne, et c'est ce qui compte : cette structure repart vers
+// chaque poste a chaque rafraichissement du planning.
+const PROD_ENTREES_MAX = 24;
 function prodDuComptoir(brut) {
   if (!brut || typeof brut !== 'object') return null;
   const mot = (v) => borner(v, 60);
@@ -4745,6 +4941,67 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     ? borner(`${lignes[0].designation} + ${lignes.length - 1} autre${lignes.length > 2 ? 's' : ''}`, 200)
     : lignes[0].designation;
 
+  // ===========================================================================
+  // UN ARTICLE, UNE LIGNE — comme la vente directe (04/09/2026)
+  // ===========================================================================
+  // Charlie, 04/09 : « 1 article = 1 ligne partout ». Un devis à trois articles
+  // n'ouvrait qu'UNE ligne au planning, quand la même vente au comptoir en
+  // ouvrait trois. Deux formes pour les mêmes faits — et surtout : une étape
+  // appartient à la LIGNE. Tant que le devis tient sur une ligne, il est tout
+  // entier en attente ou tout entier en production, jamais les deux.
+  //
+  // LE DÉCOUPAGE EST CELUI DU COMPTOIR, PAS UN SECOND. `partsDuTicket` fait la
+  // seule chose qui compte ici : la somme des lignes vaut EXACTEMENT le montant
+  // du devis, sinon la colonne Prix du planning ment et toute somme faite
+  // dessus ment avec elle. L'écart d'arrondi se pose sur la première ligne.
+  //
+  // LA PART D'UN ARTICLE EST AU PRORATA DE SON HT, et pas de sa quantité : un
+  // devis porte un ajustement global et un arrondi commercial qui ne se
+  // répartissent pas à la pièce. Une somme de HT nulle (toutes les lignes « à
+  // chiffrer ») ne se répartit pas du tout — le montant reste sur la première,
+  // et `partsDuTicket` refusera de découper si ça ne tombe pas juste.
+  const prodBrut = Array.isArray(b.prod) ? b.prod : [];
+  const sommeHt = lignes.reduce((t, l) => t + l.totalHt, 0);
+  const articles = lignes.map((l, i) => ({
+    label: l.designation,
+    qte: l.quantite > 0 ? l.quantite : null,
+    montant: sommeHt > 0
+      ? Math.round(((prix.valeur * l.totalHt) / sommeHt) * 100) / 100
+      : (i === 0 ? prix.valeur : 0),
+    prod: prodDuComptoir(prodBrut[i]),
+  }));
+  // `null` = on ne sait pas découper proprement. Une ligne juste vaut mieux que
+  // quatre fausses — c'est la règle du comptoir, à l'identique.
+  const parts = articles.length > 1 ? partsDuTicket(articles, prix.valeur) : null;
+  const lot = articles.length > 1 && parts ? articles : [];
+  const nbLignes = lot.length || 1;
+
+  // LE GROUPE — CE QUI RELIE LES N LIGNES, ET LEURS VERSIONS.
+  // Le NUMÉRO ne peut pas servir : il gagne un « -V2 » à chaque reprise (voir
+  // plus haut), donc il change là où le lien doit tenir. Le groupe est la
+  // RACINE du numéro, posée à la V1 et recopiée telle quelle ensuite. Lisible
+  // en base, et déductible d'un dossier d'avant : sa racine est la même.
+  const groupe = String(numero).replace(/-V\d+$/, '');
+
+  // Ce que CHAQUE ligne du devis porte en propre.
+  const lignesDuDevis = nbLignes > 1
+    ? lot.map((a, i) => ({
+      produit: a.label,
+      quantite: a.qte,
+      valeur: parts[i],
+      prod: a.prod,
+      rang: i,
+    }))
+    : [{
+      produit,
+      quantite,
+      valeur: prix.valeur,
+      // Un devis d'un seul article n'a pas de lot, mais il a bien un article :
+      // sa ligne mérite la même lecture que les trois d'un devis groupé.
+      prod: articles.length === 1 ? articles[0].prod : null,
+      rang: 0,
+    }];
+
   const fiche = {
     kind: 'devis-v1',
     source: 'Devis',
@@ -4760,6 +5017,10 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     dueHeure: /^\d{2}:\d{2}$/.test(String(b.dueHeure || '')) ? b.dueHeure : null,
     maquette: b.maquette === true,
     noteInterne: borner(b.noteInterne, 600),
+    // LE GROUPE : ce qui relie les N lignes de ce devis, et ses versions. Le
+    // numéro, lui, gagne un « -V2 » à chaque reprise et ne peut donc pas servir
+    // de lien. Voir le commentaire de `groupe` plus haut.
+    devisGroupe: groupe,
     // LE DEVIS TEL QU'IL A ÉTÉ IMPRIMÉ. C'est l'archive : elle ne se retouche
     // pas, et c'est elle qu'on ressort quand le client revient avec sa feuille.
     devis: {
@@ -4803,15 +5064,97 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     ].filter(([, v]) => v).map(([k, v]) => ({ k, v })),
   };
 
-  // UNE REPRISE ÉCRIT SUR LE DOSSIER, ELLE N'EN OUVRE PAS UN SECOND.
+  // ===========================================================================
+  // ÉCRIRE LE DEVIS AU PLANNING — N lignes, en une transaction
+  // ===========================================================================
+  // TOUT OU RIEN. Trois `INSERT` autonomes, c'est un devis qui peut rester à
+  // moitié en base si le réseau tombe entre le deuxième et le troisième : on
+  // verrait un échec, on réessaierait, et les articles manquants n'entreraient
+  // jamais. C'est la même règle que le comptoir, et pour la même raison.
+  const ecrireLignes = async (cx, position, ficheCommune, projetId) => {
+    const ids = [];
+    for (let i = 0; i < lignesDuDevis.length; i += 1) {
+      const l = lignesDuDevis[i];
+      const ficheLigne = ficheDeLigne(ficheCommune, l);
+      const { rows: r } = await cx.query(
+        `INSERT INTO requests
+           (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
+            contact_referent, contact_phone, contact_email, quantity, product, description,
+            deadline, position, fiche, project_value, project_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         RETURNING id`,
+        [
+          famille, sousEtape, 'demande', responsable, 1, clientType, nomDossier,
+          borner(cl.contact, 120), borner(cl.tel, 40), borner(cl.email, 160),
+          l.quantite, l.produit, borner(b.projet, DESCRIPTION_MAX),
+          // UNE DATE SOUHAITÉE N'EST PAS UNE PROMESSE. Sans elle le dossier n'a
+          // pas d'échéance : la dater du jour le ferait paraître en retard dès
+          // demain alors que personne n'a rien promis au client.
+          isDay(b.dueDate) ? b.dueDate : null,
+          // Les rangs se suivent : les lignes d'un même devis restent CONTIGUËS
+          // dans « À trier ». L'écart de 1000 entre deux dossiers laisse la
+          // place aux déplacements à la main.
+          Number(position) + i, JSON.stringify(ficheLigne), l.valeur, projetId,
+        ],
+      );
+      ids.push(r[0].id);
+    }
+    return ids;
+  };
+
+  // CE QUE CHAQUE LIGNE PORTE EN PROPRE, par-dessus la fiche commune.
+  function ficheDeLigne(ficheCommune, l) {
+    return {
+      ...ficheCommune,
+      // LE RANG DE L'ARTICLE dans le devis. C'est lui qui dit quelle ligne de
+      // `devis.lignes[]` cette ligne du planning représente — sans quoi une
+      // fiche de trois articles ne saurait pas laquelle elle décrit.
+      devisArticle: l.rang,
+      ...(nbLignes > 1 ? { lot: { ref: numero, rang: l.rang + 1, total: nbLignes } } : {}),
+      // `prodDuComptoir` rend `null` sur un article qui ne porte aucun fait : on
+      // n'écrit alors PAS la clé, plutôt qu'un `prod: null` que chaque poste
+      // recevrait à chaque rafraîchissement pour ne rien dire.
+      ...(l.prod ? { prod: l.prod } : {}),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // UNE REPRISE RÉÉCRIT LE GROUPE, ELLE N'OUVRE PAS UN SECOND DOSSIER
+  // ---------------------------------------------------------------------------
+  // Un devis n'est plus UNE ligne : c'est un GROUPE de lignes qui portent le
+  // même `fiche.devisGroupe`. Une V2 n'a donc pas à écrire sur « le » dossier,
+  // elle a à faire coïncider le groupe avec la nouvelle version.
+  //
+  // L'APPARIEMENT SE FAIT PAR LA DÉSIGNATION, pas par le rang. Retirer
+  // l'article du milieu décalerait tout : la ligne des casquettes se mettrait à
+  // décrire les sacs, en gardant son étape, son BAT et ses pièces jointes. Une
+  // ligne qui change d'article sans changer d'identité, c'est le genre d'erreur
+  // qu'on ne découvre qu'à la production.
+  //
+  // CE QUI SORT DE LA V2 EST ARCHIVÉ, JAMAIS SUPPRIMÉ. Le client a eu une
+  // feuille avec cet article dessus ; six mois plus tard il faut pouvoir dire
+  // ce qu'on lui avait chiffré.
   if (repriseId) {
-    const { rows: anc } = await pool.query('SELECT fiche FROM requests WHERE id = $1', [repriseId]);
-    const ficheAnc = anc.length && anc[0].fiche && typeof anc[0].fiche === 'object' ? anc[0].fiche : {};
+    const { rows: anciennes } = await pool.query(
+      `SELECT id, product, fiche FROM requests
+        WHERE fiche->>'devisGroupe' = $1 AND ${VIVANTES_NU}
+        ORDER BY position`,
+      [groupe],
+    );
+    // REPLI POUR LES DEVIS D'AVANT LE GROUPE : ils n'ont pas de
+    // `devisGroupe`, et ils tiennent de toute façon sur une seule ligne.
+    // On reprend celle-là, et elle gagne le groupe au passage.
+    const groupeAnc = anciennes.length
+      ? anciennes
+      : (await pool.query(`SELECT id, product, fiche FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [repriseId])).rows;
+    if (!groupeAnc.length) return res.status(404).json({ error: 'dossier introuvable' });
+
+    const ficheAnc = groupeAnc[0].fiche && typeof groupeAnc[0].fiche === 'object' ? groupeAnc[0].fiche : {};
     const version = Math.max(1, Math.round(Number(ficheAnc.version) || 1)) + 1;
     // LES VERSIONS PASSÉES, DE LA PLUS RÉCENTE À LA PLUS ANCIENNE, et bornées :
     // une fiche qu'on reprend vingt fois ne doit pas devenir un objet d'un méga.
     const passees = Array.isArray(ficheAnc.devisPassees) ? ficheAnc.devisPassees : [];
-    const neuve = {
+    const ficheV = {
       ...fiche,
       version,
       creeLe: ficheAnc.creeLe || fiche.creeLe,
@@ -4820,50 +5163,138 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
         ? [{ version: Math.max(1, Number(ficheAnc.version) || 1), devis: ficheAnc.devis }, ...passees]
         : passees).slice(0, 20),
     };
-    await pool.query(
-      `UPDATE requests SET billing_company = $2, contact_referent = $3, contact_phone = $4,
-              contact_email = $5, quantity = $6, product = $7, description = $8,
-              deadline = $9, fiche = $10, project_value = $11, client_type = $12
-       WHERE id = $1`,
-      [
-        repriseId, nomDossier, borner(cl.contact, 120), borner(cl.tel, 40),
-        borner(cl.email, 160), quantite, produit, borner(b.projet, DESCRIPTION_MAX),
-        isDay(b.dueDate) ? b.dueDate : null, JSON.stringify(neuve), prix.valeur, clientType,
-      ],
-    );
-    // LE JOURNAL DIT QU'UNE VERSION EST NÉE. Sans lui, le montant du dossier
-    // change tout seul entre deux relectures et personne ne sait pourquoi.
-    await pool.query(
-      'INSERT INTO request_events (request_id, field, value_before, value_after, who) VALUES ($1,$2,$3,$4,$5)',
-      [repriseId, 'devis',
-        `V${version - 1}${ficheAnc.devis && ficheAnc.devis.ttc != null ? ` — ${ficheAnc.devis.ttc} €` : ''}`,
-        `V${version} — ${prix.valeur} €`, quiDemande(req)],
-    ).catch(() => { /* le journal est un confort, il ne fait pas échouer la reprise */ });
-    broadcast({ kind: 'update', ids: [repriseId] });
-    return res.json({ id: repriseId, stage: null, numero, version, reprise: true });
+
+    // L'APPARIEMENT SE FAIT EN DEUX PASSES, et l'ordre compte.
+    //   1. PAR LA DÉSIGNATION, réduite sans casse ni accent — la règle de
+    //      rapprochement de noms du reste de l'application. C'est elle qui fait
+    //      qu'en retirant l'article du milieu, les deux qui restent gardent
+    //      LEUR ligne, avec leur étape, leur BAT et leurs pièces jointes.
+    //   2. PAR LE RANG, pour ce qui reste. Un article RENOMMÉ en V2 (« T-shirt
+    //      Unisexe Bio » devient « T-shirt STAFF ») est le même travail sous un
+    //      autre nom : lui donner une ligne neuve et archiver l'ancienne
+    //      perdrait son BAT et son étape pour un changement de libellé.
+    // Ce qui n'est apparié par NI l'une NI l'autre est un article vraiment
+    // nouveau, et il naît.
+    const cleArticle = (v) => String(v == null ? '' : v).trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const libres = groupeAnc.slice();
+    const apparie = lignesDuDevis.map((l) => {
+      const i = libres.findIndex((o) => cleArticle(o.product) === cleArticle(l.produit));
+      return i >= 0 ? libres.splice(i, 1)[0] : null;
+    });
+    for (let i = 0; i < apparie.length && libres.length; i += 1) {
+      if (!apparie[i]) apparie[i] = libres.shift();
+    }
+
+    const touches = [];
+    const cx = await pool.connect();
+    try {
+      await cx.query('BEGIN');
+      const { rows: posRows } = await cx.query(
+        'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
+      );
+      let rangNeuf = 0;
+      for (let i = 0; i < lignesDuDevis.length; i += 1) {
+        const l = lignesDuDevis[i];
+        const ancienne = apparie[i];
+        const ficheLigne = ficheDeLigne(ficheV, l);
+        if (ancienne) {
+          await cx.query(
+            `UPDATE requests SET billing_company = $2, contact_referent = $3, contact_phone = $4,
+                    contact_email = $5, quantity = $6, product = $7, description = $8,
+                    deadline = $9, fiche = $10, project_value = $11, client_type = $12
+             WHERE id = $1`,
+            [
+              ancienne.id, nomDossier, borner(cl.contact, 120), borner(cl.tel, 40),
+              borner(cl.email, 160), l.quantite, l.produit, borner(b.projet, DESCRIPTION_MAX),
+              isDay(b.dueDate) ? b.dueDate : null, JSON.stringify(ficheLigne), l.valeur, clientType,
+            ],
+          );
+          touches.push(ancienne.id);
+        } else {
+          // UN ARTICLE AJOUTÉ EN V2 NAÎT, il ne se greffe pas sur une ligne qui
+          // décrivait autre chose. Il prend sa place à la suite du groupe.
+          const { rows: r } = await cx.query(
+            `INSERT INTO requests
+               (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
+                contact_referent, contact_phone, contact_email, quantity, product, description,
+                deadline, position, fiche, project_value)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+             RETURNING id`,
+            [
+              famille, sousEtape, 'demande', responsable, 1, clientType, nomDossier,
+              borner(cl.contact, 120), borner(cl.tel, 40), borner(cl.email, 160),
+              l.quantite, l.produit, borner(b.projet, DESCRIPTION_MAX),
+              isDay(b.dueDate) ? b.dueDate : null,
+              Number(posRows[0].pos) + rangNeuf, JSON.stringify(ficheLigne), l.valeur,
+            ],
+          );
+          rangNeuf += 1;
+          touches.push(r[0].id);
+        }
+      }
+      // CE QUE LA V2 NE REPREND PAS EST ARCHIVÉ, avec son journal et ses PDF.
+      for (const restee of libres) {
+        await cx.query('UPDATE requests SET deleted_at = now() WHERE id = $1', [restee.id]);
+      }
+      await cx.query('COMMIT');
+    } catch (err) {
+      await cx.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      cx.release();
+    }
+
+    // LE JOURNAL DIT QU'UNE VERSION EST NÉE, sur chaque ligne touchée. Sans lui,
+    // le montant du dossier change tout seul entre deux relectures et personne
+    // ne sait pourquoi.
+    for (const id of touches) {
+      await pool.query(
+        'INSERT INTO request_events (request_id, field, value_before, value_after, who) VALUES ($1,$2,$3,$4,$5)',
+        [id, 'devis',
+          `V${version - 1}${ficheAnc.devis && ficheAnc.devis.ttc != null ? ` — ${ficheAnc.devis.ttc} €` : ''}`,
+          `V${version} — ${prix.valeur} €`, quiDemande(req)],
+      ).catch(() => { /* le journal est un confort, il ne fait pas échouer la reprise */ });
+    }
+    broadcast({ kind: 'update', ids: touches, stages: [famille] });
+    return res.json({
+      id: touches[0], stage: null, numero, version, reprise: true,
+      ...(nbLignes > 1 ? { lot: { total: nbLignes, ids: touches } } : {}),
+      ...(libres.length ? { archivees: libres.length } : {}),
+    });
   }
 
-  const { rows: posRows } = await pool.query(
-    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
-  );
-  const { rows } = await pool.query(
-    `INSERT INTO requests
-       (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
-        contact_referent, contact_phone, contact_email, quantity, product, description,
-        deadline, position, fiche, project_value)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-     RETURNING id`,
-    [
-      famille, sousEtape, 'demande', responsable, 1, clientType, nomDossier,
-      borner(cl.contact, 120), borner(cl.tel, 40), borner(cl.email, 160),
-      quantite, produit, borner(b.projet, DESCRIPTION_MAX),
-      // UNE DATE SOUHAITÉE N'EST PAS UNE PROMESSE. Sans elle le dossier n'a pas
-      // d'échéance : la dater du jour le ferait paraître en retard dès demain
-      // alors que personne n'a rien promis au client.
-      isDay(b.dueDate) ? b.dueDate : null,
-      posRows[0].pos, JSON.stringify(fiche), prix.valeur,
-    ],
-  );
+  // ---------------------------------------------------------------------------
+  // UN DEVIS NEUF
+  // ---------------------------------------------------------------------------
+  let ids;
+  const cx = await pool.connect();
+  try {
+    await cx.query('BEGIN');
+    const { rows: posRows } = await cx.query(
+      'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
+    );
+    // LE PROJET NE NAÎT QUE POUR UN GROUPE. Un seul article ne fait pas de
+    // projet : le niveau ne dirait plus rien s'il y avait autant de dossiers que
+    // de devis. C'est le regroupement qui le justifie, et lui seul — même règle
+    // qu'au comptoir.
+    let projetId = null;
+    if (nbLignes > 1) {
+      const bouts = [nomDossier, numero].filter(Boolean);
+      const { rows: pr } = await cx.query(
+        'INSERT INTO projects (numero, nom, billing_company) VALUES ($1, $2, $3) RETURNING id',
+        [numero || null, bouts.join(' — ') || 'Devis sans nom', nomDossier || null],
+      );
+      projetId = pr[0].id;
+    }
+    ids = await ecrireLignes(cx, posRows[0].pos, fiche, projetId);
+    await cx.query('COMMIT');
+  } catch (err) {
+    await cx.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    cx.release();
+  }
 
   await upsertClientSansBloquer({
     societe: nomDossier,
@@ -4874,7 +5305,13 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
   });
 
   broadcast({ kind: 'create', stages: [famille] });
-  res.status(201).json({ id: rows[0].id, stage: famille, subStage: sousEtape, numero });
+  res.status(201).json({
+    id: ids[0], stage: famille, subStage: sousEtape, numero,
+    // Combien de lignes ce devis a produites, et lesquelles. L'écran le DIT :
+    // sans ce compte, on croit avoir enregistré un devis et on en trouve trois
+    // au planning.
+    ...(nbLignes > 1 ? { lot: { total: nbLignes, ids } } : {}),
+  });
 })));
 
 // POST /api/vente/numero → réserve le numéro du ticket de vente directe,

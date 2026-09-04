@@ -2681,6 +2681,45 @@ async function setReglagesTextile(patch) {
   return propre;
 }
 
+// --- QUELLES FAMILLES MÉRITENT UN BON À TIRER ---------------------------------
+// Charlie, 04/09/2026 : « les BAT ne sont utiles que pour les textiles :
+// casquette, t-shirt, sweat, pochette, sac, etc. Le reste, on fait encore les
+// BAT sur Illustrator. »
+//
+// ⚠ « MÉRITE UN BAT » N'EST PAS « CHIFFRÉ AU MOTEUR V9 », et c'est le piège.
+// Le catalogue a une famille qui s'appelle « Textile » — celle du moteur — et
+// c'est le test que les deux écrans flash font déjà pour ranger un produit sous
+// l'onglet Textile ou Boutique. S'en servir ici priverait de BAT les vingt-cinq
+// « Vêtements — Unisexe / Femme / Enfant » : des t-shirts FINIS, vendus au prix
+// magasin, sur lesquels on imprime exactement comme sur les autres. Compté en
+// base le 04/09 : 86 produits sur 220 méritent un BAT, et 25 d'entre eux
+// seraient tombés dans ce trou.
+//
+// C'EST UN RÉGLAGE, PAS UNE CONSTANTE. Une famille neuve au catalogue ne doit
+// pas demander un déploiement pour recevoir des BAT — même raison que
+// l'identité de l'atelier juste en dessous.
+// Down : DELETE FROM app_meta WHERE key = 'familles_bat';
+const FAMILLES_BAT_DEFAUT = [
+  'Textile',
+  'Vêtements — Unisexe', 'Vêtements — Femme', 'Vêtements — Enfant',
+  'Casquettes', 'Pochettes', 'Sacs',
+];
+
+async function getFamillesBat() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'familles_bat'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return [...FAMILLES_BAT_DEFAUT];
+  try {
+    const lu = JSON.parse(rows[0].value);
+    if (!Array.isArray(lu)) return [...FAMILLES_BAT_DEFAUT];
+    // Une liste VIDE est un choix : « aucun BAT nulle part ». On ne retombe
+    // donc pas sur la valeur par défaut, qui rallumerait ce qu'on vient
+    // d'éteindre.
+    return lu.map((f) => String(f || '').trim()).filter(Boolean);
+  } catch {
+    return [...FAMILLES_BAT_DEFAUT];
+  }
+}
+
 // --- L'identité de l'atelier --------------------------------------------------
 // CE QUI SIGNE LES PAPIERS. Un bon de commande sans émetteur n'est pas un
 // document : c'est une note. Le nom, l'adresse, le téléphone, l'e-mail et les
@@ -4167,6 +4206,8 @@ async function batTailles(rel) {
 }
 
 module.exports = {
+  getFamillesBat,
+
   batLire, batEcrire, batSupprimer, batLister, batTailles, batChemin,
   pool, init, repairOrphanStages, toFiveFamilies, migrateFamiliesToFive, migrateStagesToLinear,
   // Exportée pour être rejouée SEULE : pg-mem ne relit pas `schema.sql` deux

@@ -45,6 +45,12 @@ export const contexteOuverture = {
   requestId: nettoyerId(params.get('request')),
   client: (params.get('client') || '').trim(),
   projet: (params.get('projet') || '').trim(),
+  // CE QU'IL Y A A PRODUIRE, tel que la ligne du CRM le porte (04/09/2026) :
+  // `{ refFournisseur, couleur, tailles: [{t, n}], faces: ['Coeur', 'Dos'] }`.
+  // Il n'arrive JAMAIS par l'adresse — une grille de tailles ne se met pas dans
+  // une URL — mais par `monterBatStudio`, qui est de toute facon le seul chemin
+  // dans le CRM. `null` = on ne sait rien, et le projet neuf reste vierge.
+  prod: null,
 };
 
 // Colle le contexte d'ouverture sur un projet qui n'en a pas encore. Ne réécrit

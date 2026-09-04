@@ -994,6 +994,15 @@ function renderListeSuite() {
 async function loadRows() {
   const slug = currentStage;
   const token = ++loadToken;
+  // LE TABLEAU DES TAILLES DE LOGO PART AVEC LA LISTE (04/09/2026). La ligne
+  // affiche désormais la TAILLE DU LOGO, et cette cote n'est pas dans le
+  // dossier : le comptoir ne mesure pas, elle vit dans le tableau (famille,
+  // face, taille du vêtement — voir `coteDuLogo`). Chargé seulement à
+  // l'ouverture d'une fiche, la colonne serait restée vide jusqu'à ce qu'on en
+  // ouvre une, puis se serait remplie toute seule — un écran qui change sans
+  // qu'on ait rien fait.
+  // 3,7 Ko, une fois par session, en PARALLÈLE de la liste : il ne retarde rien.
+  chargerTaillesLogo().catch(() => {});
   const { lignes: data, plafond, total } = await chargerListe(urlListe(slug));
   if (token !== loadToken || slug !== currentStage) return; // sélection dépassée
   rows = data;
@@ -1690,7 +1699,7 @@ function buildCard(r, options) {
   // lit ce qu'il y a à produire (réf, marquage, tailles, logos), puis ce qui
   // empêche de le faire. La conclusion vient après les faits — et c'est aussi
   // ce qui aligne les cinq intitulés dans une seule colonne.
-  const quoi = [nom, blocProduction(r, hiddenCols), hiddenCols.has('feu') ? null : blocFeu(r, attachTip), meta, motif]
+  const quoi = [nom, blocProduction(r, hiddenCols, coteDuLogo), hiddenCols.has('feu') ? null : blocFeu(r, attachTip), meta, motif]
     .filter(Boolean);
   carte.append(
     blocClient,
@@ -3141,7 +3150,7 @@ function cellInfos(r) {
   // LE MÊME BLOC QUE SUR LA CARTE, au même endroit dans la lecture : ce qu'il y
   // a à produire d'abord, la note libre ensuite. Deux vues à un clic l'une de
   // l'autre doivent donner le même composant, pas deux qui se ressemblent.
-  const prod = blocProduction(r, hiddenCols);
+  const prod = blocProduction(r, hiddenCols, coteDuLogo);
   if (prod) stack.appendChild(prod);
   // LE MÊME COMPOSANT, DANS LE MÊME ORDRE, DANS LES DEUX VUES — deux écrans à
   // un clic l'un de l'autre doivent donner le même bloc, pas deux qui se
@@ -3436,6 +3445,58 @@ function chargerTaillesLogo() {
   return taillesLogoEnVol;
 }
 
+// QUELLES LIGNES MÉRITENT UN BON À TIRER (04/09/2026).
+// Charlie : « les BAT ne sont utiles que pour les textiles : casquette,
+// t-shirt, sweat, pochette, sac, etc. Le reste, on fait encore les BAT sur
+// Illustrator. »
+//
+// LA LIGNE NE CONNAÎT PAS SA FAMILLE — elle porte une RÉFÉRENCE et une
+// DÉSIGNATION. Le serveur envoie donc les clés des produits concernés
+// (`/api/settings/bat-produits`, moins de 4 Ko), et on rapproche sur les deux :
+// une vendeuse peut taper une désignation sans choisir au catalogue, et sans
+// cette seconde clé un t-shirt saisi à la main n'aurait pas de bouton.
+//
+// INJOIGNABLE, ON NE PROPOSE RIEN. Un bouton « BAT » posé au hasard sur une
+// tasse est pire que pas de bouton : c'est un bouton qu'on apprend à ne plus
+// lire — la règle du « Reprendre le devis » et de la « Facture », déjà écrite
+// dans la fiche.
+let batProduits = null;
+let batFournisseur = {};
+let batProduitsEnVol = null;
+function chargerBatProduits() {
+  if (batProduits) return Promise.resolve(batProduits);
+  if (!batProduitsEnVol) {
+    batProduitsEnVol = api('GET', '/api/settings/bat-produits')
+      .then((t) => {
+        batProduits = new Set(Array.isArray(t && t.cles) ? t.cles : []);
+        // ⚠ LA RÉFÉRENCE DU FOURNISSEUR N'EST PAS LA NÔTRE. Le comptoir range
+        // « K3025 » ; le catalogue de BAT Studio indexe sur « K3025IC ». Huit
+        // références sur quarante-neuf sont dans ce cas — chercher la référence
+        // nue marche sur NS300 et échoue sur K3025.
+        batFournisseur = (t && t.fournisseur && typeof t.fournisseur === 'object') ? t.fournisseur : {};
+        return batProduits;
+      })
+      .catch(() => { batProduitsEnVol = null; return new Set(); });
+  }
+  return batProduitsEnVol;
+}
+
+// La même réduction que le serveur : sans casse ni accent, et SANS retirer le
+// pluriel — « Sacs » est une famille, « Sac coton » un produit, et les deux
+// clés viennent déjà réduites de la même façon des deux côtés.
+const cleBatProduit = (v) => String(v == null ? '' : v).trim().toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+function meriteUnBat(r) {
+  if (!batProduits || !batProduits.size) return false;
+  const prod = (r && r.fiche && r.fiche.prod) || null;
+  for (const k of [prod && prod.ref, r && r.product]) {
+    const c = cleBatProduit(k);
+    if (c && batProduits.has(c)) return true;
+  }
+  return false;
+}
+
 // Le tableau et le catalogue ne se sont pas mis d'accord sur les pluriels ni sur
 // les accents : on compare sur une forme réduite, jamais pour réécrire. C'est la
 // règle `txLogoCle` du comptoir, à l'identique — deux écrans qui rapprochent les
@@ -3496,6 +3557,55 @@ async function creerFaceDeFamille(r, nom) {
     // prochaine fois. On ne perd jamais ce qui vient d'être tapé.
     return false;
   }
+}
+
+// LA LARGEUR D'UN LOGO, POUR CETTE FACE ET CE VÊTEMENT (04/09/2026)
+// ---------------------------------------------------------------------------
+// Charlie veut la taille du logo SUR LA LIGNE, en un coup d'oeil. Elle n'y était
+// nulle part : le comptoir ne mesure pas (`prod.logos[].mm` reste vide, et
+// c'est voulu — une cote se prend à l'établi), et jusqu'ici seul le BAT allait
+// la chercher dans le tableau des tailles de logo.
+//
+// LE TABLEAU DIT UNE LARGEUR PAR TAILLE DE VÊTEMENT : un Coeur fait 60 en S et
+// 70 en 2XL, un Dos passe de 240 à 320. On rend donc ce que la LIGNE commande —
+// ses tailles à elle, pas les six du tableau — et on ne répète pas une valeur
+// identique : « Coeur 65 » plutôt que « Coeur S 65/M 65/L 65 ».
+//
+// ⚠ LE RAPPROCHEMENT EST TOLÉRANT DES DEUX CÔTÉS. Le tableau écrit « Coeur »,
+// une fiche peut porter « Cœur » : la ligature ne se décompose PAS en NFD, et
+// les deux ne seraient jamais égales. Même piège que le pré-remplissage du BAT,
+// payé le même jour.
+const cleZone = (v) => String(v == null ? '' : v).trim().toLowerCase()
+  .replace(/[œŒ]/g, 'oe').replace(/[æÆ]/g, 'ae')
+  .normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+function coteDuLogo(r, face) {
+  const fam = familleDuDossier(r);
+  const prod = (r && r.fiche && r.fiche.prod) || null;
+  if (!fam || !prod || !face) return '';
+  const cibleRef = cleZone(prod.ref);
+  const parRef = Object.entries(fam.refs || {}).find(([k]) => cleZone(k) === cibleRef);
+  if (!parRef) return '';
+  const cibleFace = cleZone(face);
+  const parFace = Object.entries(parRef[1] || {}).find(([k]) => cleZone(k) === cibleFace);
+  if (!parFace) return '';
+  const parTaille = parFace[1] || {};
+  const tailles = Array.isArray(prod.tailles) ? prod.tailles : [];
+  // Sans taille commandée, on ne devine pas laquelle montrer : la ligne ne dit
+  // rien plutôt que de dire la largeur d'un vêtement qu'on ne fait pas.
+  if (!tailles.length) return '';
+  const vus = [];
+  for (const { t } of tailles) {
+    const e = Object.entries(parTaille).find(([k]) => cleZone(k) === cleZone(t));
+    if (!e || !e[1]) continue;
+    vus.push({ t, mm: String(e[1]) });
+  }
+  if (!vus.length) return '';
+  const largeurs = [...new Set(vus.map((x) => x.mm))];
+  // UNE SEULE LARGEUR POUR TOUTES LES TAILLES : on l'écrit une fois. Répéter
+  // « S 65/M 65 » ferait lire deux mesures là où il n'y en a qu'une.
+  if (largeurs.length === 1) return largeurs[0];
+  return vus.map((x) => `${x.t} ${x.mm}`).join('/');
 }
 
 function facesProposees(r) {
@@ -3627,6 +3737,15 @@ function contexteFicheAtelier(r, marquage) {
       };
       quandPret();
     },
+    // LE BON À TIRER DE CETTE LIGNE (04/09/2026). Charlie : « à l'intérieur de
+    // chaque ligne je dois pouvoir rapidement créer un BAT ».
+    //
+    // ⚠ ON NE FERME PAS LA FICHE comme le fait « Reprendre le devis ». Le BAT
+    // s'ouvre sur un AUTRE onglet : la fiche disparaît de toute façon avec le
+    // planning, et la refermer en plus ferait perdre sa place au retour.
+    // Il ne paraît que sur une ligne textile — voir `meriteUnBat`.
+    peutBat: meriteUnBat(r),
+    ouvrirBat: () => ouvrirBatDeLaLigne(r),
     ouvrirClient: (ligne) => {
       const cible = ligne || r;
       clientVise = cible.billing_company || cible.contact_referent || '';
@@ -3650,11 +3769,15 @@ function openLigneDetail(id) {
   // LE PRIX DE CHAQUE EMPLACEMENT part avec elles. Neuf recalculs du moteur : ils
   // n'ont aucune raison de voyager sur chaque ligne de la grille, à chaque
   // rafraîchissement — ils ne servent qu'ici, et seulement quand on ouvre.
+  // LA LISTE DES PRODUITS QUI MÉRITENT UN BAT part avec elles, et pour la même
+  // raison : elle ne sert qu'ici, une fois par session, et sans elle le bouton
+  // « BAT » manquerait sur la première fiche ouverte.
   Promise.all([
     chargerFicheComplete(id).catch(() => {}),
     chargerTaillesLogo(),
+    chargerBatProduits(),
     api('GET', `/api/requests/${id}/marquage`).catch(() => null),
-  ]).then(([, , marquage]) => {
+  ]).then(([, , , marquage]) => {
     if (ficheAtelierId !== String(id)) return;
     const fraiche = rows.find((x) => String(x.id) === String(id)) || ligne;
     completerFiche(fraiche);
@@ -6084,7 +6207,11 @@ try { colWidths = JSON.parse(localStorage.getItem(COLW_KEY) || '{}') || {}; } ca
 // ligne arrêtée le 27/08 (cf. COLS_DEFAUT). Un poste qui avait réglé ses
 // colonnes en v2 aurait sinon gardé son écran, et la nouvelle ligne par défaut
 // ne serait apparue nulle part.
-const COLS_KEY = 'olda_cols_v4';
+// `v5` (04/09) : même raison, pour les cinq faits du textile. Un poste qui
+// avait réglé ses colonnes en v4 ne connaît aucune des clés neuves — il les
+// aurait donc toutes trouvées éteintes, et « par défaut » n'aurait rien voulu
+// dire. Le prix est connu et assumé : chacun remet ses préférences une fois.
+const COLS_KEY = 'olda_cols_v5';
 // `cls` = la classe portée par le <th> ET les <td> de la colonne, telle que
 // posée dans index.html et buildRow(). `auto` = la règle qui dit si l'étape
 // courante la remplit jamais — sert au seul badge « vide ici » du rail, ne
@@ -6115,10 +6242,26 @@ const PLANNING_COLS = [
   // `horsTableau` : elles n'ont pas de colonne à elles — le bloc se pose dans
   // la cellule « Infos » et dans le bloc « Projet » de la carte.
   { key: 'feu',          label: 'Ce qui manque (devis/BAT/argent)', surCarte: true, horsTableau: true },
-  { key: 'prod_ref',     label: 'Référence & couleur', surCarte: true, horsTableau: true },
-  { key: 'prod_dtf',     label: 'Couleur du marquage', surCarte: true, horsTableau: true },
-  { key: 'prod_tailles', label: 'Quantité par taille', surCarte: true, horsTableau: true },
-  { key: 'prod_logos',   label: 'Largeur des logos', surCarte: true, horsTableau: true },
+  // LES CINQ FAITS DU TEXTILE, DANS CET ORDRE (Charlie, 04/09/2026) : « sur la
+  // ligne pour le textile du planning doit absolument apparaître en un coup
+  // d'oeil dans cet ordre : réf du t-shirt, couleur, tailles/quantité, logo,
+  // taille du logo ». L'ORDRE DE CETTE LISTE EST L'ORDRE À L'ÉCRAN
+  // (`blocProduction` la parcourt telle quelle) : la déplacer, c'est déplacer
+  // la ligne.
+  //
+  // ⚠ UN FAIT PAR CHOSE, DONC UN INTERRUPTEUR PAR CHOSE. La couleur vivait
+  // dans la référence et la taille du logo dans le logo : l'ordre demandé était
+  // impossible, et surtout on ne pouvait pas masquer la taille du logo sans
+  // masquer le logo — l'exemple même que Charlie donne de ce qu'un poste doit
+  // pouvoir cacher dans sa session.
+  { key: 'prod_ref',      label: 'Référence', surCarte: true, horsTableau: true },
+  { key: 'prod_couleur',  label: 'Couleur', surCarte: true, horsTableau: true },
+  { key: 'prod_tailles',  label: 'Tailles et quantités', surCarte: true, horsTableau: true },
+  { key: 'prod_logos',    label: 'Logo (où l’on marque)', surCarte: true, horsTableau: true },
+  { key: 'prod_logo_mm',  label: 'Taille du logo', surCarte: true, horsTableau: true },
+  // Hors des cinq : la technique et la couleur d'encre. À un clic pour qui
+  // charge les rouleaux, éteint pour les autres.
+  { key: 'prod_dtf',      label: 'Marquage et encre', surCarte: true, horsTableau: true },
   { key: 'description', label: 'Infos' },
   { key: 'deadline',    label: 'Date souhaitée' },
   { key: 'flag',        label: 'État' },
@@ -6129,7 +6272,8 @@ const COLS_ETEIGNABLES = new Set(PLANNING_COLS.filter((c) => !c.locked).map((c) 
 // Celles dont la case change ce qu'une ligne DESSINE, sans changer de vue : il
 // faut les redessiner à la main. Le ticket n'en est pas — sa place reste
 // réservée sur toutes les cartes, c'est le CSS qui l'affiche ou non.
-const COLS_REDESSINENT = new Set(['price', 'feu', 'prod_ref', 'prod_dtf', 'prod_tailles', 'prod_logos']);
+const COLS_REDESSINENT = new Set(['price', 'feu', 'prod_ref', 'prod_couleur',
+  'prod_tailles', 'prod_logos', 'prod_logo_mm', 'prod_dtf']);
 // Celles qui n'existent QUE dans le tableau : ce sont elles, et elles seules,
 // qui décident de la vue (cf. modeCartes). Le ticket en est exclu — le retirer
 // sur les cartes doit retirer le bouton, pas rappeler le tableau complet.
@@ -6170,7 +6314,17 @@ const COLS_TABLEAU = new Set(
 // La donnée la MIEUX remplie de la base était la seule absente de la ligne :
 // le planning d'un atelier ne disait pas ce qu'il y avait à produire. Elle se
 // pose juste après le client — qui, pour quoi — avant l'argent et les papiers.
-const COLS_DEFAUT = new Set(['responsable', 'client', 'product', 'price', 'feu', 'description', 'deadline']);
+// ⚠ LES CINQ FAITS DU TEXTILE SONT ALLUMÉS PAR DÉFAUT DEPUIS LE 04/09.
+// « Voici ce que je veux par défaut pour le textile ; évidemment les autres
+// pourront modifier les colonnes pour cacher, dans la session, la taille des
+// logos » (Charlie). Ils ne coûtent RIEN aux lignes qui n'en portent pas : une
+// rangée sans valeur ne s'affiche pas (`blocProduction`), et un dossier sans
+// `fiche.prod` n'a pas de bloc du tout. Le planning d'un atelier doit dire ce
+// qu'il y a à produire — c'est la même raison qui a fait entrer l'article le
+// 27/08.
+const COLS_DEFAUT = new Set(['responsable', 'client', 'product', 'price', 'feu',
+  'prod_ref', 'prod_couleur', 'prod_tailles', 'prod_logos', 'prod_logo_mm',
+  'description', 'deadline']);
 const COLS_MASQUEES_DEFAUT = new Set(
   PLANNING_COLS.filter((c) => !c.locked && !COLS_DEFAUT.has(c.key)).map((c) => c.key),
 );
@@ -8050,23 +8204,90 @@ function mountTaillesLogos() {
 // serveur tant que personne n'a cliqué sur l'onglet — l'ouverture d'un poste
 // pèse 109 Ko, et ce chiffre est un budget, pas un constat.
 //
-// `chrome: true` : on GARDE sa rangée d'onglets (Projets · Bon À Tirer ·
-// Produits · Réglages). L'option existe pour le cas où le CRM monterait chaque
-// écran à sa place — un dans la fiche, deux dans les Réglages — et c'est ce que
-// recommande son INTEGRATION.md. Mais Charlie a demandé UN onglet dans la
-// barre : dans un seul écran, sans cette rangée, trois de ses quatre écrans
-// seraient inatteignables.
+// `chrome: true` : on GARDE sa rangée d'onglets (Feuille · Produits). Ils
+// n'étaient QUATRE que jusqu'à la PR #209 — la liste des projets et les
+// réglages ont quitté l'écran, l'identité qui signe le PDF étant déjà un
+// réglage du CRM. L'option `chrome: false` existe pour le cas où le CRM
+// monterait chaque écran à sa place, et c'est ce que recommande son
+// INTEGRATION.md. Mais Charlie a demandé UN onglet dans la barre : dans un
+// seul écran, sans cette rangée, « Produits » serait inatteignable — et c'est
+// par lui qu'on ajoute une référence qu'on n'a pas encore.
 //
 // ON NE DÉMONTE PAS EN QUITTANT L'ONGLET. `demonter()` existe et fonctionne,
 // mais il appelle `closeProject()` : passer voir le planning trente secondes
 // fermerait le BAT en cours d'édition. Le conteneur est simplement caché, comme
 // les huit autres écrans.
+//
+// ON GARDE CE QU'IL REND (`batMonte`), et c'est ce qui manquait : la chaîne
+// « une fiche, un BAT » était écrite et testée depuis le 04/09 — mais personne
+// n'appelait `monterBatStudio` avec une fiche, donc `ouvrirPourFiche` ne
+// s'exécutait jamais et TOUT BAT composé ici était orphelin. Au moment de le
+// déposer, l'écran répondait « Aucune fiche CRM associée à ce projet ».
 let batLoading = null;
-function mountBat() {
-  if (!$bat || batLoading) return;
-  batLoading = Promise.all([poserFeuille('bat.css'), import('./bat/js/monter.js')])
-    .then(([, m]) => m.monterBatStudio($bat, { chrome: true }))
-    .catch((err) => { batLoading = null; reportError(err); });
+let batMonte = null;
+function mountBat(pour) {
+  if (!$bat) return null;
+  if (!batLoading) {
+    batLoading = Promise.all([poserFeuille('bat.css'), import('./bat/js/monter.js')])
+      // La fiche est annoncée AU MONTAGE quand on en a une : `demarrer()` la lit
+      // pour ouvrir directement le bon BAT, au lieu d'en poser un vierge qu'il
+      // faudrait remplacer une seconde plus tard.
+      .then(([, m]) => m.monterBatStudio($bat, { chrome: true, ...(pour || {}) }))
+      .then((mod) => { batMonte = mod; return mod; })
+      .catch((err) => { batLoading = null; reportError(err); });
+  }
+  return batLoading;
+}
+
+// OUVRIR LE BAT DE CETTE LIGNE — le geste que Charlie demande depuis la fiche.
+// Déjà monté, on ne remonte pas : on demande à l'écran de basculer sur le BAT
+// de CETTE fiche. Fermer et remonter coûterait 5,4 Mo de bibliothèques et
+// fermerait le projet en cours d'édition.
+// CE QUE LA LIGNE DIT AU BAT POUR QU'IL S'OUVRE DÉJÀ REMPLI (04/09/2026).
+// Charlie : « le BAT doit déjà être pré-rempli avec les t-shirts, la bonne
+// couleur, etc., qu'on n'ait plus qu'à ajouter les logos ».
+//
+// On lui passe ce que la ligne SAIT, traduit dans SES termes : la référence du
+// FOURNISSEUR (celle sur laquelle son catalogue est indexé), la couleur, les
+// quantités par taille et les faces à marquer. Rien de plus — les logos sont
+// justement ce qu'il reste à poser.
+function prodPourBat(r) {
+  const prod = (r && r.fiche && r.fiche.prod) || null;
+  if (!prod) return null;
+  const ref = String(prod.ref || '').trim();
+  return {
+    // La table ne porte QUE les références où les deux noms diffèrent : partout
+    // ailleurs, la nôtre EST celle du fournisseur.
+    refFournisseur: batFournisseur[cleBatProduit(ref)] || ref,
+    couleur: String(prod.couleur || '').trim(),
+    tailles: Array.isArray(prod.tailles) ? prod.tailles : [],
+    faces: (Array.isArray(prod.logos) ? prod.logos : []).map((z) => z && z.face).filter(Boolean),
+  };
+}
+
+function ouvrirBatDeLaLigne(r) {
+  if (!r || !r.id || !$bat) return;
+  const quoi = {
+    requestId: r.id,
+    client: r.billing_company || '',
+    projet: r.description || '',
+    prod: prodPourBat(r),
+  };
+  // ⚠ LE MONTAGE D'ABORD, LE HASH ENSUITE. `mountBat` est aussi appelé par le
+  // changement de vue : si le hash partait devant, l'écran se monterait SANS
+  // fiche et poserait un BAT vierge qu'il faudrait remplacer une seconde plus
+  // tard — le défaut que `ouvrirPourFiche` existe pour éviter.
+  const dejaMonte = !!batLoading;
+  const attente = mountBat(quoi);
+  // Une clé de `VIEWS`, jamais une chaîne écrite à la main : c'est ce qui a
+  // laissé passer une barre morte le 31/08 (« vue et hash doivent rester
+  // alignés »).
+  location.hash = '#bat';
+  // Premier montage : `demarrer()` a déjà lu la fiche, il n'y a rien à demander.
+  if (!dejaMonte) return;
+  Promise.resolve(attente)
+    .then((mod) => (mod && mod.ouvrirPourFiche ? mod.ouvrirPourFiche(r.id, quoi) : null))
+    .catch(reportError);
 }
 
 // LE DEVIS CHIFFRE — meme montage paresseux. Il tire TROIS feuilles et deux

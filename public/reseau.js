@@ -97,3 +97,41 @@ export async function api(method, url, body, ms = DELAI_DEFAUT) {
   }
   return data;
 }
+
+// ===========================================================================
+// DÉPOSER UN PAPIER SUR UNE LIGNE — ou sur toutes celles d'un dossier
+// ===========================================================================
+// Charlie, 04/09 : « la ligne créée contienne automatiquement le devis ou la
+// facture à l'intérieur ». Les trois emplacements existaient depuis toujours ;
+// personne n'y déposait rien, ils attendaient qu'on choisisse un fichier.
+//
+// ⚠ ICI ET PAS AVEC LE RENDU PDF. Envoyer des octets n'a besoin d'aucune
+// bibliothèque de PDF — et `papier-pdf.js` en tire 511 Ko. Importé en tête des
+// deux écrans flash pour cette seule fonction, il les aurait fait descendre à
+// chaque ouverture, et il aurait fallu le mettre dans la coquille hors ligne.
+//
+// ⚠ SUR TOUTES LES LIGNES DU GROUPE. Depuis le 04/09 un article fait une
+// ligne : une vente à trois articles en ouvre trois, et le papier est le MÊME
+// pour les trois — c'est un seul document, celui que le client tient. Le
+// déposer sur la première laisserait deux lignes vides du même dossier.
+//
+// ⚠ ET C'EST UN CONFORT, JAMAIS UNE CONDITION. La facture est déjà émise et
+// archivée quand on arrive ici, le devis déjà au planning : un dépôt qui
+// échoue ne doit pas transformer une vente réussie en échec. `allSettled` —
+// une ligne qui refuse n'empêche pas les autres. Ne REJETTE jamais.
+//
+// @returns {Promise<{deposes: number, total: number}>}
+export async function deposerPapier(ids, kind, bytes, nom) {
+  const cibles = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
+  if (!cibles.length || !bytes) return { deposes: 0, total: 0 };
+  const un = async (id) => {
+    const res = await fetchBorne(
+      `/api/requests/${encodeURIComponent(id)}/pdf/${kind}?name=${encodeURIComponent(nom)}`,
+      { method: 'PUT', body: bytes },
+      DELAI_ENVOI,
+    );
+    if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  };
+  const sorties = await Promise.allSettled(cibles.map(un));
+  return { deposes: sorties.filter((r) => r.status === 'fulfilled').length, total: cibles.length };
+}

@@ -115,10 +115,16 @@ assert.match(APP, /const sig = `\$\{r\.id\}:\$\{r\.updated_at\}:\$\{coiffee \? '
 // désignation dit déjà.
 const faits = FAITS.slice(FAITS.indexOf('const PROD_FAITS = ['), FAITS.indexOf('\n];', FAITS.indexOf('const PROD_FAITS = [')));
 assert.match(faits, /nom\.includes\(p\.ref\) \? '' : p\.ref/);
-// La couleur du textile n'est nulle part ailleurs : elle reste, à côté de la
-// référence. Le marquage, lui, a sa propre rangée depuis le 26/08 — l'intitulé
-// est la technique, la valeur sa couleur.
-assert.match(faits, /morceau\(ref, true\), morceau\(p\.couleur\)/);
+// LA COULEUR A QUITTÉ LA RANGÉE DE LA RÉFÉRENCE LE 04/09 : elle a la sienne,
+// entre la référence et les tailles — l'ordre que Charlie demande, et un
+// interrupteur par chose. Ce n'est pas un doublon de plus : elle ne s'écrit
+// toujours qu'à UN endroit.
+assert.match(faits, /key: 'prod_couleur'/);
+assert.strictEqual((faits.match(/p\.couleur/g) || []).length, 1,
+  'la couleur du vêtement ne s’écrit qu’une fois dans le bloc');
 assert.match(faits, /key: 'prod_dtf'/);
+// ET LA TAILLE DU LOGO A QUITTÉ CELLE DU LOGO, pour la même raison : on ne
+// pouvait pas la masquer sans masquer la face qu'elle mesure.
+assert.match(faits, /key: 'prod_logo_mm'/);
 
 console.log('✓ carte : cinq doublons fermés — une échéance, un référent, un en-tête de lot, un bouton, une référence');

@@ -45,6 +45,22 @@ const morceau = (t, fort) => (t ? [{ t: String(t), fort: !!fort }] : []);
 const joindre = (listes, sep) => listes.filter((x) => x.length)
   .flatMap((x, i) => (i ? [{ t: sep }, ...x] : x));
 
+// CINQ FAITS, DANS CET ORDRE (Charlie, 04/09/2026) :
+//
+//   « Sur la ligne pour le textile du planning doit absolument apparaître en un
+//     coup d'oeil dans cet ordre : réf du t-shirt, couleur, tailles/quantité,
+//     logo, taille du logo. »
+//
+// CE QUI A CHANGÉ CE JOUR-LÀ. Les faits existaient, mais collés DEUX PAR DEUX :
+// la référence portait la couleur avec elle, et le logo portait sa taille. Deux
+// conséquences, et la seconde est la vraie :
+//   · l'ORDRE demandé était impossible — la couleur ne pouvait pas se ranger
+//     entre la référence et les tailles, elle était dans la référence ;
+//   · et surtout, on ne pouvait pas MASQUER la taille du logo sans masquer le
+//     logo. C'est précisément l'exemple que Charlie donne de ce qu'un poste doit
+//     pouvoir cacher dans sa session.
+//
+// Un fait par chose, donc un interrupteur par chose.
 const PROD_FAITS = [
   {
     key: 'prod_ref',
@@ -54,19 +70,22 @@ const PROD_FAITS = [
     // en dessous la répétait : deux fois NS300 sur trois centimètres.
     lire: (p, r) => {
       const nom = String((r && r.product) || '');
-      const ref = p.ref && nom.includes(p.ref) ? '' : p.ref;
-      return joindre([morceau(ref, true), morceau(p.couleur)], ' · ');
+      return morceau(p.ref && nom.includes(p.ref) ? '' : p.ref, true);
     },
   },
   {
-    key: 'prod_dtf',
-    label: 'Marquage',
-    // LA TECHNIQUE NOMME, LA COULEUR DÉCIDE : « DTF · Noir ». C'est la couleur
-    // qui dit quel rouleau charger — « DTF » tout seul ne dit rien à charger —
-    // donc elle seule porte la graisse. Le mot « encre » ne s'écrit nulle part
-    // (Charlie, 26/08) ; la clé de la fiche s'appelle encore ainsi, on ne
-    // renomme pas un champ stocké pour un mot d'écran.
-    lire: (p) => joindre([morceau(p.marquage), morceau(p.encre, true)], ' · '),
+    key: 'prod_couleur',
+    label: 'Couleur',
+    // ELLE A SA RANGÉE DEPUIS LE 04/09. Collée à la référence, elle ne pouvait
+    // ni se ranger où Charlie la veut, ni se masquer seule — et c'est la
+    // première chose que l'atelier vérifie en sortant un vêtement du carton.
+    //
+    // ⚠ ELLE NE PREND PAS LA GRAISSE POUR AUTANT. Quatre faits la portent, et
+    // eux seuls (Charlie, 26/08) : la référence, la quantité, la couleur du
+    // MARQUAGE et la largeur des logos. Avoir sa rangée et son intitulé suffit
+    // à la trouver — si tout est en gras, plus rien ne l'est, et c'est le
+    // contraste qui fait la hiérarchie.
+    lire: (p) => morceau(p.couleur),
   },
   {
     key: 'prod_tailles',
@@ -84,21 +103,66 @@ const PROD_FAITS = [
   },
   {
     key: 'prod_logos',
-    label: 'Logos',
-    // Les faces se séparent au point médian, les tailles d'une même face à la
-    // barre : « Coeur 60 · Dos S 260/M 280 ». Sans cette différence, une face
-    // mesurée taille par taille se lisait comme deux faces. La LARGEUR porte la
-    // graisse, la face la nomme.
+    label: 'Logo',
+    // OÙ L'ON MARQUE, et rien d'autre. La cote a sa rangée juste en dessous :
+    // elles se lisent alignées, face par face, et se masquent séparément.
+    // La CONSIGNE suit la face quand il y en a une (« Face 1 : Logo client ») —
+    // sur une tasse ou une gravure, c'est elle le travail, pas une mesure.
     lire: (p) => {
       const g = p.logos || [];
-      // L'unité appartient à la LARGEUR : un « mm » séparé faisait deux
-      // fragments gras côte à côte pour un seul fait.
-      return g.flatMap((x, i) => [
+      // LA FACE NOMME, ELLE NE CRIE PAS : la graisse va à la LARGEUR, dans la
+      // rangée juste en dessous — c'est elle qu'on cherche du regard, la face
+      // la situe. Règle du 26/08, tenue ici après la coupe en deux rangées.
+      return g.flatMap((z, i) => [
         ...(i ? [{ t: ' · ' }] : []),
-        { t: `${x.face} ` },
-        { t: i === g.length - 1 ? `${x.mm} mm` : String(x.mm), fort: true },
+        { t: String(z.face || '') },
+        ...(z.quoi ? [{ t: ` ${z.quoi}` }] : []),
       ]);
     },
+  },
+  {
+    key: 'prod_logo_mm',
+    label: 'Taille du logo',
+    // ⚠ ELLE N'EST PRESQUE JAMAIS SAISIE, ET C'EST VOULU. Le comptoir ne mesure
+    // pas : `prod.logos[].mm` reste vide, et la cote d'un textile vient du
+    // TABLEAU DES TAILLES DE LOGO (Réglages) — famille, face, taille du
+    // vêtement. Jusqu'ici seul le BAT la montrait ; la ligne du planning, qui
+    // est ce que le chef d'atelier lit vraiment, ne la portait nulle part.
+    //
+    // LA MAIN L'EMPORTE SUR LE TABLEAU. Une cote tapée à l'établi (« finalement
+    // le dos en 300 ») est une décision ; le tableau n'est qu'un barème.
+    //
+    // Les faces se séparent au point médian, les tailles d'une même face à la
+    // barre : « Coeur 65 · Dos M 280/L 300 ». Sans cette différence, une face
+    // mesurée taille par taille se lisait comme deux faces.
+    lire: (p, r, cote) => {
+      const g = p.logos || [];
+      const morceaux = [];
+      for (const z of g) {
+        const v = String(z.mm || '').trim() || (typeof cote === 'function' ? cote(r, z.face) : '');
+        if (!v) continue;
+        if (morceaux.length) morceaux.push({ t: ' · ' });
+        morceaux.push({ t: `${z.face} ` });
+        // L'unité appartient à la LARGEUR : un « mm » séparé faisait deux
+        // fragments gras côte à côte pour un seul fait. Elle ne s'écrit qu'une
+        // fois, à la fin — elle vaut pour toute la rangée.
+        morceaux.push({ t: v, fort: true });
+      }
+      if (morceaux.length) morceaux.push({ t: ' mm' });
+      return morceaux;
+    },
+  },
+  {
+    key: 'prod_dtf',
+    label: 'Marquage',
+    // LA TECHNIQUE NOMME, LA COULEUR DÉCIDE : « DTF · Noir ». C'est la couleur
+    // qui dit quel rouleau charger — « DTF » tout seul ne dit rien à charger —
+    // donc elle seule porte la graisse. Le mot « encre » ne s'écrit nulle part
+    // (Charlie, 26/08) ; la clé de la fiche s'appelle encore ainsi, on ne
+    // renomme pas un champ stocké pour un mot d'écran.
+    // ⚠ EN DERNIER, ET ÉTEINT PAR DÉFAUT : il ne figure pas dans les cinq faits
+    // du 04/09. Il reste à un clic pour qui charge les rouleaux.
+    lire: (p) => joindre([morceau(p.marquage), morceau(p.encre, true)], ' · '),
   },
 ];
 
@@ -341,14 +405,18 @@ export function blocFeu(r, attachTip) {
   return bloc;
 }
 
-export function blocProduction(r, hiddenCols) {
+// `cote` : la largeur du logo pour une face, quand le tableau des tailles de
+// logo la connaît. Passée à l'appel comme les colonnes masquées — ce module ne
+// remonte JAMAIS vers `app.js` (un cycle entre deux modules casse à
+// l'ouverture, et il casse ce jour-là seulement).
+export function blocProduction(r, hiddenCols, cote) {
   const p = r.fiche && r.fiche.prod;
   if (!p || typeof p !== 'object') return null;
   const bloc = document.createElement('div');
   bloc.className = 'prod-fiche';
   for (const fait of PROD_FAITS) {
     if (hiddenCols.has(fait.key)) continue;
-    const parts = fait.lire(p, r);
+    const parts = fait.lire(p, r, cote);
     if (!parts.length) continue;
     const cle = document.createElement('span');
     cle.className = 'prod-fiche__cle';

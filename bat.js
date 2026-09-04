@@ -417,12 +417,35 @@ const relDepuis = (brut) => String(brut || '').split('/').map(decodeURIComponent
 /**
  * Monte BAT Studio sous `/bat`.
  * @param {import('express').Express} app
- * @param {{deposerPdf: Function, asyncH: Function, quiDemande: Function}} hote
+ * @param {{deposerPdf: Function, asyncH: Function, quiDemande: Function,
+ *          exige?: Function}} hote
  *        Ce que le CRM prête : le dépôt d'un PDF sur une fiche (la règle est
- *        chez lui, pas ici), son enveloppe d'erreurs async, et le nom du poste.
+ *        chez lui, pas ici), son enveloppe d'erreurs async, le nom du poste, et
+ *        sa garde de capacité.
+ *
+ * QUI A LE DROIT D'ÉCRIRE ICI (04/09/2026).
+ * ---------------------------------------------------------------------------
+ * Ces routes n'avaient AUCUNE garde. Elles écrivent pourtant dans le même
+ * magasin et sur les mêmes fiches que des routes du CRM qui en ont une : le
+ * chemin le plus court vers une écriture protégée passait par `/bat`.
+ *
+ *   · LIRE (`GET`) reste ouvert à tout poste entré : un BAT se relit, et le
+ *     catalogue de mockups n'est pas un secret.
+ *   · ÉCRIRE et EFFACER dans le magasin, et DÉPOSER sur une fiche, demandent
+ *     `bat` — la capacité de la Direction, du chef d'atelier et de la boutique.
+ *   · LE MÉNAGE (`POST /api/menage/mockups`) demande `reglages` : il EFFACE des
+ *     images de production, comme tout ce qui vaut pour tous les postes.
+ *   · LE MONDE EXTÉRIEUR (`fetch-image`, `toptex/product`) demande `bat` : ce
+ *     sont des appels sortants faits en notre nom, pas des lectures d'écran.
+ *
+ * `exige` est FACULTATIF : monté sans lui (un test qui n'assemble que `/bat`),
+ * la garde est un passe-plat et le comportement est celui d'avant.
  */
-function monterBat(app, { deposerPdf, asyncH, quiDemande }) {
+function monterBat(app, { deposerPdf, asyncH, quiDemande, exige }) {
   const r = express.Router();
+  const garde = typeof exige === 'function' ? exige : () => (_req, _res, next) => next();
+  const exigeBat = garde('bat');
+  const exigeReglages = garde('reglages');
 
   // --- ce que l'application demande d'elle-même -----------------------------
   r.get('/api/info', (_req, res) => {
@@ -477,7 +500,7 @@ function monterBat(app, { deposerPdf, asyncH, quiDemande }) {
   // passé : on refuse (409) et on rend la version du serveur, pour que le
   // client puisse poser la question plutôt qu'écraser.
   // L'en-tête est FACULTATIF : sans lui, le dernier écrit gagne, comme avant.
-  r.put('/api/data/*', express.raw({ type: () => true, limit: '80mb' }), asyncH(async (req, res) => {
+  r.put('/api/data/*', exigeBat, express.raw({ type: () => true, limit: '80mb' }), asyncH(async (req, res) => {
     const rel = relDepuis(req.params[0]);
     const base = req.get('X-Bat-Base');
     try {
@@ -500,7 +523,7 @@ function monterBat(app, { deposerPdf, asyncH, quiDemande }) {
     }
   }));
 
-  r.delete('/api/data/*', asyncH(async (req, res) => {
+  r.delete('/api/data/*', exigeBat, asyncH(async (req, res) => {
     try { await batSupprimer(relDepuis(req.params[0])); res.json({ ok: true }); }
     catch (e) { res.status(e.statut || 400).json({ error: e.message }); }
   }));
@@ -531,7 +554,7 @@ function monterBat(app, { deposerPdf, asyncH, quiDemande }) {
     res.json({ actif: true });
   });
 
-  r.put('/api/crm/bat/:id', express.raw({ type: () => true, limit: '13mb' }), asyncH(async (req, res) => {
+  r.put('/api/crm/bat/:id', exigeBat, express.raw({ type: () => true, limit: '13mb' }), asyncH(async (req, res) => {
     const id = String(req.params.id || '').trim();
     // L'identifiant décide DANS QUELLE FICHE le BAT sera déposé : on ne devine
     // jamais ce qu'un identifiant douteux voulait dire.
@@ -551,7 +574,7 @@ function monterBat(app, { deposerPdf, asyncH, quiDemande }) {
 
   // POST et pas DELETE : l'action porte sur un ENSEMBLE calculé par le serveur,
   // pas sur une ressource nommée par le client.
-  r.post('/api/menage/mockups', asyncH(async (_req, res) => {
+  r.post('/api/menage/mockups', exigeReglages, asyncH(async (_req, res) => {
     const out = await menageNettoyer();
     if (out.supprimes) console.log(`Ménage BAT : ${out.supprimes} image(s) inutilisée(s) supprimée(s).`);
     res.json(out);
@@ -567,7 +590,7 @@ function monterBat(app, { deposerPdf, asyncH, quiDemande }) {
   }));
 
   // --- le monde extérieur --------------------------------------------------
-  r.get('/api/fetch-image', asyncH(async (req, res) => {
+  r.get('/api/fetch-image', exigeBat, asyncH(async (req, res) => {
     const u = req.query.url;
     if (!u || typeof u !== 'string') return res.status(400).json({ error: 'url manquante' });
     try {
@@ -576,7 +599,7 @@ function monterBat(app, { deposerPdf, asyncH, quiDemande }) {
     } catch (e) { res.status(400).json({ error: String(e.message || e) }); }
   }));
 
-  r.post('/api/toptex/product', express.json(), asyncH(async (req, res) => {
+  r.post('/api/toptex/product', exigeBat, express.json(), asyncH(async (req, res) => {
     const ref = ((req.body && req.body.ref) || '').trim();
     if (!ref) return res.status(400).json({ error: 'Référence manquante.' });
     try { res.json(await toptexProduit(ref)); }

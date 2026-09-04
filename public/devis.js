@@ -47,6 +47,147 @@ export const cents = (n) => Math.round((Number(n) || 0) * 100) / 100;
 // attente, le papier l'imprime tel quel.
 export const SANS_PRIX = 'À chiffrer';
 
+// ===========================================================================
+// CE QU'IL Y A À PRODUIRE — de la ligne de l'écran vers la fiche du dossier
+// ===========================================================================
+// LA VENDEUSE TAPAIT DES TAILLES QUI N'ARRIVAIENT NULLE PART (04/09/2026).
+// Les deux écrans flash envoyaient quatre champs plats — référence, couleur,
+// marquage, encre — et laissaient derrière eux les six cases de taille, les
+// bulles créées à la main, et les faces à marquer. Le détail survivait sur le
+// PAPIER, en texte (« 12 × M · 18 × L »), et dans la facture archivée : jamais
+// dans `fiche.prod`, la seule forme que la fiche atelier, le ticket, le bon de
+// commande et le BAT sachent lire. Mesuré en production le 29/08 : `fiche.prod`
+// sur 0 dossier de 187.
+//
+// ICI ET PAS DANS LES DEUX ÉCRANS. La vente flash est une copie modifiée du
+// devis flash — assumé, documenté, et c'est justement pourquoi la traduction
+// vit dans le module que les DEUX importent déjà. Écrite deux fois, elle
+// deviendrait deux traductions le jour où l'une gagne une taille.
+//
+// TOUT EST PUR : ni DOM, ni réseau. C'est ce qui la rend vérifiable hors
+// navigateur, comme le modèle du papier juste en dessous.
+
+// Les six tailles du tableau, dans l'ordre où elles se lisent. Une taille hors
+// de cette liste n'est pas une faute : c'est une bulle libre (`taillesLibres`),
+// et elle passe par l'autre chemin.
+export const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
+
+// LES DEUX MOITIÉS NE SONT PAS EXPORTÉES, et c'est voulu : ce sont les
+// entrailles de `prodDeLigne`, qui est la seule chose dont un écran ait besoin.
+// Un export de plus serait une surface de plus à tenir — et les tests les
+// atteignent parfaitement à travers `prodDeLigne`.
+//
+// `[{ t: 'M', n: 12 }, …]` — la forme qu'attend `prodDuComptoir` côté serveur.
+// Les cases d'abord, dans l'ordre du tableau ; les bulles libres ensuite, dans
+// l'ordre où la vendeuse les a ouvertes. Une case à zéro ou une bulle sans nom
+// ne compte pas : c'est une case qu'on n'a pas remplie, pas une taille à zéro.
+function taillesDeLigne(ligne) {
+  const par = (ligne && ligne.parTaille && typeof ligne.parTaille === 'object') ? ligne.parTaille : {};
+  const fixes = TAILLES
+    .map((t) => ({ t, n: Math.round(Number(par[t]) || 0) }))
+    .filter((x) => x.n > 0);
+  const libres = (Array.isArray(ligne && ligne.taillesLibres) ? ligne.taillesLibres : [])
+    .map((l) => ({ t: texte(l && l.nom), n: Math.round(Number(l && l.qte) || 0) }))
+    .filter((x) => x.t && x.n > 0);
+  return [...fixes, ...libres];
+}
+
+// LES FACES SONT UN TEXTE À L'ÉCRAN, UNE LISTE DANS LE DOSSIER.
+// La vendeuse écrit « Coeur, Dos » sur un textile ; une tasse s'écrit toute
+// seule « Face 1 : Sublimation · Dessous : Logo ». Les deux se lisent d'une
+// même règle : on coupe aux séparateurs, puis au DEUX-POINTS s'il y en a un —
+// ce qui est devant est la face, ce qui suit est la consigne.
+//
+// ⚠ `quoi` N'EXISTE QUE S'IL EXISTE, exactement comme côté serveur : cette
+// structure repart vers chaque poste à chaque rafraîchissement du planning, et
+// un « quoi » vide sur chaque face de chaque textile est du poids sur le fil
+// pour ne rien dire.
+//
+// ⚠ AUCUNE COTE N'EST INVENTÉE. Le comptoir ne mesure pas : `mm` reste vide et
+// le serveur l'écrit tel quel. La largeur se prend à l'établi, ou vient du
+// tableau des tailles de logo — jamais d'une supposition d'ici.
+const SEPARATEURS_FACES = /[·•;,\n]+/;
+function facesDeLigne(brut) {
+  return texte(brut).split(SEPARATEURS_FACES)
+    .map((m) => texte(m))
+    .filter(Boolean)
+    .map((morceau) => {
+      const coupe = morceau.indexOf(':');
+      if (coupe < 0) return { face: morceau };
+      const face = texte(morceau.slice(0, coupe));
+      const quoi = texte(morceau.slice(coupe + 1));
+      // « : quelque chose » sans nom devant n'est pas une consigne sans face,
+      // c'est une face qu'on a nommée après le signe. On ne perd rien.
+      if (!face) return quoi ? { face: quoi } : null;
+      return quoi ? { face, quoi } : { face };
+    })
+    .filter(Boolean);
+}
+
+// ===========================================================================
+// LA RÉFÉRENCE SE CHERCHE, ELLE NE SE TAPE PAS
+// ===========================================================================
+// Charlie, 04/09/2026 : « ce genre de chose ne doit pas exister, la recherche
+// doit faire des propositions car personne n'écrit les réfs pareil, il faut de
+// la fluidité absolue car ce genre de détails nous emmerde toute la journée ».
+//
+// Le champ « Référence » était une saisie LIBRE : ni liste, ni proposition, ni
+// contrôle. On tapait « k3025 », « K-3025 » ou « 3025 » et il ne se passait
+// rien — pendant que le champ « Désignation », juste à côté, cherchait déjà
+// dans tout le catalogue par son menu.
+//
+// LA RECHERCHE EXISTE DÉJÀ, ET ELLE EST BONNE : `menu-recherche.js` réduit les
+// deux côtés à leurs LETTRES ET CHIFFRES avant de comparer — « NS300 »,
+// « ns 300 », « NS-300 » et « ns3 » désignent la même référence, et le rang
+// fait remonter la référence avant un libellé. Il n'y avait rien à écrire, il
+// y avait à la BRANCHER.
+//
+// CE QUE CETTE FONCTION REND est ce que le menu sait lire : la valeur qui
+// tombera dans le champ (la référence), le texte qu'on LIT (la désignation, un
+// code seul ne dit rien), le jeton affiché en tête de ligne, et ce qui se
+// cherche sans s'afficher. Écrit ICI parce que les deux écrans flash le posent
+// à l'identique — et que deux listes de références deviendraient deux listes.
+export function referencesDuCatalogue(catalogue, familleTextile) {
+  const vues = new Set();
+  const out = [];
+  for (const p of Array.isArray(catalogue) ? catalogue : []) {
+    // Un produit éteint ne se propose pas — la règle du menu du comptoir.
+    if (!p || p.actif === false) continue;
+    const ref = texte(p.reference);
+    if (!ref || vues.has(ref)) continue;
+    vues.add(ref);
+    out.push({
+      valeur: ref,
+      // CE QU'ON LIT DANS LA LISTE. « K3025 » ne dit rien à personne trois
+      // jours plus tard ; « T-shirt unisexe léger Pro 145 g » si.
+      texte: texte(p.label) || texte(p.designation) || ref,
+      jeton: ref,
+      // CE QUI SE CHERCHE SANS S'AFFICHER : la famille, la variante, la
+      // couleur. Quelqu'un qui a « olive » en tête doit tomber dessus.
+      cherche: [p.famille, p.designation, p.variante, p.couleur, p.note]
+        .map(texte).filter(Boolean).join(' '),
+      onglet: p.famille === familleTextile ? 'Textile' : 'Boutique',
+    });
+  }
+  return out;
+}
+
+// CE QUE LA LIGNE ENVOIE AU DOSSIER. On ne décide PAS ici si c'est vide : la
+// règle « un `prod` sans un seul fait ne vaut pas la place qu'il prend » vit
+// côté serveur (`prodDuComptoir`), et elle doit rester à un seul endroit —
+// sinon une ligne de transport serait retenue ici et jetée là, ou l'inverse.
+export function prodDeLigne(ligne) {
+  return {
+    ref: texte(ligne && ligne.reference),
+    couleur: texte(ligne && ligne.couleur),
+    marquage: texte(ligne && ligne.marquage),
+    // La couleur de l'ENCRE, pas celle du vêtement : le mot de l'atelier.
+    encre: texte(ligne && ligne.encre),
+    tailles: taillesDeLigne(ligne),
+    logos: facesDeLigne(ligne && ligne.faces),
+  };
+}
+
 // LA DATE CIVILE DE L'ATELIER — Saint-Martin, UTC−4, sans heure d'été. Le
 // conteneur de production tourne en UTC : dès 20 h locales, un `toISOString()`
 // naïf date le devis du lendemain, et sa validité avec.
@@ -366,6 +507,22 @@ export function modeleDevis(saisie, entreprise) {
 //   --dv-cle    ce qui identifie : le titre, le numéro, le nom du client, la
 //               maison, l'intitulé d'une section.
 //   --dv-texte  tout le corps.
+// LE MÊME DOCUMENT, EN PDF — pour le déposer sur la ligne et l'envoyer.
+// Troisième consommateur du même modèle : voir l'en-tête de `papier-pdf.js`.
+// L'import est PARESSEUX (pdf-lib pèse 511 Ko, et composer un devis n'est pas
+// l'imprimer).
+export async function pdfDevis(t) {
+  const { ecrirePapierPdf, nomDuPapier } = await import('./papier-pdf.js');
+  // L'ACOMPTE EST PROPRE AU DEVIS, comme le mode de règlement l'est à la
+  // facture : la phrase se compose donc ici, où le modèle est connu.
+  const r = t.reglement;
+  const reglement = r
+    ? `ACOMPTE ${r.pourcent} % — ${r.montant} a la commande, solde ${r.solde}`
+      + (r.reference ? ` — reference ${r.reference}` : '')
+    : '';
+  return { bytes: await ecrirePapierPdf(t, { reglement }), nom: nomDuPapier(t) };
+}
+
 export const CSS_DEVIS = SOCLE_PAPIER + `
   .dv {${JETONS_PAPIER}
        --dv-geant: 30px; --dv-cle: 17px; --dv-texte: 13px;
