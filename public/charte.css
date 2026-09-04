@@ -1722,11 +1722,22 @@ body.a-connecter { overflow: hidden; }
 
    LES PISTES SONT ÉCRITES UNE FOIS, sur le tableau, et l'en-tête comme les
    rangées les lisent. Deux écritures, ce serait un intitulé qui coiffe la
-   mauvaise case au premier changement. Chaque écran règle `--lignes-cols` chez
-   lui : le devis compte en HT, la vente en TTC, et leurs colonnes diffèrent.
+   mauvaise case au premier changement — et UNE SEULE FOIS DANS TOUT LE DÉPÔT :
+   `test/devis-flash.test.js` compte cette déclaration et refuse la deuxième.
+
+   SIX PISTES, PAS CINQ (04/09/2026). Ce bloc est arrivé ici le 02/09 avec cinq
+   colonnes, et le PU TTC a rejoint le PU HT le 03/09 sur une AUTRE branche —
+   Charlie : « pouvoir modifier l'un ou l'autre mais qu'il reste lié ». Les deux
+   se sont rencontrées à la fusion : à cinq pistes, le PU TTC tombait sous le PU
+   HT, deux nombres dans une case écrite pour un.
+   Les DEUX écrans qui lisent cette grammaire — le devis flash et la vente
+   flash — ont exactement les mêmes six colonnes (Désignation, Qté, PU HT,
+   PU TTC, Total, actions). La valeur est donc ici, et nulle part ailleurs.
+   Largeurs : le total garde ses 96 px (« 184,56 € » en demande 77,6 et
+   débordait à 84), la quantité ses 56, chaque PU ses 76.
    =========================================================================== */
 .lignes {
-  --lignes-cols: minmax(0, 1fr) 56px 76px 96px var(--ctrl-h);
+  --lignes-cols: minmax(0, 1fr) 56px 76px 76px 96px var(--ctrl-h);
   display: flex;
   flex-direction: column;
   gap: var(--pas-2);

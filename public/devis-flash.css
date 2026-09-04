@@ -183,22 +183,10 @@
    partis dans `charte.css` : l'écran de VENTE les porte aussi depuis le 02/09,
    et deux écrans du même poste ne peuvent pas avoir deux grammaires de ligne.
    Ce qui reste ici, c'est ce qui n'appartient qu'au devis — le détail d'un
-   article sous sa ligne, et les SIX pistes de SON tableau.
+   article sous sa ligne. Les pistes du tableau, elles, sont dans la charte et
+   ne se réécrivent pas ici : elles y sont écrites UNE fois, pour les deux
+   écrans qui les lisent, et un test compte cette déclaration.
    =========================================================================== */
-/* SIX PISTES, ET C'EST POURQUOI ELLES SE RÈGLENT ICI (04/09/2026).
-   La grammaire de ligne — l'en-tête, la rangée, la case, le nombre, les
-   totaux — vit dans `charte.css` depuis le 02/09, avec cinq pistes par défaut.
-   Le devis en a une de plus depuis le 03/09 : le PU TTC a rejoint le PU HT
-   (Charlie : « pouvoir modifier l'un ou l'autre mais qu'il reste lié »).
-   Les deux changements sont arrivés par DEUX BRANCHES qui ne se voyaient pas ;
-   ils se rencontrent ici. Reprendre les cinq pistes de la charte ferait tomber
-   le PU TTC sous le PU HT — deux nombres dans une piste écrite pour un.
-   La charte prévoit ce cas en toutes lettres : « chaque écran règle
-   `--lignes-cols` chez lui ». C'est UNE valeur, écrite UNE fois, sur le seul
-   écran qui s'écarte du défaut.
-   Largeurs inchangées : le total garde ses 96 px (« 184,56 € » en demande 77,6
-   et débordait à 84), la quantité ses 56, chaque PU ses 76. */
-.devis-flash .lignes { --lignes-cols: minmax(0, 1fr) 56px 76px 76px 96px var(--ctrl-h); }
 
 /* ===========================================================================
    CE QUE LA GRAMMAIRE PARTAGÉE NE CONNAÎT PAS ENCORE (04/09/2026)
