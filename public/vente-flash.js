@@ -260,7 +260,7 @@ function relireBrouillon() {
 //
 // Rend `[bloc, corps]` : on empile dans le corps, jamais dans le bloc.
 function carte(icone, titre, cle) {
-  const c = el('details', 'reg-card dvf-cat volet-plus');
+  const c = el('details', 'reg-card dvf-cat volet-plus volet-carte');
   // FERMÉES AU DÉPART (02/09, Charlie : « par défaut ces bulles doivent être
   // fermé »). Quatre catégories dépliées, c'est trois écrans à franchir avant
   // d'arriver aux articles — et sur un devis sur trois, le client est déjà en

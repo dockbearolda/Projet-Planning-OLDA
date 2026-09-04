@@ -326,6 +326,13 @@ console.log('✓ fiche atelier : la boîte de l’app, et deux colonnes au même
   // ET LES DEUX ÉCRANS LA PORTENT, SUR LE MÊME NŒUD QUE LEUR CARTE.
   assert.ok(/'reg-card dvf-cat volet-plus volet-carte'/.test(DEVIS),
     'le devis flash pose le volet de la charte sur sa carte');
+  // … ET LA VENTE FLASH AUSSI (04/09). Elle est NÉE APRÈS la branche qui a posé
+  // ce volet : elle repliait donc ses cartes avec sa propre poignée, et les deux
+  // écrans — à un clic l'un de l'autre, le même geste — donnaient 50 px pour le
+  // devis et 44,6 pour la vente. Mesuré au rendu, pas relu.
+  const VENTE_FLASH = fs.readFileSync(path.join(RACINE, 'public/vente-flash.js'), 'utf8');
+  assert.ok(/'reg-card dvf-cat volet-plus volet-carte'/.test(VENTE_FLASH),
+    'la vente flash pose le MÊME volet que le devis — pas un qui lui ressemble');
   const volets = VENTE.match(/<details class="card[^"]*volet-plus volet-carte"/g) || [];
   assert.ok(volets.length >= 5,
     `les cartes de l’écran de vente sont des volets (${volets.length} trouvé(s), 5 attendus au moins)`);
