@@ -617,10 +617,17 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
   gap: 9px;
   width: 100%;
   margin: 0;
-  /* La ligne respire : en 16 px, 30 px de haut et 5 px de rembourrage ne
-     laissaient rien autour du texte — le libellé touchait ses propres bords. */
-  min-height: 38px;
-  padding: 8px 8px 8px 9px;
+  /* UNE SEULE BOÎTE POUR TOUTES LES LIGNES DU RAIL (04/09/2026).
+     Elles en avaient TROIS, écrites à trois endroits : `.stage` posait
+     `min-height: 38px` (un NOMBRE, pas un jeton) avec 8 px de rembourrage,
+     `.stage-repli` recopiait le même 38, et `.stage.zone-head` défaisait les
+     deux (`min-height: auto`, 7 px de rembourrage, `gap: 10`). Résultat
+     mesuré à 1 280 px : un titre de phase sur une ligne faisait 33,3 px quand
+     la sous-étape juste dessous en faisait 39,4 — le TITRE plus court que ce
+     qu'il coiffe, et personne ne pouvait le voir en relisant une seule règle.
+     C'est la boîte serrée de la charte, et elle se dit ICI, une fois. */
+  min-height: var(--ctrl-h-serre);
+  padding: var(--champ-y-serre) 8px var(--champ-y-serre) 9px;
   border: 0;
   border-radius: var(--arrondi-champ);
   background: transparent;
@@ -678,7 +685,7 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    décalait le texte de 16 px vers la gauche. Mesuré au rendu : les libellés
    d'étape commencent à 37 px du bord du rail, celui-ci aussi. */
 .stage-repli {
-  min-height: 38px;
+  /* La boîte vient de `.stage` — elle ne se réécrit pas ici. */
   padding-left: 25px;
   font-size: var(--rail-taille-etape);
   font-weight: var(--graisse-texte);
@@ -716,7 +723,6 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
    Il RESTE un bouton : afficher toute la famille se fait toujours d'un clic
    (et « À trier », famille sans sous-étapes, n'a que cette ligne-là). */
 .stage.zone-head {
-  min-height: auto;
   /* Rien au-dessus : l'air du dessus appartient à la SÉPARATION (voir
      `.stage-zone + .stage-zone`). Ici on ne règle que la distance du titre à
      ses propres étapes — courte, pour qu'il leur reste attaché. */
@@ -729,8 +735,10 @@ body.sidebar-resizing .grid-wrap { pointer-events: none; }
      c'est-à-dire un blanc légèrement sali — un surlignage qu'on ne distingue pas
      de son support ne surligne rien. Sur le ton foncé, le blanc passe à 5,7:1 au
      pire des six phases. */
-  padding: 7px 8px 7px 9px;
-  gap: 10px;
+  /* NI REMBOURRAGE NI ÉCART EN PROPRE : le bandeau prend la boîte de `.stage`,
+     comme tout ce que le rail aligne. Les 7 px et le `gap: 10` d'ici étaient
+     les deux seules raisons pour lesquelles un titre de phase ne tombait pas
+     à la même hauteur que ses étapes. */
   border-radius: var(--arrondi-champ);
   background: var(--zsur-fond);
 }
@@ -1828,7 +1836,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
      absent portait un pointillé : 2 px d'écart entre deux pastilles empilées
      dans la même cellule, avant même de compter le rembourrage. */
   border: var(--trait-reserve);
-  border-radius: var(--pilule);
+  /* LA PILULE EST PARTIE (04/09) — voir le bloc « TROIS CHIPS, UNE BOÎTE »
+     sous `.ref-chip` : ces trois-là AGISSENT, et une action ne prend jamais
+     la forme d'une étiquette. */
+  border-radius: var(--arrondi-champ);
   /* … ET LA BOÎTE EST LA BOÎTE SERRÉE DE LA CHARTE. Sans elle, c'est le CONTENU
      qui décide : un disque d'initiale donnait 36 px au pilote, du texte et un
      trait donnaient 39 au « + référent ». Le disque se pose DANS la boîte, il
@@ -1888,12 +1899,35 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    est de nommer quelqu'un. À 10, elle en laisse 112. */
 .resp-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--pas-1) var(--pas-2); }
 .resp-stack .resp-chip { margin: 0; max-width: 100%; }
+/* TROIS CHIPS, UNE SEULE BOÎTE — ET AUCUNE NE PORTE PLUS LA PILULE (04/09).
+   Mesurés sur la ligne du planning, les trois jetons cliquables donnaient
+   TROIS hauteurs : `.ref-chip` 27,4 px, `.deadline-badge` 33,4 et
+   `.resp-chip` 39,4. Même famille — un texte court, dans une cellule de la
+   grille, qu'on clique pour changer une valeur — et trois rembourrages écrits
+   à la main. Un écart de 1,4 px entre l'échéance et le pilote ne se lit pas
+   comme une hiérarchie, seulement comme du désordre ; et il ne se voyait pas
+   en relisant une règle, seulement en mesurant les trois côte à côte.
+   Ils prennent maintenant `--ctrl-h-serre`, la boîte serrée de la charte, que
+   `.resp-chip` portait déjà seul : la hauteur est un JETON, jamais un nombre,
+   et elle se dit UNE fois pour les trois.
+
+   ET LA FORME DIT LE RÔLE. Les trois étaient en `--pilule` alors que les trois
+   AGISSENT : « assigner le pilote », « ajouter un référent », « cliquer pour
+   modifier » la date. La pilule est la forme de l'étiquette et de l'état — la
+   porter ici, c'est faire passer trois boutons pour trois badges, sur la seule
+   ligne que l'atelier lit toute la journée. Rectangle arrondi : ça agit.
+   (Le point de couleur de `.deadline-badge`, lui, reste rond : c'est un point,
+   pas une commande. Les icônes seules de la ligne gardent aussi leur rond —
+   `--ligne-ic`, une icône seule est ronde, c'est la loi des formes.) */
 .ref-chip {
   max-width: 100%;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ctrl-h-serre);
   padding: 2px 10px;
-  border: 0;
-  border-radius: var(--pilule);
+  border: var(--trait-reserve);
+  border-radius: var(--arrondi-champ);
   background: transparent;
   color: var(--text-2);
   font: inherit;
@@ -2409,8 +2443,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   gap: 7px;
   margin: 8px 20px;
   padding: 5px 13px;
-  border: 0;
-  border-radius: var(--pilule);
+  /* La boîte serrée et le rectangle arrondi des trois chips de la ligne —
+     voir le bloc « TROIS CHIPS, UNE BOÎTE » au-dessus de `.ref-chip`. */
+  min-height: var(--ctrl-h-serre);
+  border: var(--trait-reserve);
+  border-radius: var(--arrondi-champ);
   font: inherit;
   font-size: var(--taille-texte);
   font-weight: var(--graisse-texte);

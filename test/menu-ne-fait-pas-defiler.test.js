@@ -63,6 +63,26 @@ assert.ok(/menuBornes\(peau\)/.test(placer[0]),
 assert.ok(!/window\.innerWidth/.test(placer[0]),
   '… et plus jamais par la largeur de la fenêtre — c’était tout le défaut');
 
+// --- 2 bis. LE PANNEAU TOMBE SUR LE CHAMP QUI L'OUVRE (04/09/2026) --------
+// Mesuré au comptoir, sur « Couleur textile » : champ de 246,7 px, panneau de
+// 560, posé 32,7 px À GAUCHE du champ et débordant de 280,7 px à droite,
+// par-dessus la colonne voisine. Ce n'est pas le placement qui était faux,
+// c'est la LARGEUR : elle se prenait sur toute la largeur des bornes, le
+// panneau ne finissait pas dedans, et la ligne d'après le RAMENAIT vers la
+// gauche pour qu'il tienne. Le décalage était donc la conséquence, pas la
+// cause — et c'est le même défaut que le menu de « Nouveau Projet », qui
+// tombait 13,7 px de travers. Ici c'était deux fois et demie pire.
+// On aligne d'abord, on mesure la place qui RESTE À DROITE, et le panneau ne
+// demande jamais plus que cette place-là.
+assert.ok(/const placeADroite=Math\.max\(0,b\.droite-marge-gauche\)/.test(placer[0]),
+  'la place disponible se mesure À PARTIR de l’alignement sur le champ');
+assert.ok(/const largeur=Math\.max\(champ\.width,Math\.min\(560,placeADroite\)\)/.test(placer[0]),
+  '… et la largeur ne demande jamais plus que cette place-là');
+assert.ok(!/b\.droite-b\.gauche-2\*marge/.test(placer[0]),
+  '… elle ne se prend plus sur toute la largeur des bornes : c’était ce qui forçait le décalage');
+assert.ok(placer[0].indexOf('let gauche=champ.left') < placer[0].indexOf('const largeur='),
+  'on aligne D’ABORD, on dimensionne ensuite — l’inverse ramène le panneau à côté de son champ');
+
 // --- 3. Un panneau posé en coordonnées de fenêtre ne suit pas le défilement -
 // Il resterait planté pendant que son champ s'en va. On le referme.
 // En CAPTURE (`true`) : le défilement d'un conteneur ne remonte PAS jusqu'au

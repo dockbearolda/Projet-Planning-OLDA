@@ -352,3 +352,80 @@ console.log('✓ fiche atelier : la boîte de l’app, et deux colonnes au même
 }
 
 console.log('✓ écrans : un seul en-tête, une seule verticale, une seule action de ligne, un seul volet');
+
+// ===========================================================================
+// LA LIGNE DU PLANNING : TROIS CHIPS, UNE SEULE BOÎTE (04/09/2026)
+// ---------------------------------------------------------------------------
+// Mesurés à 1 280 px sur la ligne, les trois jetons cliquables donnaient TROIS
+// hauteurs : `.ref-chip` 27,4 px, `.deadline-badge` 33,4 et `.resp-chip` 39,4.
+// Même famille — un texte court, dans une cellule de la grille, qu'on clique
+// pour changer une valeur — et trois rembourrages écrits à la main. Un écart de
+// 1,4 px entre l'échéance et le pilote ne se lit pas comme une hiérarchie.
+// Et les TROIS portaient la pilule alors que les trois AGISSENT.
+{
+  const chips = ['.resp-chip', '.ref-chip', '.deadline-badge'];
+  for (const c of chips) {
+    const bloc = CSS.match(new RegExp('\\' + c + ' \\{([^}]*)\\}'));
+    assert.ok(bloc, `${c} a sa règle dans styles.css`);
+    assert.match(bloc[1], /min-height: var\(--ctrl-h-serre\)/,
+      `${c} prend la boîte serrée de la charte — une hauteur est un jeton, jamais un nombre`);
+    assert.ok(!/border-radius: var\(--pilule\)/.test(bloc[1]),
+      `${c} agit (assigner, ajouter, modifier une date) : une action ne prend jamais la pilule`);
+    assert.match(bloc[1], /border-radius: var\(--arrondi-champ\)/,
+      `${c} prend le rectangle arrondi — la forme dit le rôle`);
+  }
+}
+
+// ===========================================================================
+// LE RAIL : UNE SEULE BOÎTE POUR TOUTES SES LIGNES (04/09/2026)
+// ---------------------------------------------------------------------------
+// Elle s'écrivait à TROIS endroits : `.stage` posait `min-height: 38px` (un
+// NOMBRE), `.stage-repli` recopiait le même 38, et `.stage.zone-head` défaisait
+// les deux (`min-height: auto`, 7 px de rembourrage, `gap: 10`). Résultat : un
+// titre de phase sur une ligne faisait 33,3 px quand la sous-étape juste
+// dessous en faisait 39,4 — le TITRE plus court que ce qu'il coiffe.
+{
+  const stage = CSS.match(/\n\.stage \{([^}]*)\}/);
+  assert.ok(stage, '`.stage` a sa règle');
+  assert.match(stage[1], /min-height: var\(--ctrl-h-serre\)/,
+    'la boîte du rail est la boîte serrée de la charte, et elle se dit ICI');
+  for (const [sel, re] of [['.stage-repli', /\.stage-repli \{([^}]*)\}/],
+                           ['.stage.zone-head', /\.stage\.zone-head \{([^}]*)\}/]]) {
+    const bloc = CSS.match(re);
+    assert.ok(bloc, `${sel} a sa règle`);
+    /* LES COMMENTAIRES SORTENT D'ABORD : celui de `.zone-head` cite les
+       valeurs qu'il a perdues (« le `gap: 10` d'ici »), et une sonde qui lit le
+       bloc brut se déclenche sur le récit de la correction au lieu du code. */
+    const code = bloc[1].replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.ok(!/min-height:/.test(code),
+      `${sel} ne réécrit pas la hauteur du rail — deux écritures redeviennent deux hauteurs`);
+    assert.ok(!/\bpadding:/.test(code) && !/\bgap:/.test(code),
+      `${sel} ne réécrit ni le rembourrage ni l’écart de \`.stage\``);
+  }
+}
+
+// ===========================================================================
+// L'APERÇU DU TICKET DU COMPTOIR : QUATRE CRANS, PAS ONZE (04/09/2026)
+// ---------------------------------------------------------------------------
+// C'était le SEUL fichier du dépôt qui écrivait encore une taille de texte en
+// clair : onze crans à l'écran (11, 12, 12.5, 13, 14, 15, 16, 18, 19, 24, 28)
+// et cinq de plus à l'impression, dont un 12 contre 12,5 qui ne se lit que
+// comme de la négligence. Le ticket de l'atelier avait la même maladie — dix
+// crans — et il en a été guéri ; son aperçu au comptoir ne l'avait pas été.
+// Un papier garde ses PROPRES crans (l'échelle de l'écran ne le regarde pas),
+// mais il n'en a que trois, plus celui des intitulés.
+{
+  const DD = fs.readFileSync(path.join(RACINE, 'public/comptoir/demande-devis.css'), 'utf8');
+  assert.ok(!/font-size:\s*[0-9.]+px/.test(DD),
+    'aucune taille de texte en clair dans demande-devis.css : le papier passe par ses jetons');
+  for (const j of ['--tkc-geant', '--tkc-cle', '--tkc-texte', '--tkc-cap']) {
+    assert.ok(DD.includes(j + ':'), `le papier du comptoir déclare ${j}`);
+  }
+  // QUATRE, ET PAS UN DE PLUS : un cinquième jeton, c'est le désordre qui
+  // revient par la porte des jetons.
+  const crans = new Set((DD.match(/--tkc-[a-z]+(?=:)/g) || []));
+  assert.strictEqual(crans.size, 4,
+    `le papier du comptoir a ${crans.size} crans : trois, plus celui des intitulés`);
+}
+
+console.log('✓ ligne du planning, rail et papier du comptoir : une seule boîte, quatre crans');
