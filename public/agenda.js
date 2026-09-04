@@ -29,6 +29,11 @@
 // AUCUN PRIX. Ce n'est pas une omission : l'écran sert à préparer une remise,
 // pas à encaisser (l'argent vit sur la fiche), et le serveur ne l'envoie même
 // pas — voir `GET /api/agenda`.
+//
+// ET AUCUN DEVIS. « Il n'y a plus de demande, il y a maintenant devis et vente »
+// (Charlie, 03/09) : l'agenda ne montre que des VENTES à remettre. Un devis
+// n'est pas un retrait — tant que le client n'a pas dit oui, il n'y a rien à
+// venir chercher. Le tri se fait côté serveur, voir `AGENDA_FILTRE`.
 
 import { fetchBorne } from './reseau.js';
 import { ecranTete } from './ecran-tete.js';
@@ -119,6 +124,109 @@ function libelleArticle(l) {
   return Number.isFinite(n) && n > 1 ? `${n} × ${nom}` : nom;
 }
 
+// ===========================================================================
+// UN CLIENT QUI PASSE UN JOUR N'Y FIGURE QU'UNE FOIS (03/09/2026)
+// ===========================================================================
+// Charlie : « il ne doit pas y avoir de doublon de nom de clients ».
+//
+// D'OÙ VENAIENT LES DOUBLONS — deux causes, aucune anormale :
+//   · UN TICKET À PLUSIEURS ARTICLES EST PLUSIEURS LIGNES depuis le 25/08 (voir
+//     `fiche.lot`) : c'est ce qui permet de produire les casquettes pendant que
+//     les mugs attendent le fournisseur. Mais côté COMPTOIR, ce sont bien des
+//     casquettes ET des mugs remis EN UNE FOIS, à une personne ;
+//   · un même client peut aussi avoir deux tickets le même jour.
+// Mesuré sur la base de production le 03/09 : six couples client + jour
+// portaient plusieurs lignes, jusqu'à QUATRE (« Enzo B », le 04/09, deux
+// tickets), et « ATELIER OLDA Sarl » sortait trois fois sur le 01/09.
+//
+// L'AGENDA COMPTE DES PASSAGES, PAS DES LIGNES. Un retrait, c'est une personne
+// qui pousse la porte un jour donné : la clé est donc (client, jour), et le
+// compteur de l'en-tête dit désormais combien de gens passent — pas combien de
+// lignes le planning porte.
+//
+// CE QUE LE GROUPE HÉRITE DE SES LIGNES, et pourquoi :
+//   · L'HEURE : la plus TÔT. Le client vient une fois, et c'est à ce moment-là
+//     qu'il faut que tout soit prêt.
+//   · LES ARTICLES : tous, à la suite, dédoublonnés. Deux lignes portant le même
+//     libellé ne s'écrivent pas deux fois — ce serait le doublon suivant.
+//   · L'ÉTAT : celui de la ligne LA MOINS AVANCÉE. On ne remet pas la moitié
+//     d'un ticket : le passage est prêt quand le dernier article l'est.
+//   · LE BLOCAGE : dès qu'UNE ligne est bloquée. C'est elle qui empêchera le
+//     retrait, et son motif est la seule chose à lire.
+const RANG_FAMILLE = {
+  a_trier: 0, demande_chiffrage: 1, preparation: 2, production: 3, facturation: 4,
+};
+const rang = (l) => (RANG_FAMILLE[l && l.stage] ?? 0);
+
+// La clé de regroupement se replie (casse et accents) : « OLDA » et « Olda »
+// s'affichent pareil, donc se lisent comme un doublon — c'en est un.
+const replier = (s) => String(s == null ? '' : s)
+  .toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+
+function enRetraits(lignes) {
+  const par = new Map();
+  for (const l of lignes) {
+    const jour = enJour(l.deadline);
+    if (!jour) continue;                    // le serveur ne devrait pas en envoyer
+    const cle = `${jour}|${replier(l.billing_company)}`;
+    if (!par.has(cle)) par.set(cle, { cle, jour, lignes: [] });
+    par.get(cle).lignes.push(l);
+  }
+  const retraits = [];
+  for (const r of par.values()) {
+    const heures = r.lignes.map((l) => l.heure).filter(Boolean).sort();
+    const moinsAvancee = r.lignes.reduce((a, b) => (rang(b) < rang(a) ? b : a));
+    const bloquee = r.lignes.find((l) => l.flag === 'bloque') || null;
+    const vus = new Set();
+    const articles = [];
+    for (const l of r.lignes) {
+      const t = libelleArticle(l);
+      if (vus.has(t)) continue;
+      vus.add(t);
+      articles.push(t);
+    }
+    const tete = r.lignes[0];
+    retraits.push({
+      cle: r.cle,
+      jour: r.jour,
+      heure: heures[0] || null,
+      // ON OUVRE LA LIGNE LA MOINS AVANCÉE, pas la première venue : sur un
+      // passage qui n'est pas prêt, c'est celle-là qu'on veut regarder.
+      id: moinsAvancee.id,
+      nombre: r.lignes.length,
+      nom: nomClientAffiche(tete.billing_company, tete.client_type) || 'Sans nom',
+      articles,
+      stage: moinsAvancee.stage,
+      sub_stage: moinsAvancee.sub_stage,
+      flag: bloquee ? 'bloque' : null,
+      flag_reason: bloquee ? bloquee.flag_reason : null,
+    });
+  }
+  // L'heure d'abord, le nom ensuite : c'est l'ordre dans lequel la journée se
+  // déroule, et les passages sans heure ferment la marche.
+  return retraits.sort((a, b) => (a.jour < b.jour ? -1 : a.jour > b.jour ? 1
+    : (a.heure || '99') < (b.heure || '99') ? -1 : (a.heure || '99') > (b.heure || '99') ? 1
+      : a.nom.localeCompare(b.nom, 'fr')));
+}
+
+// LE RETARD A UN HORIZON (03/09/2026). Charlie : « ce planning depuis plusieurs
+// mois a évolué et on a en ligne des anciens dossiers dont on ne peut pas faire
+// de modification comme la date par exemple, et ils se retrouvent donc tous en
+// "en retard" ».
+//
+// Écarter les DEVIS (voir `AGENDA_FILTRE` dans server.js — un devis n'est pas
+// un retrait) enlève l'essentiel du bruit ; mais il reste, sur la base de
+// production du 03/09, quatre dossiers dont l'échéance a 23, 27, 36 et 38 jours,
+// en production ou en facturation depuis juin-juillet. Personne ne vient les
+// chercher : ce ne sont plus des retards, ce sont des dossiers oubliés, et ils
+// poussaient la journée du jour sous la ligne de flottaison.
+//
+// TRENTE JOURS. Au-delà, un retrait ne se rattrape plus au comptoir, il se
+// reprend au planning. ON NE LES CACHE PAS POUR AUTANT : le bloc « En retard »
+// DIT combien il en met de côté, ils restent dans le planning, et la vue au mois
+// les montre à leur date — un mois qu'on ouvre exprès n'a pas d'horizon.
+const RETARD_MAX_JOURS = 30;
+
 // LA VUE CHOISIE SUIT L'APPAREIL. Celle qui prépare les retraits le matin veut
 // retrouver SON écran, pas celui du collègue de la veille : c'est la même règle
 // que le repli du rail et la largeur des colonnes. Un seul bit, une seule clé —
@@ -164,24 +272,25 @@ export function createAgenda(deps) {
   // « Découpe & Contrôle DTF » ou « Pressage », dans les deux cas ce n'est pas
   // prêt. On nomme donc la FAMILLE, et l'écran reste lisible d'un coup d'œil.
   const PRET = 'facturation';
-  function etatDe(l) {
-    if (l.stage === PRET) return SUB_LABEL[l.sub_stage] || STAGE_LABEL[l.stage] || 'Prêt';
-    return STAGE_LABEL[l.stage] || l.stage || '';
+  function etatDe(r) {
+    if (r.stage === PRET) return SUB_LABEL[r.sub_stage] || STAGE_LABEL[r.stage] || 'Prêt';
+    return STAGE_LABEL[r.stage] || r.stage || '';
   }
 
   // ------------------------------------------------------------- une rangée
-  function rangee(l, { avecDate }) {
+  // UNE RANGÉE = UN PASSAGE, pas une ligne du planning : un client qui vient
+  // chercher quatre articles vient UNE fois (voir `enRetraits`).
+  function rangee(r, { avecDate }) {
     const b = el('button', 'ag-ligne');
     b.type = 'button';
-    b.dataset.id = l.id;
+    b.dataset.id = r.id;
 
     // QUAND. L'heure dans un jour daté ; la date dans le bloc « En retard »,
     // qui rassemble plusieurs jours et où l'heure ne situe plus rien.
-    const heure = enHeure(l.heure);
-    const jour = enJour(l.deadline);
+    const heure = enHeure(r.heure);
     const quand = el('span', 'ag-ligne__quand');
     if (avecDate) {
-      quand.textContent = jour ? JOUR_COURT.format(new Date(enTemps(jour))) : '—';
+      quand.textContent = JOUR_COURT.format(new Date(enTemps(r.jour)));
       quand.setAttribute('aria-label', `Attendu le ${quand.textContent}`);
     } else {
       // PAS DE TIRET QUAND L'HEURE MANQUE, et c'est voulu : sur une liste où
@@ -193,25 +302,27 @@ export function createAgenda(deps) {
     }
     b.append(quand);
 
-    // QUI. Le nom du dossier, en capitales quand c'est un particulier.
-    const qui = el('span', 'ag-ligne__client',
-      nomClientAffiche(l.billing_company, l.client_type) || 'Sans nom');
+    // QUI. Le nom du dossier, en capitales quand c'est un particulier. UNE FOIS.
+    const qui = el('span', 'ag-ligne__client', r.nom);
     b.append(qui);
 
-    // QUOI.
-    const quoi = el('span', 'ag-ligne__quoi', libelleArticle(l));
+    // QUOI. Tous les articles du passage, à la suite : c'est ce qu'on prépare,
+    // et c'est ce qu'on vérifie en le donnant. La colonne s'abrège si besoin,
+    // la liste entière reste dans le nom accessible.
+    const texteArticles = r.articles.join(' · ');
+    const quoi = el('span', 'ag-ligne__quoi', texteArticles);
     b.append(quoi);
 
     // EST-CE PRÊT. Une commande bloquée le dit à la place du reste : c'est la
     // seule ligne où l'état ne suffit pas — il faut le motif, sinon la
     // vendeuse promet un retrait qui n'aura pas lieu.
     const etat = el('span', 'ag-ligne__etat');
-    if (l.flag === 'bloque') {
+    if (r.flag === 'bloque') {
       etat.classList.add('is-bloque');
-      etat.textContent = l.flag_reason || 'Bloquée';
+      etat.textContent = r.flag_reason || 'Bloquée';
     } else {
-      if (l.stage === PRET) etat.classList.add('is-pret');
-      etat.textContent = etatDe(l);
+      if (r.stage === PRET) etat.classList.add('is-pret');
+      etat.textContent = etatDe(r);
     }
     b.append(etat);
 
@@ -220,9 +331,9 @@ export function createAgenda(deps) {
     // décalerait l'index, et la ligne s'annoncerait de travers sans que rien
     // ne le signale.
     b.setAttribute('aria-label', [
-      quand.textContent, qui.textContent, quoi.textContent, etat.textContent,
+      quand.textContent, r.nom, texteArticles, etat.textContent,
     ].filter(Boolean).join(' — '));
-    b.addEventListener('click', () => ouvrirDossier && ouvrirDossier(l.id));
+    b.addEventListener('click', () => ouvrirDossier && ouvrirDossier(r.id));
     return b;
   }
 
@@ -231,16 +342,25 @@ export function createAgenda(deps) {
   // sans lui, à mi-liste, on ne sait plus quel jour on lit. Il est collant DANS
   // SON BLOC — un titre collant ne sort jamais du sien, sinon celui de demain
   // se colle en haut pendant qu'on lit encore aujourd'hui.
-  function bloc({ cle, nom, precision, lignes, retard, avecDate }) {
+  function bloc({ cle, nom, precision, lignes, retard, avecDate, vide }) {
     const s = el('section', 'ag-jour');
     if (retard) s.classList.add('is-retard');
     if (cle) s.dataset.jour = cle;
     const tete = el('header', 'ag-jour__tete');
     tete.append(el('h2', 'ag-jour__nom', nom));
     if (precision) tete.append(el('span', 'ag-jour__date', precision));
-    tete.append(el('span', 'ag-jour__n',
-      `${lignes.length} retrait${lignes.length > 1 ? 's' : ''}`));
+    // Le compteur se TAIT quand le bloc ne liste rien : « 0 retrait » à côté de
+    // « 4 dossiers oubliés » se lit comme une contradiction, alors que la
+    // précision a déjà tout dit.
+    if (lignes.length) {
+      tete.append(el('span', 'ag-jour__n',
+        `${lignes.length} retrait${lignes.length > 1 ? 's' : ''}`));
+    }
     s.append(tete);
+    if (!lignes.length && vide) {
+      s.append(el('p', 'ag-jour__vide', vide));
+      return s;
+    }
     const liste = el('div', 'ag-liste');
     for (const l of lignes) liste.append(rangee(l, { avecDate }));
     s.append(liste);
@@ -256,28 +376,47 @@ export function createAgenda(deps) {
   // exactement ce que cet écran existe pour éviter ; et le mettre en bas
   // reviendrait à ranger sous le tapis les clients qui attendent depuis le plus
   // longtemps. Là, ses lignes portent leur date à la place de leur heure.
-  function grouper(lignes, jour) {
+  //
+  // ET IL A UN HORIZON (voir RETARD_MAX_JOURS) : au-delà, un retrait ne se
+  // rattrape plus au comptoir. Ceux-là sont COMPTÉS, jamais tus — le bloc dit
+  // combien il en met de côté.
+  function grouper(retraits, jour) {
     const enRetard = [];
+    let oublies = 0;
     const parJour = new Map();
-    for (const l of lignes) {
-      const j = enJour(l.deadline);
-      if (!j) continue;                       // le serveur ne devrait pas en envoyer
-      if (ecartJours(j, jour) < 0) { enRetard.push(l); continue; }
-      if (!parJour.has(j)) parJour.set(j, []);
-      parJour.get(j).push(l);
+    for (const r of retraits) {
+      const ecart = ecartJours(r.jour, jour);
+      if (ecart < 0) {
+        if (-ecart > RETARD_MAX_JOURS) oublies += 1;
+        else enRetard.push(r);
+        continue;
+      }
+      if (!parJour.has(r.jour)) parJour.set(r.jour, []);
+      parJour.get(r.jour).push(r);
     }
     const blocs = [];
-    if (enRetard.length) {
+    if (enRetard.length || oublies) {
       blocs.push({
         cle: 'retard', nom: 'En retard', lignes: enRetard, retard: true, avecDate: true,
-        precision: 'commandes non retirées',
+        precision: oublies
+          ? `${oublies} dossier${oublies > 1 ? 's' : ''} de plus, oublié${oublies > 1 ? 's' : ''} `
+            + `depuis plus de ${RETARD_MAX_JOURS} jours`
+          : 'commandes non retirées',
       });
     }
+    // AUJOURD'HUI EST TOUJOURS LÀ, même vide. C'est la question que l'écran
+    // existe pour poser : sauter du bloc « En retard » à « Demain » laisse
+    // croire qu'on a mal lu, alors que « personne ne vient » est une RÉPONSE —
+    // et c'est celle qui libère la journée.
+    if (!parJour.has(jour)) parJour.set(jour, []);
     for (const j of [...parJour.keys()].sort()) {
       const ecart = ecartJours(j, jour);
       const date = majuscule(NOM_DU_JOUR.format(new Date(enTemps(j))));
       blocs.push(ecart === 0
-        ? { cle: j, nom: 'Aujourd’hui', precision: date, lignes: parJour.get(j) }
+        ? {
+          cle: j, nom: 'Aujourd’hui', precision: date, lignes: parJour.get(j),
+          vide: 'Personne ne vient aujourd’hui.',
+        }
         : ecart === 1
           ? { cle: j, nom: 'Demain', precision: date, lignes: parJour.get(j) }
           : { cle: j, nom: date, lignes: parJour.get(j) });
@@ -331,21 +470,23 @@ export function createAgenda(deps) {
 
   // UN NOM, ET RIEN D'AUTRE À L'ÉCRAN. C'est un vrai bouton : il ouvre le
   // dossier, comme une rangée de la vue au jour — même geste sur les deux vues.
-  function nomDuClient(l) {
+  // UN PASSAGE, DONC UN SEUL NOM : quatre lignes du même client le même jour ne
+  // font qu'une entrée (voir `enRetraits`). C'est la demande du 03/09, et c'est
+  // aussi la seule façon de tenir une case de 123 px.
+  function nomDuClient(r) {
     const b = el('button', 'ag-nom');
     b.type = 'button';
-    b.dataset.id = l.id;
-    if (l.flag === 'bloque') b.classList.add('is-bloque');
-    const nom = nomClientAffiche(l.billing_company, l.client_type) || 'Sans nom';
-    b.textContent = nom;
+    b.dataset.id = r.id;
+    if (r.flag === 'bloque') b.classList.add('is-bloque');
+    b.textContent = r.nom;
     // TOUT LE RESTE AU SURVOL — l'heure, ce qu'il vient chercher, où ça en est.
     // À l'écran, la case ne porte que des noms ; sous la souris, elle en dit
     // autant qu'une rangée de la vue au jour.
-    const detail = [enHeure(l.heure), libelleArticle(l),
-      l.flag === 'bloque' ? (l.flag_reason || 'Bloquée') : etatDe(l)].filter(Boolean).join(' · ');
+    const detail = [enHeure(r.heure), r.articles.join(' · '),
+      r.flag === 'bloque' ? (r.flag_reason || 'Bloquée') : etatDe(r)].filter(Boolean).join(' · ');
     attachTip(b, detail);
-    b.setAttribute('aria-label', `${nom} — ${detail}`);
-    b.addEventListener('click', () => ouvrirDossier && ouvrirDossier(l.id));
+    b.setAttribute('aria-label', `${r.nom} — ${detail}`);
+    b.addEventListener('click', () => ouvrirDossier && ouvrirDossier(r.id));
     return b;
   }
 
@@ -367,15 +508,14 @@ export function createAgenda(deps) {
     return d;
   }
 
-  function rendreMois(lignes, jour) {
+  function rendreMois(retraits, jour) {
     const cible = mois || moisDe(jour);
     const parJour = new Map();
     let duMois = 0;
-    for (const l of lignes) {
-      const j = enJour(l.deadline);
-      if (!j || moisDe(j) !== cible) continue;
-      if (!parJour.has(j)) parJour.set(j, []);
-      parJour.get(j).push(l);
+    for (const r of retraits) {
+      if (moisDe(r.jour) !== cible) continue;
+      if (!parJour.has(r.jour)) parJour.set(r.jour, []);
+      parJour.get(r.jour).push(r);
       duMois += 1;
     }
     const grille = el('div', 'ag-mois');
@@ -422,16 +562,20 @@ export function createAgenda(deps) {
     }
 
     const { lignes, sansDate } = donnees;
+    // LES LIGNES DEVIENNENT DES PASSAGES ICI, une seule fois, et les deux vues
+    // lisent le même résultat : deux conversions, ce serait deux comptages qui
+    // finiraient par diverger.
+    const retraits = enRetraits(lignes);
 
     if (vue === 'mois') {
-      const { grille, duMois } = rendreMois(lignes, jour);
+      const { grille, duMois } = rendreMois(retraits, jour);
       $tete.majCompte(texteCompte(duMois, sansDate));
       $corps.replaceChildren(grille);
       return;
     }
 
-    $tete.majCompte(texteCompte(lignes.length, sansDate));
-    const blocs = grouper(lignes, jour);
+    $tete.majCompte(texteCompte(retraits.length, sansDate));
+    const blocs = grouper(retraits, jour);
     if (!blocs.length) {
       $corps.replaceChildren(el('p', 'ag-vide',
         'Aucun retrait daté. Les dates de retrait se posent au comptoir, ou sur la fiche d’un dossier.'));

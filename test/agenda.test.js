@@ -53,41 +53,38 @@ const SW = lire('public/sw.js');
 // PARTIE A — CE QUE L'ÉCRAN EST, SANS RÉSEAU
 // ===========================================================================
 
-// --- L'entrée du rail -------------------------------------------------------
+// --- L'onglet, collé à celui du planning -------------------------------------
 assert.match(APP, /const HASH_AGENDA = '#agenda';/,
   'l’agenda a une ADRESSE : sans elle, il ne s’ouvre pas dans un second onglet et un rechargement le perd');
 assert.match(APP, /\[HASH_AGENDA\]: 'agenda',/,
-  '… et le hash est le seul pilote de la vue, comme pour les huit autres écrans');
-assert.match(APP, /function entreeAgenda\(\)/, 'son entrée est construite par le rail');
-assert.match(APP, /\$stages\.appendChild\(entreeAgenda\(\)\);/,
-  '… et posée EN TÊTE du rail, avant les phases');
-assert.match(APP, /a\.className = 'stage stage--agenda';/,
-  'elle emprunte le gabarit d’une étape : le rail n’a qu’UN rythme');
-assert.ok(!/stage--agenda[\s\S]{0,400}?dataset\.slug/.test(APP),
-  '… mais jamais de data-slug — ce n’est pas une étape, et une dépose partirait en PATCH `stage: undefined`');
-assert.ok(!/entreeAgenda[\s\S]{0,600}?stage-count/.test(APP),
-  '… ni de compteur : elle ne contient aucun dossier, un « 0 » l’éteindrait comme une étape vide');
+  '… et le hash est le seul pilote de la vue, comme pour les neuf autres écrans');
 
-// LA BARRE DU HAUT NE GAGNE PAS UN NEUVIÈME ONGLET. Mesuré le 03/09 à 1 280 px :
-// 868 px de rangée pour 868 disponibles, DÉJÀ resserrée (`est-serree`). Le mot
-// de plus ne tiendrait qu'en poussant le dernier hors de l'écran — et un onglet
-// qu'on ne voit pas est un écran qui n'existe pas.
+// « L'AGENDA DOIT ÊTRE SUR LA LIGNE À CÔTÉ DE PLANNING » (Charlie, 03/09). C'est
+// le MÊME planning vu par l'autre bout : sa place est juste après lui.
 const nav = HTML.match(/<nav class="nav-switch"[\s\S]*?<\/nav>/)[0];
-assert.ok(!/#agenda/.test(nav),
-  'l’agenda n’a pas d’onglet dans la barre du haut : elle est pleine, sa porte est le rail');
+const ordre = [...nav.matchAll(/id="(view[A-Za-z]+)"/g)].map((m) => m[1]);
+assert.strictEqual(ordre[ordre.indexOf('viewPlanning') + 1], 'viewAgenda',
+  'l’onglet Agenda suit IMMÉDIATEMENT celui du Planning');
+assert.match(nav, /<a class="nav-switch-btn" id="viewAgenda" href="#agenda">/,
+  '… et c’est un lien de hash, comme les dix autres');
+assert.match(APP, /\$viewAgenda\.classList\.toggle\('active', mode === 'agenda'\)/,
+  '… que la bascule de vue allume');
 
-// --- Le gabarit du rail, au pixel -------------------------------------------
-// `.stage` porte la boîte, le rembourrage et l'arrondi ; l'agenda n'en réécrit
-// AUCUN. Deux hauteurs dans la même colonne se voient tout de suite.
+// LA RANGÉE A LA PLACE, et c'est une MESURE, pas une impression. Resserrée
+// (`est-serree`, écart 0) à 1 280 px : onze onglets pour 860 px sur 868.
+//
+// ⚠ LA MESURE PRÉCÉDENTE ÉTAIT FAUSSE, et elle avait servi à écrire le contraire
+// dans ce fichier : `nav.scrollWidth === nav.clientWidth` avait été lu comme
+// « la rangée est pleine ». `scrollWidth` vaut `max(contenu, clientWidth)` — il
+// ne prouve QUE l'absence de débordement. Ce qui se mesure, c'est la SOMME des
+// largeurs d'onglets plus les écarts.
+assert.ok(!/est PLEINE|868 px de rangée pour 868/.test(APP + HTML),
+  'la mesure fausse (« 868 pour 868 ») ne doit plus traîner dans le code');
+
+// --- Le rail ne porte plus que des étapes ------------------------------------
 const CSS = lire('public/styles.css').replace(/\/\*[\s\S]*?\*\//g, '');
-const regleAgenda = CSS.match(/\.stage--agenda \{([^}]*)\}/);
-assert.ok(regleAgenda, 'l’entrée du rail a sa règle');
-assert.ok(!/min-height|padding:/.test(regleAgenda[1]),
-  'elle ne réécrit NI la hauteur NI le rembourrage de `.stage` : ils viennent du gabarit');
-assert.match(regleAgenda[1], /padding-left: 25px/,
-  '… seul le retrait de gauche est repris, comme la ligne de repli : sans puce, le texte reculait de 16 px');
-assert.match(CSS, /\.stage--agenda::before \{ content: none; \}/,
-  'pas de puce : elle dirait une phase, et l’agenda n’en est pas une');
+assert.ok(!/stage--agenda|stage-epingle/.test(APP + CSS),
+  'l’entrée d’agenda a quitté le rail : deux sorties pour le même écran, c’est un doublon');
 
 // --- La vue, dans la coquille de la page ------------------------------------
 assert.match(HTML, /<section class="agenda" id="agenda" hidden/,
@@ -175,13 +172,16 @@ assert.ok(!/project_value|acompte|paye\b|eur\(/.test(AGENDA),
   'l’agenda ne parle pas d’argent : il sert à préparer une remise, pas à encaisser');
 
 // ===========================================================================
-// PARTIE B — LE REGROUPEMENT PAR JOUR, SUR LE VRAI CODE
+// PARTIE B — LES PASSAGES ET LES BLOCS, SUR LE VRAI CODE
 // ===========================================================================
 // On n'exécute pas une copie de la logique : on extrait les blocs source de
 // `public/agenda.js` et on les évalue. Une copie diverge le jour où l'écran
 // change, et le test continue de passer sur du code que personne n'exécute.
 {
-  const bac = { Intl, Date };
+  // `nomClientAffiche` vient de `nom-client.js` (règle unique : un nom de
+  // client se lit en CAPITALES). Ici on n'en teste pas la casse — on lui donne
+  // sa forme la plus simple pour que le REGROUPEMENT soit ce qu'on observe.
+  const bac = { Intl, Date, Array, Map, Set, nomClientAffiche: (n) => String(n || '') };
   vm.createContext(bac);
   const morceaux = [
     AGENDA.match(/const JOUR_ATELIER = [\s\S]*?\n\}\);/)[0],
@@ -192,46 +192,112 @@ assert.ok(!/project_value|acompte|paye\b|eur\(/.test(AGENDA),
     AGENDA.match(/const NOM_DU_JOUR = [\s\S]*?\n\}\);/)[0],
     AGENDA.match(/const enHeure = [\s\S]*?\n\};/)[0],
     AGENDA.match(/function libelleArticle\(l\) \{[\s\S]*?\n\}/)[0],
-    AGENDA.match(/ {2}function grouper\(lignes, jour\) \{[\s\S]*?\n {2}\}/)[0],
+    AGENDA.match(/const RANG_FAMILLE = \{[\s\S]*?\n\};/)[0],
+    AGENDA.match(/const rang = [^\n]*\n/)[0],
+    AGENDA.match(/const replier = [\s\S]*?\n {2}\.toLowerCase[^\n]*\n/)[0],
+    AGENDA.match(/function enRetraits\(lignes\) \{[\s\S]*?\n\}/)[0],
+    AGENDA.match(/const RETARD_MAX_JOURS = \d+;/)[0],
+    AGENDA.match(/ {2}function grouper\(retraits, jour\) \{[\s\S]*?\n {2}\}/)[0],
   ];
   vm.runInContext(`${morceaux.join('\n')}
     globalThis.grouper = grouper;
+    globalThis.enRetraits = enRetraits;
     globalThis.enHeure = enHeure;
     globalThis.libelleArticle = libelleArticle;
-    globalThis.ecartJours = ecartJours;`, bac);
+    globalThis.ecartJours = ecartJours;
+    globalThis.RETARD_MAX_JOURS = RETARD_MAX_JOURS;`, bac);
 
   const jour = '2026-09-03';
-  const ligneDe = (id, date) => ({ id, deadline: date, billing_company: id, stage: 'production' });
-  const blocs = bac.grouper([
-    ligneDe('vieille', '2026-08-20'),
-    ligneDe('hier', '2026-09-02'),
-    ligneDe('aujourdhui', '2026-09-03'),
-    ligneDe('demain', '2026-09-04'),
-    ligneDe('apres', '2026-09-06'),
-    ligneDe('sansDate', null),
-  ], jour);
+  const l = (o) => ({ id: o.id, deadline: o.j, billing_company: o.c, client_type: 'pro',
+    product: o.p || 'Objet', quantity: o.q || 1, stage: o.s || 'production',
+    sub_stage: o.ss || null, heure: o.h || null, flag: o.f || null, flag_reason: o.fr || null });
 
-  // `Array.from` et non `.map` : les tableaux nés DANS le bac à sable viennent
-  // d'un autre « realm », et `deepStrictEqual` compare les prototypes — deux
-  // listes rigoureusement identiques échouaient, en s'affichant à l'identique.
+  // ---------------------------------------------------------------------------
+  // UN CLIENT QUI PASSE UN JOUR N'Y FIGURE QU'UNE FOIS
+  // ---------------------------------------------------------------------------
+  // Le cas mesuré en production le 03/09 : « ATELIER OLDA Sarl » sortait TROIS
+  // fois sur le 01/09, et « Enzo B » quatre fois sur le 04/09 (deux tickets).
+  const passages = Array.from(bac.enRetraits([
+    l({ id: 'a1', c: 'Enzo B', j: '2026-09-04', p: 'Mug', q: 2, h: '11:00', s: 'facturation', ss: 'client_prevenu' }),
+    l({ id: 'a2', c: 'Enzo B', j: '2026-09-04', p: 'T-shirt', q: 5, h: '09:00', s: 'preparation' }),
+    l({ id: 'a3', c: 'ENZO B', j: '2026-09-04', p: 'Mug', q: 2, s: 'production' }),
+    l({ id: 'b1', c: 'La Playa', j: '2026-09-04', p: 'Tablier', q: 12, s: 'production' }),
+    l({ id: 'c1', c: 'Enzo B', j: '2026-09-05', p: 'Casquette', s: 'production' }),
+  ]));
+
+  assert.strictEqual(passages.length, 3,
+    'trois passages : Enzo B le 4, La Playa le 4, Enzo B le 5 — pas cinq lignes');
+  const enzo4 = passages.find((r) => r.jour === '2026-09-04' && /enzo/i.test(r.nom));
+  assert.strictEqual(enzo4.nombre, 3, 'les trois lignes d’Enzo B du 4 ne font qu’un passage');
+  assert.strictEqual(enzo4.heure, '09:00',
+    'le passage prend l’heure la plus TÔT : c’est à ce moment-là que tout doit être prêt');
+  assert.deepStrictEqual(Array.from(enzo4.articles), ['2 × Mug', '5 × T-shirt'],
+    'tous les articles, DÉDOUBLONNÉS — deux lignes « 2 × Mug » ne s’écrivent pas deux fois');
+  assert.strictEqual(enzo4.stage, 'preparation',
+    'l’état est celui de la ligne LA MOINS AVANCÉE : on ne remet pas la moitié d’un ticket');
+  assert.strictEqual(enzo4.id, 'a2',
+    '… et c’est cette ligne-là qu’on ouvre : sur un passage qui n’est pas prêt, c’est elle qu’on regarde');
+
+  // La casse ne fait pas deux clients : « Enzo B » et « ENZO B » s’affichent
+  // pareil, donc se lisent comme un doublon — c’en est un.
+  assert.ok(!passages.some((r, i) => passages.some((o, k) => k !== i
+    && o.jour === r.jour && o.nom.toLowerCase() === r.nom.toLowerCase())),
+    'aucun nom ne peut apparaître deux fois le même jour');
+
+  // UNE SEULE LIGNE BLOQUÉE BLOQUE LE PASSAGE : c’est elle qui empêchera la
+  // remise, et son motif est la seule chose à lire.
+  const [bloque] = Array.from(bac.enRetraits([
+    l({ id: 'd1', c: 'Mairie', j: '2026-09-04', s: 'facturation', ss: 'client_prevenu' }),
+    l({ id: 'd2', c: 'Mairie', j: '2026-09-04', s: 'production', f: 'bloque', fr: 'Attente BAT' }),
+  ]));
+  assert.strictEqual(bloque.flag, 'bloque');
+  assert.strictEqual(bloque.flag_reason, 'Attente BAT');
+
+  // ---------------------------------------------------------------------------
+  // LES BLOCS DE JOURNÉE, ET L'HORIZON DU RETARD
+  // ---------------------------------------------------------------------------
+  assert.strictEqual(bac.RETARD_MAX_JOURS, 30,
+    'au-delà de trente jours, un retrait ne se rattrape plus au comptoir');
+
+  const blocs = Array.from(bac.grouper(Array.from(bac.enRetraits([
+    l({ id: 'x1', c: 'Oublie', j: '2026-07-27' }),        // 38 jours : mis de côté
+    l({ id: 'x2', c: 'Vieux', j: '2026-07-29' }),         // 36 jours : mis de côté
+    l({ id: 'x3', c: 'Hier', j: '2026-09-02' }),          // 1 jour : listé
+    l({ id: 'x4', c: 'Demain', j: '2026-09-04' }),
+    l({ id: 'x5', c: 'Apres', j: '2026-09-06' }),
+  ])), jour));
+
   assert.deepStrictEqual(Array.from(blocs, (b) => b.nom),
     ['En retard', 'Aujourd’hui', 'Demain', 'Dimanche 6 septembre'],
-    'un bloc par jour, dans l’ordre du calendrier — et RIEN pour les jours sans retrait');
+    'un bloc par jour, dans l’ordre du calendrier — et rien pour les jours sans retrait');
 
-  // LE RETARD EST UN SEUL BLOC, ET IL EST EN TÊTE. Un bloc par jour passé
-  // donnerait dix en-têtes avant « Aujourd'hui » — exactement ce que cet écran
-  // existe pour éviter ; et le mettre en bas reviendrait à ranger sous le tapis
-  // les clients qui attendent depuis le plus longtemps.
-  assert.deepStrictEqual(Array.from(blocs[0].lignes, (l) => l.id), ['vieille', 'hier'],
-    'tous les jours passés tiennent dans UN bloc « En retard »');
+  // AUJOURD'HUI EST TOUJOURS LÀ, MÊME VIDE. C'est la question que l'écran existe
+  // pour poser : sauter de « En retard » à « Demain » laisse croire qu'on a mal
+  // lu, alors que « personne ne vient » est une réponse.
+  const auj = blocs.find((b) => b.nom === 'Aujourd’hui');
+  assert.strictEqual(auj.lignes.length, 0);
+  assert.match(auj.vide, /Personne ne vient/,
+    '… et le bloc vide le DIT, il ne se contente pas d’être vide');
+
+  // LE RETARD EST UN SEUL BLOC, EN TÊTE, ET IL A UN HORIZON.
+  assert.deepStrictEqual(Array.from(blocs[0].lignes, (r) => r.nom), ['Hier'],
+    'seuls les retards de moins de trente jours sont listés');
+  assert.match(blocs[0].precision, /2 dossiers de plus, oubliés depuis plus de 30 jours/,
+    '… et les autres sont COMPTÉS : on ne les cache pas, on cesse de les faire défiler');
   assert.strictEqual(blocs[0].avecDate, true,
-    '… et ses lignes portent leur DATE : dans un bloc qui couvre plusieurs jours, l’heure ne situe plus rien');
+    'ses lignes portent leur DATE : dans un bloc qui couvre plusieurs jours, l’heure ne situe plus rien');
   assert.ok(!blocs[1].avecDate,
     'dans une journée datée, la colonne porte l’heure — répéter la date sous son propre titre n’apprend rien');
 
+  // Sans rien d’ancien, la précision redevient la phrase ordinaire.
+  const sansOubli = Array.from(bac.grouper(Array.from(bac.enRetraits([
+    l({ id: 'y1', c: 'Hier', j: '2026-09-02' }),
+  ])), jour));
+  assert.strictEqual(sansOubli[0].precision, 'commandes non retirées');
+
   // Une ligne sans date ne peut se ranger sous aucun jour : elle est ignorée
   // ici, et COMPTÉE par le serveur (voir partie C).
-  assert.ok(!blocs.some((b) => b.lignes.some((l) => l.id === 'sansDate')),
+  assert.strictEqual(Array.from(bac.enRetraits([l({ id: 'z', c: 'X', j: null })])).length, 0,
     'un dossier sans date de retrait n’invente pas un jour');
 
   // « Aujourd'hui » et « Demain » sont NOMMÉS, les autres jours se datent.
@@ -267,16 +333,26 @@ assert.ok(!/project_value|acompte|paye\b|eur\(/.test(AGENDA),
 // la seule façon de tenir douze journées de front : l'heure, l'article et l'état
 // vivent dans la bulle du nom, pas à l'écran.
 assert.match(AGENDA, /function rendreMois\(/, 'la vue au mois existe');
-assert.match(AGENDA, /function nomDuClient\(l\)/, '… et sa case n’aligne que des noms');
+assert.match(AGENDA, /function nomDuClient\(r\)/, '… et sa case n’aligne que des noms');
 {
-  const nom = AGENDA.match(/function nomDuClient\(l\) \{[\s\S]*?\n {2}\}/)[0];
-  assert.ok(!/libelleArticle\(l\)[^;]*textContent|textContent = .*(heure|article)/.test(nom),
-    'rien d’autre que le nom ne s’écrit dans la case');
+  const nom = AGENDA.match(/function nomDuClient\(r\) \{[\s\S]*?\n {2}\}/)[0];
+  assert.match(nom, /b\.textContent = r\.nom;/,
+    'rien d’autre que le nom ne s’écrit dans la case — et c’est le nom du PASSAGE, donc une seule fois');
   assert.match(nom, /attachTip\(b, detail\)/,
     '… le reste est au SURVOL : la case reste une liste de noms, et on ne perd rien');
   assert.match(nom, /ouvrirDossier/,
     '… et un nom ouvre le dossier, comme une rangée de la vue au jour : même geste sur les deux vues');
 }
+// LA VUE AU MOIS LIT LES MÊMES PASSAGES que la vue au jour : deux conversions,
+// ce serait deux comptages qui finiraient par diverger.
+assert.match(AGENDA, /const retraits = enRetraits\(lignes\);/,
+  'les lignes deviennent des passages UNE fois, et les deux vues lisent le résultat');
+assert.match(AGENDA, /function rendreMois\(retraits, jour\)/,
+  '… y compris le calendrier');
+// L'HORIZON DU RETARD NE S'APPLIQUE PAS AU MOIS : un mois qu'on ouvre exprès
+// n'a pas d'horizon, et une date passée y est simplement une date passée.
+assert.ok(!/rendreMois[\s\S]{0,900}?RETARD_MAX_JOURS/.test(AGENDA),
+  'la vue au mois montre ce qui tombe dans le mois affiché, sans horizon');
 
 // LES DEUX GRILLES DU MOIS DÉCLARENT LES MÊMES SEPT COLONNES. Écrites
 // différemment, les intitulés (« Lun. », « Mar. »…) ne tomberaient plus sur les
@@ -411,6 +487,7 @@ assert.match(AGENDA, /catch \(_\) \{ return 'jour'; \}/,
 // PARTIE C — LA ROUTE, SUR UNE VRAIE BASE
 // ===========================================================================
 assert.match(SERVEUR, /app\.get\('\/api\/agenda'/, 'la route existe');
+const AGENDA_FAM = SERVEUR.match(/const AGENDA_FAMILLES = \[([^\]]*)\]/)[1];
 
 delete process.env.DATABASE_URL;
 delete process.env.APP_PASSWORD;
@@ -460,12 +537,51 @@ const jourDecale = (n) => {
     stage: 'production', sub_stage: 'prod_dtf', billing_company: marque('EN PROD'),
     product: 'Casquettes', quantity: 40, deadline: jourDecale(1),
   });
-  // ET CE QUI N'EST PAS ENCORE CHIFFRÉ. Une commande promise pour aujourd'hui
-  // et encore « à chiffrer », c'est exactement ce qu'il faut voir AVANT que le
-  // client ne pousse la porte.
-  const aChiffrer = await creer({
-    stage: 'demande_chiffrage', sub_stage: 'a_chiffrer', billing_company: marque('À CHIFFRER'),
-    product: 'Banderole', deadline: jourDecale(0),
+  // ===========================================================================
+  // IL N'Y A PLUS DE « DEMANDE » : IL Y A UN DEVIS, ET IL Y A UNE VENTE
+  // ===========================================================================
+  // Charlie, 03/09 : « faut bien comprendre qu'il n'y a plus de demande, il y a
+  // maintenant devis et vente ». UN DEVIS N'EST PAS UN RETRAIT — tant que le
+  // client n'a pas dit oui, rien n'est produit et personne ne vient rien
+  // chercher. Le mot « demande » ne survit que dans la BASE (`order_kind`, et le
+  // slug `demande_chiffrage`) : ce sont des noms d'avant.
+  const devisEnChiffrage = await creer({
+    stage: 'demande_chiffrage', sub_stage: 'a_chiffrer', billing_company: marque('DEVIS CHIFFRAGE'),
+    product: 'Banderole', deadline: jourDecale(0), order_kind: 'demande',
+  });
+  // LE PIÈGE QUE LA FAMILLE SEULE NE VOIT PAS : depuis le 02/09, « Enregistrer »
+  // sur le devis flash crée la ligne dans « À TRIER » — la même famille que les
+  // ventes du comptoir. Sans la seconde condition, un devis tout juste
+  // enregistré s'affichait comme un retrait.
+  const devisATrier = await creer({
+    stage: 'a_trier', billing_company: marque('DEVIS À TRIER'),
+    product: 'Devis à chiffrer', deadline: jourDecale(1), order_kind: 'demande',
+  });
+  const venteATrier = await creer({
+    stage: 'a_trier', billing_company: marque('VENTE À TRIER'),
+    product: 'Mugs', deadline: jourDecale(1), order_kind: 'commande',
+  });
+  // UN DEVIS ACCEPTÉ DEVIENT UNE VENTE en entrant en préparation / production /
+  // facturation : c'est ce PASSAGE qui le fait entrer à l'agenda, pas un champ
+  // que quelqu'un devrait penser à changer. Dix dossiers sont dans ce cas sur la
+  // base de production ; les écarter aurait vidé l'agenda de ce qu'on fabrique.
+  const devisAccepte = await creer({
+    stage: 'production', sub_stage: 'prod_dtf', billing_company: marque('DEVIS ACCEPTÉ'),
+    product: 'Flyers', deadline: jourDecale(1), order_kind: 'demande',
+  });
+  // Une VIEILLE ligne (25 en production) n'a pas de `order_kind` du tout :
+  // `NULL <> 'demande'` vaut NULL, donc faux — sans le `COALESCE`, elles
+  // auraient toutes disparu d'« À trier », en silence.
+  const vieilleATrier = await creer({
+    stage: 'a_trier', billing_company: marque('VIEILLE LIGNE'),
+    product: 'Objet d’avant', deadline: jourDecale(1),
+  });
+  // Un devis sans date ne doit pas non plus gonfler le compteur « sans date » :
+  // un devis n'A PAS de jour de retrait, c'est normal, et le compter comme un
+  // manque est un faux reproche affiché en permanence.
+  const devisSansDate = await creer({
+    stage: 'demande_chiffrage', sub_stage: 'demande_recue', billing_company: marque('DEVIS NU'),
+    product: 'Devis à faire', order_kind: 'demande',
   });
   const aTrier = await creer({
     stage: 'a_trier', billing_company: marque('À TRIER'),
@@ -502,17 +618,34 @@ const jourDecale = (n) => {
 
   for (const [id, quoi] of [[aPrevenir, 'un dossier prêt à remettre'],
     [enProd, 'un dossier encore en production'],
-    [aChiffrer, 'un dossier promis pour aujourd’hui et pas encore chiffré'],
-    [aTrier, 'un dossier encore à trier']]) {
+    [aTrier, 'un dossier encore à trier'],
+    [venteATrier, 'une VENTE qui attend d’être triée'],
+    [devisAccepte, 'un devis ACCEPTÉ, déjà en production — c’est une vente'],
+    [vieilleATrier, 'une vieille ligne « À trier » sans `order_kind` : on ne la fait pas disparaître']]) {
     assert.ok(ids.has(id), `${quoi} doit figurer à l’agenda`);
   }
   for (const [id, quoi] of [[recuperee, 'une commande déjà récupérée au comptoir'],
     [soldee, 'un dossier parti chez le client (« Paiement & clôture »)'],
     [fiverr, 'de la sous-traitance graphiste — aucun client au comptoir'],
     [archivee, 'un dossier archivé'],
+    [devisEnChiffrage, 'un DEVIS en chiffrage — le client attend un prix, pas un carton'],
+    [devisATrier, 'un DEVIS tout juste enregistré, qui attend « À trier »'],
     [sansDate, 'un dossier sans date de retrait']]) {
     assert.ok(!ids.has(id), `${quoi} n’a rien à faire dans une liste de gens qui vont passer`);
   }
+  assert.ok(!AGENDA_FAM.includes('demande_chiffrage'),
+    'la famille du devis est hors de l’agenda, côté serveur');
+  // IL FAUT LES DEUX CONDITIONS. La famille seule laissait passer les devis
+  // posés « À trier » par le devis flash depuis le 02/09.
+  assert.match(SERVEUR,
+    /AND \(r\.stage <> 'a_trier' OR COALESCE\(r\.order_kind, ''\) <> 'demande'\)/,
+    'un devis qui attend « À trier » est écarté lui aussi — et le COALESCE protège les vieilles lignes');
+  // Un devis ne compte pas non plus dans les « sans date » : mesuré sur la base
+  // de PRODUCTION le 03/09, la famille en apportait 23 sur 30.
+  const avant = agenda.sansDate;
+  await call('PATCH', `/api/requests/${devisSansDate}`, { billing_company: marque('DEVIS NU 2') });
+  assert.strictEqual((await call('GET', '/api/agenda')).body.sansDate, avant,
+    'un devis sans date de retrait n’est pas un dossier « sans date » : il n’en a pas besoin');
 
   assert.ok(agenda.sansDate >= 1,
     'les dossiers sans date sont COMPTÉS : les taire ferait lire l’agenda comme complet');
