@@ -243,7 +243,14 @@ assert.match(
   });
   const lHostile = (await liste()).find((r) => r.id === hostile.body.id);
   assert.ok(lHostile.fiche.prod.ref.length <= 60, 'une référence de 500 signes n’est pas une référence');
-  assert.strictEqual(lHostile.fiche.prod.tailles.length, 12, '6 tailles, 6 emplacements : au-delà, ce n’est plus une saisie');
+  // ⚠ 24, ET PLUS 12, DEPUIS LE 04/09. Le compte « 6 tailles, 6 emplacements »
+  // ne tenait que tant que les tailles étaient les six du tableau. Depuis le
+  // 03/09 la vendeuse crée ses propres bulles : une commande de staff à neuf
+  // tailles et six emplacements existe, et le plafond la tronquait EN SILENCE.
+  // Ce qui compte n'est pas le nombre, c'est qu'il y en ait un — cette
+  // structure repart vers chaque poste à chaque rafraîchissement.
+  assert.strictEqual(lHostile.fiche.prod.tailles.length, 24,
+    'une saisie est bornée : quarante tailles ne sont pas une commande');
   assert.strictEqual(lHostile.fiche.prod.logos.length, 1, 'une face sans nom ne décrit rien');
   assert.ok(lHostile.fiche.prod.logos[0].mm.length <= 120);
 

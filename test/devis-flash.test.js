@@ -745,8 +745,17 @@ assert.ok(!/dv__|\.dv\s*\{/.test(FEUILLE),
   // « AUTRES » A DISPARU (03/09) : remplacé par les tailles LIBRES (bulles
   // nommées, testées plus bas) — un 3XL ou un enfant se nomme désormais,
   // au lieu de se compter dans un bac générique.
-  assert.ok(/const TAILLES = \['XS', 'S', 'M', 'L', 'XL', '2XL'\]/.test(ECRAN),
+  //
+  // ⚠ ELLE VIT DANS `devis.js` DEPUIS LE 04/09, plus dans chaque écran. Les
+  // deux écrans flash en portaient chacun une copie ; la traduction vers
+  // `fiche.prod` en a besoin, et deux listes seraient deux listes le jour où
+  // l'une gagne une taille.
+  assert.ok(/export const TAILLES = \['XS', 'S', 'M', 'L', 'XL', '2XL'\]/.test(DEVIS),
     'XS, S, M, L, XL, 2XL — et dans cet ordre, sans « Autres »');
+  assert.ok(!/const TAILLES = \[/.test(ECRAN),
+    'l’écran ne redéclare pas la liste : il l’importe, sinon elles divergent');
+  assert.ok(/TAILLES, prodDeLigne,/.test(ECRAN),
+    'l’écran importe la liste ET la traduction depuis le module partagé');
   assert.ok(ECRAN.includes("el('div', 'fa-tailles')") && ECRAN.includes("'fa-lab fa-taille__k'"),
     'les cases de taille sont celles de la fiche de production, pas une grille qui leur ressemble');
   assert.ok(!/\.fa-tailles?\s*(,|\{)/.test(FEUILLE), 'devis-flash.css ne redéclare pas la grille des tailles');

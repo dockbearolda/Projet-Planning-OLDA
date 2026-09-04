@@ -35,6 +35,10 @@ import {
   APPROS, APPRO_DEFAUT, ARRONDIS, REGIMES, AJUSTEMENT_UNITES, VEDETTES,
   calculerDevis, modeleDevis, dessinerDevis, CSS_DEVIS, jourAtelier, jourPlus,
   SANS_PRIX,
+  // LES SIX TAILLES ET LA TRADUCTION VERS LE DOSSIER viennent du module que
+  // les deux ecrans partagent deja : ecrites ici, elles seraient deux listes
+  // et deux traductions le jour ou l'une gagne une taille.
+  TAILLES, prodDeLigne,
 } from './devis.js';
 // LE MENU DÉROULANT AVEC RECHERCHE, celui des deux écrans du comptoir. Charlie,
 // 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
@@ -130,7 +134,6 @@ function saisieNeuve() {
 // devis ne disait plus lequel. Remplacé par les TAILLES LIBRES ci-dessous :
 // Charlie voulait pouvoir « créer sa bulle » et lui donner un nom (« 4XL »),
 // autant de fois que nécessaire sur une même ligne.
-const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
 
 // CE QUE LES TAILLES DISENT SUR LE DEVIS : « 2 × S · 3 × M · 3 × 4XL ». C'est
 // la grammaire de toute la maison — la fiche de production et le ticket de
@@ -2379,6 +2382,18 @@ async function enregistrer() {
       ajustementValeur: compte.ajustement.valeur,
       ajustementMontant: compte.ajustement.montant,
       lignes: compte.lignes,
+      // CE QU'IL Y A A PRODUIRE, ARTICLE PAR ARTICLE (04/09/2026). Le devis
+      // n'envoyait RIEN de tout ca : ni les six cases de taille, ni les bulles
+      // creees a la main, ni les faces a marquer — le detail ne survivait que
+      // sur le papier, en texte, et l'atelier ouvrait une fiche vide.
+      //
+      // ⚠ LE SERVEUR NE POSE `fiche.prod` QUE SUR UN DEVIS A UN SEUL ARTICLE,
+      // parce qu'un devis a trois articles n'ouvre pour l'instant qu'UNE ligne
+      // au planning : y ecrire le premier article ferait passer la ligne
+      // entiere pour lui. On envoie quand meme les trois — le decoupage en une
+      // ligne par article est le lot suivant, et il n'aura rien a redemander a
+      // l'ecran.
+      prod: compte.lignes.map((l) => prodDeLigne(l)),
       sousTotalHt: compte.sousTotalHt,
       totalHt: compte.totalHt,
       taxe: compte.taxe,

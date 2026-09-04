@@ -38,6 +38,10 @@
 import {
   ARRONDIS, REGIMES, AJUSTEMENT_UNITES, VEDETTES,
   calculerDevis, jourAtelier, SANS_PRIX,
+  // LES SIX TAILLES ET LA TRADUCTION VERS LE DOSSIER viennent du module que
+  // les deux ecrans partagent deja : ecrites ici, elles seraient deux listes
+  // et deux traductions le jour ou l'une gagne une taille.
+  TAILLES, prodDeLigne,
 } from './devis.js';
 import {
   MODES_PAIEMENT, modeleFacture, dessinerFacture, CSS_FACTURE,
@@ -138,7 +142,6 @@ function saisieNeuve() {
 // papier ne disait plus lequel. Remplacé par les TAILLES LIBRES ci-dessous :
 // Charlie voulait pouvoir « créer sa bulle » et lui donner un nom (« 4XL »),
 // autant de fois que nécessaire sur une même ligne.
-const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
 
 // CE QUE LES TAILLES DISENT SUR LE DEVIS : « 2 × S · 3 × M · 3 × 4XL ». C'est
 // la grammaire de toute la maison — la fiche de production et le ticket de
@@ -2249,7 +2252,13 @@ async function emettreFacture() {
         label: l.designation,
         qty: l.quantite,
         amount: Math.round(l.totalHt * (1 + compte.tauxTgca) * 100) / 100,
-        prod: { ref: l.reference, couleur: l.couleur, marquage: l.marquage, encre: l.encre },
+        // CE QU'IL Y A A PRODUIRE, EN ENTIER (04/09/2026). Il n'y avait ici que
+        // quatre champs plats : les six cases de taille, les bulles creees a la
+        // main et les faces a marquer restaient a l'ecran. `prodDeLigne`
+        // (devis.js) les traduit dans la forme que la fiche atelier, le ticket,
+        // le bon de commande et le BAT lisent tous — `prodDuComptoir` decide
+        // ensuite, cote serveur, si la ligne porte assez pour valoir un `prod`.
+        prod: prodDeLigne(l),
         // MOTEUR « UNITAIRE » : le prix est déjà tranché à l'émission (par le
         // moteur V9 ou le catalogue), on l'archive tel quel plutôt que de
         // rejouer une chiffrage textile complexe server-side pour ce lot. Une

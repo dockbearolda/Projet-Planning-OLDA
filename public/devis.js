@@ -47,6 +47,99 @@ export const cents = (n) => Math.round((Number(n) || 0) * 100) / 100;
 // attente, le papier l'imprime tel quel.
 export const SANS_PRIX = 'À chiffrer';
 
+// ===========================================================================
+// CE QU'IL Y A À PRODUIRE — de la ligne de l'écran vers la fiche du dossier
+// ===========================================================================
+// LA VENDEUSE TAPAIT DES TAILLES QUI N'ARRIVAIENT NULLE PART (04/09/2026).
+// Les deux écrans flash envoyaient quatre champs plats — référence, couleur,
+// marquage, encre — et laissaient derrière eux les six cases de taille, les
+// bulles créées à la main, et les faces à marquer. Le détail survivait sur le
+// PAPIER, en texte (« 12 × M · 18 × L »), et dans la facture archivée : jamais
+// dans `fiche.prod`, la seule forme que la fiche atelier, le ticket, le bon de
+// commande et le BAT sachent lire. Mesuré en production le 29/08 : `fiche.prod`
+// sur 0 dossier de 187.
+//
+// ICI ET PAS DANS LES DEUX ÉCRANS. La vente flash est une copie modifiée du
+// devis flash — assumé, documenté, et c'est justement pourquoi la traduction
+// vit dans le module que les DEUX importent déjà. Écrite deux fois, elle
+// deviendrait deux traductions le jour où l'une gagne une taille.
+//
+// TOUT EST PUR : ni DOM, ni réseau. C'est ce qui la rend vérifiable hors
+// navigateur, comme le modèle du papier juste en dessous.
+
+// Les six tailles du tableau, dans l'ordre où elles se lisent. Une taille hors
+// de cette liste n'est pas une faute : c'est une bulle libre (`taillesLibres`),
+// et elle passe par l'autre chemin.
+export const TAILLES = ['XS', 'S', 'M', 'L', 'XL', '2XL'];
+
+// LES DEUX MOITIÉS NE SONT PAS EXPORTÉES, et c'est voulu : ce sont les
+// entrailles de `prodDeLigne`, qui est la seule chose dont un écran ait besoin.
+// Un export de plus serait une surface de plus à tenir — et les tests les
+// atteignent parfaitement à travers `prodDeLigne`.
+//
+// `[{ t: 'M', n: 12 }, …]` — la forme qu'attend `prodDuComptoir` côté serveur.
+// Les cases d'abord, dans l'ordre du tableau ; les bulles libres ensuite, dans
+// l'ordre où la vendeuse les a ouvertes. Une case à zéro ou une bulle sans nom
+// ne compte pas : c'est une case qu'on n'a pas remplie, pas une taille à zéro.
+function taillesDeLigne(ligne) {
+  const par = (ligne && ligne.parTaille && typeof ligne.parTaille === 'object') ? ligne.parTaille : {};
+  const fixes = TAILLES
+    .map((t) => ({ t, n: Math.round(Number(par[t]) || 0) }))
+    .filter((x) => x.n > 0);
+  const libres = (Array.isArray(ligne && ligne.taillesLibres) ? ligne.taillesLibres : [])
+    .map((l) => ({ t: texte(l && l.nom), n: Math.round(Number(l && l.qte) || 0) }))
+    .filter((x) => x.t && x.n > 0);
+  return [...fixes, ...libres];
+}
+
+// LES FACES SONT UN TEXTE À L'ÉCRAN, UNE LISTE DANS LE DOSSIER.
+// La vendeuse écrit « Coeur, Dos » sur un textile ; une tasse s'écrit toute
+// seule « Face 1 : Sublimation · Dessous : Logo ». Les deux se lisent d'une
+// même règle : on coupe aux séparateurs, puis au DEUX-POINTS s'il y en a un —
+// ce qui est devant est la face, ce qui suit est la consigne.
+//
+// ⚠ `quoi` N'EXISTE QUE S'IL EXISTE, exactement comme côté serveur : cette
+// structure repart vers chaque poste à chaque rafraîchissement du planning, et
+// un « quoi » vide sur chaque face de chaque textile est du poids sur le fil
+// pour ne rien dire.
+//
+// ⚠ AUCUNE COTE N'EST INVENTÉE. Le comptoir ne mesure pas : `mm` reste vide et
+// le serveur l'écrit tel quel. La largeur se prend à l'établi, ou vient du
+// tableau des tailles de logo — jamais d'une supposition d'ici.
+const SEPARATEURS_FACES = /[·•;,\n]+/;
+function facesDeLigne(brut) {
+  return texte(brut).split(SEPARATEURS_FACES)
+    .map((m) => texte(m))
+    .filter(Boolean)
+    .map((morceau) => {
+      const coupe = morceau.indexOf(':');
+      if (coupe < 0) return { face: morceau };
+      const face = texte(morceau.slice(0, coupe));
+      const quoi = texte(morceau.slice(coupe + 1));
+      // « : quelque chose » sans nom devant n'est pas une consigne sans face,
+      // c'est une face qu'on a nommée après le signe. On ne perd rien.
+      if (!face) return quoi ? { face: quoi } : null;
+      return quoi ? { face, quoi } : { face };
+    })
+    .filter(Boolean);
+}
+
+// CE QUE LA LIGNE ENVOIE AU DOSSIER. On ne décide PAS ici si c'est vide : la
+// règle « un `prod` sans un seul fait ne vaut pas la place qu'il prend » vit
+// côté serveur (`prodDuComptoir`), et elle doit rester à un seul endroit —
+// sinon une ligne de transport serait retenue ici et jetée là, ou l'inverse.
+export function prodDeLigne(ligne) {
+  return {
+    ref: texte(ligne && ligne.reference),
+    couleur: texte(ligne && ligne.couleur),
+    marquage: texte(ligne && ligne.marquage),
+    // La couleur de l'ENCRE, pas celle du vêtement : le mot de l'atelier.
+    encre: texte(ligne && ligne.encre),
+    tailles: taillesDeLigne(ligne),
+    logos: facesDeLigne(ligne && ligne.faces),
+  };
+}
+
 // LA DATE CIVILE DE L'ATELIER — Saint-Martin, UTC−4, sans heure d'été. Le
 // conteneur de production tourne en UTC : dès 20 h locales, un `toISOString()`
 // naïf date le devis du lendemain, et sa validité avec.

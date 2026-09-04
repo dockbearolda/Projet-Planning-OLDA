@@ -4550,7 +4550,14 @@ function articlesDuComptoir(brut) {
 // vers chaque poste à chaque rafraîchissement du planning, comme le numéro de
 // ticket. Une largeur de logo tient en trois chiffres, une taille en trois
 // signes — ce qui déborde n'est pas une mesure, c'est une faute de frappe.
-const PROD_ENTREES_MAX = 12;        // 6 tailles, 6 emplacements : le compte y est
+// ⚠ RELEVE DE 12 A 24 LE 04/09/2026. Le compte « 6 tailles, 6 emplacements »
+// ne tenait que tant que les tailles etaient les six du tableau. Depuis le
+// 03/09 la vendeuse cree ses propres bulles (`taillesLibres`) : une commande de
+// staff a neuf tailles ET six emplacements existe, et le plafond la tronquait
+// EN SILENCE — des pieces disparaissaient du dossier sans un message nulle
+// part. 24 reste borne, et c'est ce qui compte : cette structure repart vers
+// chaque poste a chaque rafraichissement du planning.
+const PROD_ENTREES_MAX = 24;
 function prodDuComptoir(brut) {
   if (!brut || typeof brut !== 'object') return null;
   const mot = (v) => borner(v, 60);
@@ -4785,6 +4792,13 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     ? borner(`${lignes[0].designation} + ${lignes.length - 1} autre${lignes.length > 2 ? 's' : ''}`, 200)
     : lignes[0].designation;
 
+  // Traduit AVANT la fiche, pour que la clé puisse ne pas exister du tout (voir
+  // le commentaire de `prod` plus bas). Une reprise V2/V3 le reprend par le
+  // `...fiche` de `neuve` : elle porte donc le `prod` de SA version, pas celui
+  // de la précédente — un devis qui passe d'un article à trois cesse d'en avoir
+  // un, et c'est juste.
+  const prodDevis = prodDuComptoir(Array.isArray(b.prod) ? b.prod[0] : null);
+
   const fiche = {
     kind: 'devis-v1',
     source: 'Devis',
@@ -4800,6 +4814,24 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     dueHeure: /^\d{2}:\d{2}$/.test(String(b.dueHeure || '')) ? b.dueHeure : null,
     maquette: b.maquette === true,
     noteInterne: borner(b.noteInterne, 600),
+    // CE QU'IL Y A À PRODUIRE (04/09/2026). Un dossier né d'un devis n'en
+    // portait RIEN : la fiche atelier s'ouvrait vide, le ticket sortait sans
+    // les tailles, et le BAT n'avait rien à se mettre. Le détail vivait dans
+    // `devis.lignes[]`, en texte, sous une forme qu'aucun de ces trois écrans
+    // ne lit — ils lisent tous `fiche.prod`, et lui seul.
+    //
+    // ⚠ SEULEMENT SUR UN DEVIS À UN SEUL ARTICLE, et c'est la même règle que
+    // la route du comptoir applique déjà à un panier d'un article : à
+    // plusieurs, le dossier n'ouvre pour l'instant qu'UNE ligne au planning, et
+    // y écrire le premier article ferait passer la ligne entière pour lui.
+    // Deux articles sur une ligne, ce n'est pas une production à moitié
+    // décrite, c'est une production FAUSSE. Le découpage en une ligne par
+    // article lève cette réserve — l'écran envoie déjà les N.
+    //
+    // `prodDuComptoir` rend `null` sur un article qui ne porte aucun fait : on
+    // n'écrit alors PAS la clé, plutôt qu'un `prod: null` que chaque poste
+    // recevrait à chaque rafraîchissement pour ne rien dire.
+    ...(lignes.length === 1 && prodDevis ? { prod: prodDevis } : {}),
     // LE DEVIS TEL QU'IL A ÉTÉ IMPRIMÉ. C'est l'archive : elle ne se retouche
     // pas, et c'est elle qu'on ressort quand le client revient avec sa feuille.
     devis: {
