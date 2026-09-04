@@ -8354,10 +8354,11 @@ function setViewMode(mode) {
   if ($viewVenteFlash) $viewVenteFlash.classList.toggle('active', mode === 'venteflash');
   if ($viewBat) $viewBat.classList.toggle('active', mode === 'bat');
   // L'AGENDA EST UN ONGLET, PLUS UNE ENTRÉE DU RAIL (03/09) : il s'allume donc
-  // comme les autres onglets de la barre. La version d'avant l'allumait dans le
-  // rail (`.stage--agenda`) et devait le faire ICI, avant le retour anticipé,
-  // parce que le rail n'est reconstruit qu'au changement des étapes vides.
-  // L'onglet n'a pas ce problème : la barre se repeint à chaque passage.
+  // comme les autres onglets de la barre. Dans le rail, il fallait le rallumer
+  // ICI, avant le retour anticipé, parce que le rail n'est reconstruit qu'au
+  // changement des étapes vides — l'onglet n'a pas ce problème, la barre se
+  // repeint à chaque passage. (Le nom de l'ancienne classe n'est pas écrit :
+  // `test/agenda.test.js` refuse qu'il traîne encore dans le code.)
   if ($viewAgenda) $viewAgenda.classList.toggle('active', mode === 'agenda');
   // Deux onglets pour une seule vue : c'est le HASH qui dit lequel est allumé.
   if ($viewVente) $viewVente.classList.toggle('active', mode === 'projet' && location.hash === HASH_VENTE);
