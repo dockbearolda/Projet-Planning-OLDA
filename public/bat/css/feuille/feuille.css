@@ -1,0 +1,425 @@
+/* ===========================================================================
+   LA FEUILLE BAT — LE DOCUMENT, PAS L'INTERFACE
+   ---------------------------------------------------------------------------
+   CE FICHIER EST HORS DU SYSTÈME PHAREDESIGN, ET C'EST VOULU.
+
+   Ce qu'il habille n'est pas un écran : c'est un A4 rendu à l'écran en
+   1 pt = 1 px, dont CHAQUE cote et CHAQUE teinte sont partagées avec
+   l'exportateur PDF (src/js/batlayout.js → G_HEX / HEX / G_RADIUS / ROW_H /
+   TBL_FONT*, consommés par src/js/batpdf.js). Une taille de 9 px n'est pas
+   « une taille hors échelle » : c'est 9 points sur le papier du client.
+   Passer ces valeurs à l'échelle 14/17/21/32 ne changerait pas un habillage,
+   ça changerait le DOCUMENT — et l'aperçu mentirait sur le PDF exporté.
+
+   D'où la séparation physique : le garde-fou s'exécute avec
+   `--exclure feuille`, et cette exclusion est la trace écrite de la frontière.
+   Tout ce qui n'est PAS le document vit dans app.css et suit la charte.
+
+   Ses jetons lui sont propres (--doc-*) et NE BASCULENT PAS de nuit : du
+   papier reste blanc.
+   =========================================================================== */
+
+:root {
+  /* Palette bleu canard — le reste de la feuille (visuels, pied de page).
+     Miroir de HEX dans batlayout.js. */
+  --doc-accent:      #4A6274;
+  --doc-accent-soft: rgba(74, 98, 116, .10);
+  --doc-accent-line: rgba(74, 98, 116, .22);
+  --doc-sheet:       #ffffff;   /* = HEX.SHEET : papier BLANC PUR */
+  --doc-sheet-2:     #f5f7f8;   /* champ au focus */
+  --doc-ink:         #1a1c1f;
+  --doc-grey:        #6b7378;
+  --doc-faint:       #9ea3a9;
+  --doc-hair:        #d4d8d8;
+  --doc-danger:      #dc2626;
+  --doc-danger-soft: rgba(220, 38, 38, .10);
+
+  /* Palette du BANDEAU unifié (identité + fiche de production).
+     Miroir EXACT de G_HEX dans batlayout.js. */
+  --doc-g-bg:      #ffffff;
+  --doc-g-head:    #f8f9fa;
+  --doc-g-ink:     #202124;
+  --doc-g-grey:    #5f6368;
+  --doc-g-faint:   #80868b;
+  --doc-g-border:  #dadce0;
+  --doc-g-sep:     #f1f3f4;
+  --doc-g-accent:  #1a73e8;
+  --doc-g-soft:    #e8f0fe;
+
+  /* Polices du document : celles que le PDF embarque, pas celle de l'app. */
+  --doc-font:      'Inter', system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --doc-font-ui:   'Roboto', system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --doc-font-mono: 'Roboto Mono', ui-monospace, monospace;
+
+  /* Ombre d'écran uniquement : le PDF exporté n'en porte pas. */
+  --doc-ombre: 0 1px 2px rgba(0, 0, 0, .08), 0 10px 28px rgba(0, 0, 0, .10);
+  --doc-plateau: 0 2px 6px rgba(74, 98, 116, .10), 0 14px 40px rgba(74, 98, 116, .12);
+  --doc-verre: rgba(244, 244, 242, .94);
+
+  /* Le mouvement du document : un seul retour immédiat, il n'anime rien d'autre. */
+  --doc-dur:  .14s;
+  --doc-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* La feuille : fond #f4f4f2 (jamais blanc pur), ombre teintée bleu canard.
+   Police 'Inter' = fidélité au PDF exporté. Géométrie inchangée. */
+.bat-page {
+  position: relative; background: var(--doc-sheet); transform-origin: 0 0;
+  font-family: var(--doc-font);
+  box-shadow: var(--doc-ombre);
+}
+
+/* Pastilles de couleur flottantes d'un logo sélectionné (seule UI affichée ;
+   la rotation se fait directement sur le logo). Plateau simple et discret. */
+.logo-swatches-float {
+  position: absolute; z-index: 5; max-width: 196px;
+  padding: 8px 9px; border-radius: 12px;
+  background: var(--doc-verre);
+  -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
+  border: 1px solid var(--doc-accent-line);
+  box-shadow: var(--doc-plateau);
+  contain: layout paint;
+}
+
+/* Éléments de la page — mêmes cotes que le PDF (1 pt = 1 px).
+   Sélecteurs élément+classe pour l'emporter sur les styles génériques
+   des champs (bordures/padding) définis plus haut. Teintes éditeur en bleu
+   canard (ces tuiles n'existent QUE dans l'éditeur : le PDF est redessiné). */
+.bat-page > * { position: absolute; }
+input.pdf-in, select.pdf-in, textarea.pdf-in {
+  border: 1px solid rgba(74, 98, 116, .16); border-radius: 2px;
+  background: rgba(74, 98, 116, .05);
+  padding: 0 1px; font-family: var(--doc-font);
+  color: inherit; outline: none; box-shadow: none; min-height: 0; height: auto;
+}
+/* Champ encore vide → tuile accent plus marquée : « à remplir » */
+input.pdf-in:placeholder-shown, textarea.pdf-in:placeholder-shown {
+  background: var(--doc-accent-soft); border-color: rgba(74, 98, 116, .32);
+}
+input.pdf-in:hover, select.pdf-in:hover, textarea.pdf-in:hover { border-color: var(--doc-accent); }
+input.pdf-in:focus, select.pdf-in:focus, textarea.pdf-in:focus {
+  border-color: var(--doc-accent); background: var(--doc-sheet-2); box-shadow: 0 0 0 2px var(--doc-accent-soft);
+}
+
+/* Bulles du bandeau : cartes arrondies (fond derrière le contenu) */
+.pdf-bubble {
+  box-sizing: border-box; border: .9px solid var(--doc-hair);
+  background: rgba(245, 247, 248, .7); border-radius: 8px;
+}
+/* Bandeau unifié (identité + tableau empilés dans UNE seule carte) : Material
+   (Google), voir G_HEX/G_RADIUS dans batlayout.js. Seule cette carte en
+   dévie ; le reste de la feuille garde .pdf-bubble ci-dessus (bleu canard),
+   inchangé. Géométrie de la section identité inchangée (ID_H, positions des
+   champs) : seul l'habillage change. */
+.pdf-bub-head {
+  background: var(--doc-g-bg); border: 1px solid var(--doc-g-border); border-radius: 12px;
+  display: flex; flex-direction: column; font-family: var(--doc-font-ui);
+}
+/* Section identité : logo + client/projet/date + BON À TIRER, sur une ligne ;
+   filet bas = séparateur avec la section tableau qui suit, dans la même carte. */
+.pdf-head-id {
+  flex: none; height: 36px; display: flex; align-items: center; gap: 16px; padding: 0 12px;
+  border-bottom: 1px solid var(--doc-g-border);
+}
+
+.pdf-company-logo { height: 24px; max-width: 120px; flex: none; display: flex; align-items: center; }
+.pdf-company-logo img { max-height: 24px; max-width: 120px; object-fit: contain; }
+.pdf-company-name { font-size: 12px; font-weight: 700; color: var(--doc-g-ink); line-height: 1; }
+.pdf-company-mark { color: var(--doc-g-ink); display: flex; align-items: center; }
+.pdf-company-mark svg { display: block; }
+
+/* Métadonnées : 5 colonnes qui remplissent l'espace libre entre le logo et le
+   bloc BON À TIRER. Les largeurs ne sont PAS égales — le poids de chaque
+   colonne est posé en style inline par batpage.js depuis META_COLS
+   (batlayout.js), partagé avec le PDF : CLIENT et PROJET, seuls champs à texte
+   libre long, reçoivent environ le double d'ÉCHÉANCE. */
+.pdf-meta { flex: 1; display: flex; flex-direction: row; align-items: center; gap: 10px; min-width: 0; }
+.pdf-meta-cell { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-width: 0; }
+.pdf-meta-cell .lb {
+  flex: none; font-size: 6px; font-weight: 500; letter-spacing: .12em;
+  color: var(--doc-g-faint); text-transform: uppercase; padding-left: 1px;
+}
+/* LE BANDEAU EST UN APERÇU. Ces valeurs se saisissaient ici, dans des cases de
+   16 px de haut sur un A4 réduit à l'écran — impossibles à viser au doigt, et
+   très loin des 44 px que ce projet s'impose. Elles se saisissent maintenant
+   dans le rail ; ce qui reste ici est ce que le PDF imprimera.
+   Le cadre demeure : il dit « voici une case du document », et c'est encore
+   vrai. Il ne dit simplement plus « tapez ici ».
+   `display: block` + `overflow: hidden` ne sont pas décoratifs : c'est ce qui
+   fait que `scrollWidth > clientWidth` reste vrai sur un span, donc que
+   `fitMetaValue` continue de réduire une valeur trop longue au lieu de la
+   rogner — la même règle que `fitValue()` dans le PDF. */
+.pdf-meta-val {
+  display: block; width: 100%; min-width: 0; overflow: hidden; white-space: nowrap;
+  font-size: 9px; font-weight: 600; color: var(--doc-g-ink); line-height: 16px;
+  padding: 0 8px; height: 16px; border-radius: 5px;
+  border: 1px solid var(--doc-g-border); background: none;
+}
+.pdf-meta-val:empty::before { content: '—'; color: var(--doc-g-faint); }
+
+/* « BON À TIRER » calé à droite de la section identité. Pas de marge négative :
+   la gouttière finale du letter-spacing reste DANS la boîte pour que le libellé
+   ne déborde jamais le coin arrondi de la carte (même retrait que le PDF). */
+.pdf-head-right { flex: none; text-align: right; }
+.pdf-bat-label { font-size: 13px; font-weight: 700; letter-spacing: .24em; color: var(--doc-g-ink); }
+
+.pdf-face-canvas { position: absolute; touch-action: none; cursor: default; }
+
+/* Conteneur du mockup (canvas + pastilles d'emplacement). Un clic sur une
+   zone vide du visuel — pastille ou non — pose un logo à cet endroit (autant
+   qu'on veut). */
+.pdf-face-wrap { position: absolute; }
+
+/* Emplacements standard (Cœur, Poitrine, Dos…), matérialisés par des
+   pastilles cliquables FIXES posées sur le mockup — cf. buildZoneDots() dans
+   batpage.js. Position FIXE de chaque pastille (aucun zoom, aucun
+   déplacement au survol) pour un clic fiable à la souris ; seule leur
+   apparition/disparition anime, au niveau du calque (.zone-layer ci-dessous),
+   pas au niveau de chaque pastille. Même widget réutilisé, toujours visible
+   cette fois, dans l'éditeur de zones (Réglages), en variante
+   `.zone-dot--edit` glissable. Repères ÉCRAN uniquement — le PDF est régénéré
+   indépendamment (batpdf.js) et ne les contient pas.
+   Tailles à l'échelle ÉCRAN via --k (= 1/zoom de page, posé à 1 hors de
+   l'éditeur BAT) → constantes à l'œil quel que soit le zoom. */
+.zone-layer {
+  position: absolute; inset: 0; z-index: 6; pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--doc-dur) var(--doc-ease);
+}
+/* Le vêtement reste net, sans repère, tant qu'on ne montre pas l'intention
+   d'y poser un logo : le survol du mockup (ou le focus clavier, au clavier
+   comme à la souris) révèle les pastilles. */
+.pdf-face-wrap:hover .zone-layer,
+.pdf-face-wrap:focus-within .zone-layer { opacity: 1; }
+/* Estompées pendant qu'on manipule un logo sur la face (cf. draw()) — y
+   compris pendant qu'on survole, pour ne pas distraire du geste en cours. */
+.pdf-face-wrap:hover .zone-layer.is-dimmed,
+.pdf-face-wrap:focus-within .zone-layer.is-dimmed { opacity: .14; }
+
+.zone-dot {
+  --k: 1;
+  position: absolute; transform: translate(-50%, -50%);
+  width: calc(44px * var(--k)); height: calc(44px * var(--k));
+  display: grid; place-items: center;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  pointer-events: auto; -webkit-tap-highlight-color: transparent; outline: none;
+}
+/* Souris/pavé (pointeur précis) : capture resserrée à 30px → aucun
+   chevauchement des cibles quand deux emplacements sont proches, tout en
+   restant très confortable à cliquer. Au doigt (coarse) on garde 44px. */
+@media (pointer: fine) {
+  .zone-dot { width: calc(30px * var(--k)); height: calc(30px * var(--k)); }
+}
+/* Anneau de visée : trait fin, jamais un halo flou. Présent — discret — au
+   repos (une pastille qui n'existe qu'au survol ne s'annonce pas), il se
+   resserre et s'affirme au survol/focus, comme un point de mise au point
+   d'appareil photo plutôt qu'un bouton qui s'allume. */
+.zone-dot__ring {
+  position: absolute; top: 50%; left: 50%; z-index: 1;
+  width: calc(28px * var(--k)); height: calc(28px * var(--k));
+  border-radius: 50%;
+  border: calc(1px * var(--k)) solid var(--doc-accent);
+  opacity: .32;
+  transform: translate(-50%, -50%) scale(.78);
+  transition: opacity var(--doc-dur) var(--doc-ease), transform var(--doc-dur) var(--doc-ease);
+}
+.zone-dot:hover .zone-dot__ring,
+.zone-dot:focus-visible .zone-dot__ring { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+/* Cœur : point plein, MAT — une seule teinte, aucun dégradé glacé qui le
+   ferait lire comme une bille ou un bouton de jeu. Le liseré clair (pas un
+   halo double) le détache proprement du textile, clair ou foncé ; l'ombre
+   est celle d'un objet posé, pas d'un feu. Le survol le soulève légèrement
+   (échelle + ombre plus profonde) — un geste physique, pas un flash. */
+.zone-dot__core {
+  position: relative; z-index: 2;
+  width: calc(12px * var(--k)); height: calc(12px * var(--k));
+  border-radius: 50%;
+  background: var(--doc-accent);
+  box-shadow:
+    0 0 0 calc(2px * var(--k)) var(--doc-sheet),
+    0 calc(1px * var(--k)) calc(3px * var(--k)) rgba(20, 26, 31, .28);
+  transition: transform var(--doc-dur) var(--doc-ease), box-shadow var(--doc-dur) var(--doc-ease);
+}
+.zone-dot:hover .zone-dot__core,
+.zone-dot:focus-visible .zone-dot__core {
+  transform: scale(1.2);
+  box-shadow:
+    0 0 0 calc(2px * var(--k)) var(--doc-sheet),
+    0 calc(2px * var(--k)) calc(7px * var(--k)) rgba(20, 26, 31, .32);
+}
+.zone-dot:active .zone-dot__core { transform: scale(.94); }
+/* Libellé de l'emplacement : verre dépoli, révélé au survol/focus — jamais un
+   tooltip web générique. */
+.zone-dot__label {
+  position: absolute; bottom: calc(100% + 9px * var(--k)); left: 50%; z-index: 3;
+  transform: translate(-50%, calc(4px * var(--k))) scale(.96); transform-origin: bottom center;
+  white-space: nowrap;
+  font: 600 calc(10.5px * var(--k))/1.1 var(--doc-font-ui);
+  letter-spacing: .01em;
+  color: var(--doc-ink);
+  background: var(--doc-verre); border: 1px solid rgba(255,255,255,.5);
+  -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+  padding: calc(4px * var(--k)) calc(10px * var(--k));
+  border-radius: 8px;
+  box-shadow: var(--doc-ombre);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--doc-dur) var(--doc-ease), transform var(--doc-dur) var(--doc-ease);
+}
+/* Petit ergot sous le libellé : ancre visuelle vers la pastille. */
+.zone-dot__label::after {
+  content: ''; position: absolute; top: 100%; left: 50%;
+  width: calc(7px * var(--k)); height: calc(7px * var(--k));
+  background: var(--doc-verre);
+  border-right: 1px solid rgba(255,255,255,.5); border-bottom: 1px solid rgba(255,255,255,.5);
+  transform: translate(-50%, -55%) rotate(45deg);
+}
+.zone-dot__label em { opacity: .6; font-style: normal; font-weight: 500; color: var(--doc-grey); }
+.zone-dot:hover .zone-dot__label,
+.zone-dot:focus-visible .zone-dot__label { opacity: 1; transform: translate(-50%, 0) scale(1); }
+
+/* Pastille en mode édition (éditeur de zones, Réglages) : la mire reste
+   affirmée en permanence — on la cherche pour la saisir, elle n'a pas à se
+   mériter au survol comme sur le BAT. Saisie directe au glisser ; le libellé
+   sort au survol ou quand elle est active. */
+.zone-dot--edit { cursor: grab; touch-action: none; }
+.zone-dot--edit:active { cursor: grabbing; }
+.zone-dot--edit .zone-dot__ring { opacity: .6; transform: translate(-50%, -50%) scale(1); }
+.zone-dot--edit:hover .zone-dot__ring,
+.zone-dot--edit.is-active .zone-dot__ring { opacity: 1; }
+.zone-dot--edit:hover .zone-dot__core,
+.zone-dot--edit.is-active .zone-dot__core { transform: scale(1.3); }
+.zone-dot--edit.is-active .zone-dot__label,
+.zone-dot--edit:hover .zone-dot__label { opacity: 1; transform: translate(-50%, 0) scale(1); }
+
+.pdf-empty {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  border: 1.2px dashed var(--doc-accent-line); border-radius: 6px; color: var(--doc-faint);
+  font-size: 9px; line-height: 1.6;
+}
+
+/* Tableau « Fiche de production », section basse de la carte unifiée
+   .pdf-bub-head — voir G_HEX/TBL_FONT* dans batlayout.js. Densité légèrement
+   plus généreuse que l'ancien tableau (lignes 14→16px, police 8→9px) pour
+   une lecture parfaitement nette côté client/production, sans empiéter sur
+   la place réservée aux visuels (le total ne bouge que de quelques pt). */
+.pdf-col { display: flex; flex-direction: column; overflow: visible; width: 100%; box-sizing: border-box; padding: 0 8px; }
+.pdf-table { position: relative; flex: none; font-family: var(--doc-font-ui); }
+
+.pdf-tbl-head { display: flex; align-items: stretch; min-height: 20px; background: var(--doc-g-head); border-bottom: .8px solid var(--doc-g-border); }
+.pdf-tbl-head .hc {
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 1px 3px; border-right: .8px solid var(--doc-g-border);
+  box-sizing: border-box;
+}
+.pdf-tbl-head .hc:last-child { border-right: 0; }
+/* Les deux intitulés de la barre : « TAILLE » à gauche, « TOTAL » à droite. */
+.hc-label, .hc-total { font-size: 6.5px; font-weight: 500; letter-spacing: .08em; color: var(--doc-g-grey); text-transform: uppercase; }
+/* DEUX CLASSES (0,2,0) pour battre `.pdf-tbl-head .hc` qui centre : la colonne
+   d'intitulé se lit à gauche sur TOUTE sa hauteur — « TAILLE », « QTÉ » et les
+   noms d'emplacement sur la même verticale. Un intitulé centré au-dessus d'une
+   pile d'intitulés calés à gauche se lit comme un décalage, pas comme un titre.
+   Le PDF applique la même règle (batpdf.drawGrid). */
+.pdf-tbl-head .hc.hc-label { justify-content: flex-start; padding-left: 4px; }
+/* UNE COLONNE PAR TAILLE. L'intitulé se saisissait ici, sur une case de 16 px ;
+   il se saisit maintenant dans le rail, sur une ligne à hauteur de commande.
+   Ce qui reste est ce que le PDF imprimera — même corps, même graisse, même
+   place. */
+.hc-size { position: relative; }
+.hc-size-val {
+  display: block; width: 100%; text-align: center;
+  font-size: 9px; font-weight: 700; color: var(--doc-g-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-tbl-row { display: flex; align-items: center; height: 16px; border-bottom: .5px solid var(--doc-g-sep); position: relative; }
+/* La ligne d'emplacement porte un intitulé éditable : un peu plus d'air. */
+.pdf-row-place { height: 19px; }
+.pdf-tbl-body .pdf-tbl-row:last-child { border-bottom: 0; }
+.pdf-tbl-row .cell { font-size: 9px; font-variant-numeric: tabular-nums; box-sizing: border-box; }
+/* L'INTITULÉ DE LIGNE remplace l'ancienne colonne « Taille » : il dit ce que la
+   ligne mesure (une quantité, une cote de marquage), calé à gauche comme se
+   lit un intitulé. */
+.pdf-tbl-row .rlabel {
+  display: flex; align-items: center; gap: 2px; min-width: 0;
+  padding-left: 4px; font-size: 6.5px; font-weight: 500;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--doc-g-grey);
+}
+.pdf-tbl-row .rlabel-place { text-transform: none; letter-spacing: 0; }
+.pdf-tbl-row .cell.qte { text-align: center; color: var(--doc-g-grey); }
+.pdf-tbl-row .cell.total { text-align: center; font-weight: 700; color: var(--doc-g-ink); }
+/* Une ligne « Qté » ferme la commande : filet plus marqué dessous, comme
+   l'ancienne ligne Total. */
+.pdf-row-qte { border-bottom-width: .8px; border-bottom-color: var(--doc-g-border); }
+
+/* L'intitulé d'un emplacement : la zone en gras, puis « couleur · emplacement »
+   éditable, sur une seule ligne. */
+.hc-zone { font-size: 8px; font-weight: 700; color: var(--doc-g-ink); line-height: 1.15; flex: none; }
+.hc-sep { color: var(--doc-g-grey); font-size: 6.5px; flex: none; }
+input.pdf-in.hc-color, input.pdf-in.hc-name {
+  min-width: 0; flex: 1 1 auto; text-align: left; font-size: 6.5px;
+  color: var(--doc-g-grey); height: 9px; padding: 0 1px;
+}
+
+/* Cote de marquage : valeur (Roboto Mono) + unité « mm » statique accolée,
+   groupe centré dans la colonne. L'unité se cache tant que le champ est vide
+   (placeholder affiché) via le combinateur + (unité = frère adjacent). */
+.pdf-tbl-row .dimcell { display: flex; align-items: center; justify-content: center; gap: 2px; }
+.pdf-tbl-row .dimcell input.cell.dim {
+  flex: none; width: 2.6em; text-align: right; color: var(--doc-g-ink);
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+}
+.pdf-tbl-row .dimcell input.cell.dim:placeholder-shown { text-align: center; }
+.pdf-tbl-row .dimcell input.cell.dim:placeholder-shown + .dim-unit { visibility: hidden; }
+.dim-unit { font-size: 6.5px; color: var(--doc-g-grey); }
+
+.pdf-row-del {
+  position: absolute; right: -16px; top: 2px; border: 0; background: none;
+  color: var(--doc-g-faint); font-size: 9px; padding: 2px 4px; opacity: 0;
+  transition: color var(--doc-dur) var(--doc-ease), opacity var(--doc-dur) var(--doc-ease);
+}
+.pdf-tbl-row:hover .pdf-row-del { opacity: 1; }
+/* LA CROIX EST UN TRACÉ, PAS UN CARACTÈRE. « ✕ » (U+2715) sort de la plage
+   latine des polices du document : ce SEUL glyphe, sur deux boutons révélés au
+   survol, faisait télécharger le fichier Roboto complet (36,6 Ko) à chaque
+   ouverture. C'est en plus la croix du système (ICON_X), la même que partout
+   ailleurs. Dimensionnée en `em`, elle garde exactement la taille d'avant et
+   suit l'échelle de la feuille au zoom. */
+.pdf-row-del svg { width: 1em; height: 1em; display: block; }
+.pdf-tbl-row:hover .pdf-row-del { opacity: 1; }
+.pdf-row-del:hover { color: var(--doc-danger); }
+
+input.pdf-in.hc-color, input.pdf-in.hc-name {
+  min-width: 0; max-width: 44%; text-align: center; font-size: 6.5px; color: var(--doc-g-grey); height: 9px; padding: 0 1px;
+}
+.hc-sep { color: var(--doc-g-grey); font-size: 6.5px; }
+
+/* Champs du bandeau (identité + tableau) : affordance Material (bleu Google)
+   au lieu du bleu canard générique .pdf-in — sélecteur à spécificité
+   supérieure, gagne quel que soit l'ordre des règles dans la feuille. */
+.pdf-head-id input.pdf-in, .pdf-grid input.pdf-in { font-family: inherit; border-color: var(--doc-g-border); background: none; border-radius: 3px; }
+.pdf-head-id input.pdf-in:hover, .pdf-grid input.pdf-in:hover { border-color: var(--doc-g-accent); background: var(--doc-g-sep); }
+.pdf-head-id input.pdf-in:focus, .pdf-grid input.pdf-in:focus { border-color: var(--doc-g-accent); background: var(--doc-g-bg); box-shadow: 0 0 0 2px rgba(26, 115, 232, .15); }
+.pdf-head-id input.pdf-in:placeholder-shown, .pdf-grid input.pdf-in:placeholder-shown { background: rgba(26, 115, 232, .06); border-color: rgba(26, 115, 232, .22); }
+.pdf-grid input.pdf-in { border-color: transparent; }
+.pdf-grid input.pdf-in:hover { border-color: var(--doc-g-border); }
+
+.pdf-footer { bottom: 9px; }
+.pdf-mentions {
+  border-top: .6px solid var(--doc-hair); padding-top: 4px; font-size: 5.2px; line-height: 6.8px;
+  color: var(--doc-faint); cursor: pointer; border-radius: 2px;
+  transition: background-color var(--doc-dur) var(--doc-ease);
+}
+.pdf-mentions:hover { background: var(--doc-accent-soft); outline: 3px solid var(--doc-accent-soft); }
+.pdf-identity { position: relative; text-align: center; white-space: nowrap; font-size: 6px; font-weight: 500; color: var(--doc-grey); margin-top: 5px; }
+.pdf-identity .pn { position: absolute; right: 0; top: 0; color: var(--doc-faint); font-weight: 400; font-size: 6.4px; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.swatches .sw {
+  width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(74, 98, 116, .2);
+  cursor: pointer;
+  transition: transform var(--doc-dur) var(--doc-ease);
+}
+.swatches .sw:hover { transform: translateY(-1px); }
+.swatches .sw.selected { outline: 2px solid var(--doc-accent); outline-offset: 1.5px; }
+
+

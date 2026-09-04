@@ -1,0 +1,36 @@
+/* ===========================================================================
+   L'ONGLET BAT — LA MISE EN PLACE, ET RIEN D'AUTRE (04/09/2026)
+   ---------------------------------------------------------------------------
+   BAT Studio apporte tout son habillage (`public/bat/css/`), enfermé sous
+   `.bat-app`. Cette feuille-ci ne le refait pas : elle ne fait que ce que
+   l'hôte doit faire, et que l'invité ne peut pas faire à sa place.
+
+   UNE HAUTEUR. C'est la seule chose que `monterBatStudio` demande, et elle est
+   écrite noir sur blanc dans son entête : « le conteneur doit avoir une
+   hauteur, l'hôte la donne, BAT Studio ne l'impose pas ». Sans elle la feuille
+   A4 s'étire jusqu'en bas de la page et la barre d'onglets part au défilement.
+
+   RIEN D'AUTRE ICI. Toute règle d'apparence qu'on écrirait dans ce fichier
+   serait la deuxième écriture d'une règle qui existe déjà sous `.bat-app` —
+   donc celle qui divergera. Les jetons, eux, descendent de `charte.css` : c'est
+   ce qui fait que cet onglet et les huit autres portent la même encre, la même
+   échelle de texte et le même thème sombre (cf. `public/bat/css/phare.css`).
+   =========================================================================== */
+
+.bat-ecran:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* `min-height: 0` : sans lui, un enfant en `overflow` pousse le conteneur
+     flex au-delà de sa piste au lieu de défiler dans sa boîte. Même piège que
+     dans `devis-flash.css`, et il se voit de la même façon — une page qui
+     défile alors que c'est le panneau qui devait le faire. */
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Le conteneur EST `.bat-app` une fois monté (c'est `monterBatStudio` qui pose
+   la classe) : il prend la place, ses écrans défilent dedans. */
+.bat-ecran.bat-app {
+  min-height: 0;
+}

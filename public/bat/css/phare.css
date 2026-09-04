@@ -1,0 +1,45 @@
+/* ===========================================================================
+   BAT STUDIO — CE QUE SA PALETTE AJOUTE À CELLE DU CRM, ET RIEN D'AUTRE
+   ---------------------------------------------------------------------------
+   Ce fichier déclarait 84 jetons sur `.bat-app`. Le CRM en déclare les mêmes
+   sur `:root`, et 76 étaient IDENTIQUES AU CARACTÈRE PRÈS — les deux écrans
+   sortent du même design system. Les 41 jetons du thème sombre l'étaient
+   aussi, tous les 41.
+
+   Les redéclarer sur `.bat-app`, c'était les COUPER de ceux du CRM : la
+   cascade s'arrêtait là. Le jour où Charlie change l'encre du CRM, BAT Studio
+   gardait l'ancienne — et personne ne le voyait avant d'ouvrir les deux
+   écrans côte à côte. Deux écritures redeviennent deux valeurs le jour où
+   l'une bouge (cf. la règle « même hauteur » du CLAUDE.md, c'est la même).
+
+   Les 76 sont donc SUPPRIMÉS : `.bat-app` vit dans le document du CRM, les
+   jetons de `:root` descendent jusqu'à lui tout seuls. Le thème sombre avec —
+   d'où la disparition du bloc `[data-theme="dark"] .bat-app`, qui de toute
+   façon ne s'appliquait JAMAIS une fois embarqué : `theme.js` posait
+   l'attribut SUR `.bat-app`, et un sélecteur descendant ne s'atteint pas
+   lui-même. Le thème est celui du CRM, décidé par le bouton lune de sa barre.
+
+   Reste ce que le CRM ne nomme pas :
+
+   · quatre couleurs d'état que BAT appelle autrement. Mêmes valeurs, dans les
+     deux thèmes — vérifié : neutre #4b5563/#d1d5db, ok #166534/#86efac,
+     fort #111827/#f3f4f6, éteint #676e7b/#9ca3af. Ce sont donc des ALIAS, pas
+     des copies : le CRM reste la source.
+   · deux interlignes que le CRM n'a pas sous ce nom.
+
+   AVANT D'AJOUTER UN JETON ICI : vérifier qu'il n'existe pas déjà dans
+   `charte.css`. S'il y est, il descend tout seul — l'écrire ici le casserait.
+   =========================================================================== */
+
+.bat-app {
+  /* Les quatre états, sous le nom que BAT Studio leur donne. */
+  --st-neutre: var(--st-demande);
+  --st-ok:     var(--st-livree);
+  --st-fort:   var(--st-facture);
+  --st-eteint: var(--st-archive);
+
+  /* Deux interlignes en propre. `--ligne-champ` est l'interligne serré du CRM
+     sous le nom qu'emploient les champs d'ici. */
+  --ligne-titre: 1.2;
+  --ligne-champ: var(--ligne-serre);
+}

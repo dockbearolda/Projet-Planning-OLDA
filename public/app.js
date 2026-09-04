@@ -7594,6 +7594,7 @@ const $viewPilotage = document.getElementById('viewPilotage');
 const $viewTaillesLogos = document.getElementById('viewTaillesLogos');
 const $viewDevisFlash = document.getElementById('viewDevisFlash');
 const $viewVenteFlash = document.getElementById('viewVenteFlash');
+const $viewBat = document.getElementById('viewBat');
 const $reglages = document.getElementById('reglages');
 const $montravail = document.getElementById('montravail');
 const $pilotage = document.getElementById('pilotage');
@@ -7601,6 +7602,7 @@ const $tailleslogos = document.getElementById('tailleslogos');
 const $devisflash = document.getElementById('devis-flash');
 const $venteflash = document.getElementById('vente-flash');
 const $agenda = document.getElementById('agenda');
+const $bat = document.getElementById('bat');
 // « VENTE » ET « DEVIS » SONT DEUX ONGLETS (29/08/2026, Charlie : « je veux
 // retrouver directement vente et devis, ils doivent être cliquables direct »).
 // Il y avait un onglet « Nouveau Projet » qui ne menait nulle part : il
@@ -7840,6 +7842,37 @@ function mountTaillesLogos() {
   } else if (tlModule && tlModule.refreshTaillesLogos) {
     tlModule.refreshTaillesLogos();
   }
+}
+
+// LE BAT — BAT STUDIO, MONTÉ DANS L'ONGLET.
+//
+// Une ligne, et c'est tout ce que le CRM a à en savoir : `monterBatStudio` pose
+// ses feuilles, précharge ses modules et rend l'écran. Le CRM ne connaît ni ses
+// composants, ni son état, ni sa feuille A4.
+//
+// MÊME MONTAGE PARESSEUX QUE LES AUTRES ÉCRANS, et il compte plus ici
+// qu'ailleurs : BAT Studio tire 5,4 Mo de bibliothèques (pdf-lib, pdf.js,
+// fontkit) et 1,8 Mo de polices de document. Rien de tout ça ne doit partir du
+// serveur tant que personne n'a cliqué sur l'onglet — l'ouverture d'un poste
+// pèse 109 Ko, et ce chiffre est un budget, pas un constat.
+//
+// `chrome: true` : on GARDE sa rangée d'onglets (Projets · Bon À Tirer ·
+// Produits · Réglages). L'option existe pour le cas où le CRM monterait chaque
+// écran à sa place — un dans la fiche, deux dans les Réglages — et c'est ce que
+// recommande son INTEGRATION.md. Mais Charlie a demandé UN onglet dans la
+// barre : dans un seul écran, sans cette rangée, trois de ses quatre écrans
+// seraient inatteignables.
+//
+// ON NE DÉMONTE PAS EN QUITTANT L'ONGLET. `demonter()` existe et fonctionne,
+// mais il appelle `closeProject()` : passer voir le planning trente secondes
+// fermerait le BAT en cours d'édition. Le conteneur est simplement caché, comme
+// les huit autres écrans.
+let batLoading = null;
+function mountBat() {
+  if (!$bat || batLoading) return;
+  batLoading = Promise.all([poserFeuille('bat.css'), import('./bat/js/monter.js')])
+    .then(([, m]) => m.monterBatStudio($bat, { chrome: true }))
+    .catch((err) => { batLoading = null; reportError(err); });
 }
 
 // LE DEVIS CHIFFRE — meme montage paresseux. Il tire TROIS feuilles et deux
@@ -8125,6 +8158,7 @@ function setViewMode(mode) {
   if ($viewTaillesLogos) $viewTaillesLogos.classList.toggle('active', mode === 'tailleslogos');
   if ($viewDevisFlash) $viewDevisFlash.classList.toggle('active', mode === 'devisflash');
   if ($viewVenteFlash) $viewVenteFlash.classList.toggle('active', mode === 'venteflash');
+  if ($viewBat) $viewBat.classList.toggle('active', mode === 'bat');
   // L'AGENDA S'ALLUME DANS LE RAIL, pas dans la barre du haut. Le rail n'est
   // reconstruit qu'au changement des étapes vides : sans cette ligne, son
   // entrée resterait éteinte pendant qu'on lit l'agenda, ou allumée après
@@ -8159,6 +8193,7 @@ function setViewMode(mode) {
   const devisflash = mode === 'devisflash';
   const venteflash = mode === 'venteflash';
   const agenda = mode === 'agenda';
+  const bat = mode === 'bat';
   const projet = mode === 'projet';
   if ($dashboard) $dashboard.hidden = !dash;
   if ($clients) $clients.hidden = !clients;
@@ -8169,6 +8204,7 @@ function setViewMode(mode) {
   if ($devisflash) $devisflash.hidden = !devisflash;
   if ($venteflash) $venteflash.hidden = !venteflash;
   if ($agenda) $agenda.hidden = !agenda;
+  if ($bat) $bat.hidden = !bat;
   if ($projet) $projet.hidden = !projet;
   document.body.classList.toggle('view-plein', !isPlanningMode(mode));
   document.body.classList.toggle('view-focus', mode in PROMOTED_BY_VIEW);
@@ -8187,6 +8223,7 @@ function setViewMode(mode) {
   if (montravail) mountMonTravail();
   if (pilotage) mountPilotage();
   if (tailleslogos) mountTaillesLogos();
+  if (bat) mountBat();
   if (devisflash) mountDevisFlash();
   if (venteflash) mountVenteFlash();
   if (agenda) mountAgenda(); else if (agModule) agModule.hide();
@@ -8231,6 +8268,7 @@ const VIEWS = {
   [HASH_CLIENTS]: 'clients', '#reglages': 'reglages', '#mon-travail': 'montravail',
   '#pilotage': 'pilotage',
   '#tailles-logos': 'tailleslogos',
+  '#bat': 'bat',
   '#devis-flash': 'devisflash',
   '#vente-flash': 'venteflash',
   [HASH_AGENDA]: 'agenda',

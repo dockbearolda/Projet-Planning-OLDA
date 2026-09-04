@@ -11,6 +11,13 @@
    Usage :
      node outils/chercher-code-mort.mjs            # rapport lisible
      node outils/chercher-code-mort.mjs --json     # même chose, en JSON
+     node outils/chercher-code-mort.mjs --sauf public/bat/   # sans ce dossier
+
+   `--sauf <préfixes séparés par une virgule>` retire des RÉSULTATS ce qui vit
+   sous ces chemins — sans les retirer du FOIN. La nuance est tout : une
+   fonction du CRM que seul BAT Studio appelle doit rester vivante, et une
+   classe de BAT posée par BAT ne doit pas être annoncée morte. On ne cesse donc
+   pas de LIRE ces fichiers, on cesse de les JUGER.
 
    Il regarde quatre choses :
      1. exports       un `export` que plus aucun écran n'importe
@@ -195,6 +202,25 @@ for (const f of fichiers) {
   const ailleurs = foinTotal.split(lire(f)).join('\n');       // le fichier ne se cite pas lui-même
   if (new RegExp(echapper(nom)).test(ailleurs)) continue;
   resultat.orphelins.push(relatif(f));
+}
+
+// --- CE QU'ON NE JUGE PAS -------------------------------------------------
+// La sonde est faite pour le code du CRM. Une application VENDORISÉE — BAT
+// Studio, arrivé entier dans `public/bat/` — a ses propres conventions et ses
+// propres liens : des modules qui ne se citent qu'à travers un import
+// dynamique, des classes posées par concaténation depuis quatre fichiers, une
+// API interne dont la moitié des `export` n'a qu'un appelant à l'intérieur.
+// La juger avec cette sonde rendrait quarante faux positifs, et un cliquet à
+// quarante ne refuse plus rien. Elle vient avec ses propres garde-fous, dans
+// son dépôt d'origine.
+const iSauf = process.argv.indexOf('--sauf');
+const sauf = iSauf === -1 ? [] : String(process.argv[iSauf + 1] || '').split(',').filter(Boolean);
+if (sauf.length) {
+  for (const categorie of Object.keys(resultat)) {
+    resultat[categorie] = resultat[categorie].filter(
+      (l) => !sauf.some((prefixe) => String(l).trimStart().startsWith(prefixe)),
+    );
+  }
 }
 
 // --- SORTIE ---------------------------------------------------------------

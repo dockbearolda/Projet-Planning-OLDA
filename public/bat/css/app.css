@@ -1,0 +1,1326 @@
+/* ===========================================================================
+   BAT STUDIO — L'INTERFACE
+   ---------------------------------------------------------------------------
+   Se charge en DERNIER : `phare.css` (les jetons) → `charte.css` (les jetons
+   qui manquaient) → `phare-composants.css` (ce que plus d'un écran porte) →
+   ce fichier → `feuille/feuille.css` (le document).
+
+   Ici : AUCUNE VALEUR EN DUR. Pas une teinte, pas une taille, pas une durée,
+   pas un écart. Ce qui manque se pose dans `charte.css`, avec son rôle écrit.
+   Le garde-fou refuse le reste :
+
+       node scripts/verifier.mjs src --exclure feuille
+       node scripts/contraste.mjs src/css/phare.css
+
+   LA FEUILLE BAT N'EST PAS ICI, ET C'EST VOULU. Ce n'est pas un écran : c'est
+   un A4 rendu en 1 pt = 1 px dont chaque cote est partagée avec l'exportateur
+   PDF. La raison complète est écrite en tête de `feuille/feuille.css`.
+   =========================================================================== */
+
+/* ============================================================== LA POLICE
+   ELLE VIENT DU CRM, ET IL NE LA TELECHARGE PAS. Cette application embarquait
+   Manrope (deux sous-ensembles, 1,2 Mo de .woff2 sur le chemin critique). Le
+   CRM, lui, ecrit dans la police du systeme : c est une regle du depot, et
+   c est aussi la seule facon que deux ecrans ouverts a un clic l un de l autre
+   se ressemblent vraiment. Le jeton `--font` n est donc plus redeclare ici
+   (cf. phare.css) : il descend de `charte.css`, et les deux ecrans changent
+   ensemble ou pas du tout.
+
+   LES POLICES DU DOCUMENT RESTENT, ELLES. Inter, Roboto et Roboto Mono
+   ci-dessous n habillent jamais l interface : elles habillent LA FEUILLE, et
+   `batpdf.js` embarque les .ttf correspondants dans le PDF exporte. Les
+   retirer ferait mentir l apercu a l ecran sur ce qui sortira de
+   l imprimante — c est exactement ce qu on ne veut pas d un bon a tirer. */
+
+/* Les polices du DOCUMENT — la feuille et le PDF exporté les partagent
+   (batpdf.js embarque les TTF correspondants). Elles n'habillent jamais
+   l'interface.
+
+   DÉCOUPÉES EN DEUX PLAGES : latin + latin étendu, et rien d'autre. Les fichiers publiés
+   couvrent en plus le grec et le cyrillique — Inter Regular + Medium, c'était
+   278 Ko au démarrage, et l'application s'ouvrant sur la feuille, ils
+   partaient à chaque ouverture pour écrire des noms de clients français.
+   Le latin étendu ne se télécharge que le jour où un caractère l'exige.
+
+   PAS DE FICHIER COMPLET EN REPLI : deux `@font-face` de même famille et même
+   graisse dont les plages SE CHEVAUCHENT font télécharger les deux (mesuré sur
+   Roboto : 36,6 Ko de rab pour rien). Les plages sont donc disjointes. Au-delà du latin étendu, c'est la police système qui
+   prend le relais — exactement ce que fait déjà l'interface.
+
+   Les sous-ensembles se régénèrent par `npm run fonts:subset` (les .woff2
+   complets restent sur le disque : ce sont eux la source). */
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/Inter-Regular-latin.woff2') format('woff2'); font-weight: 400; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/Inter-Regular-latin-ext.woff2') format('woff2'); font-weight: 400; font-display: swap; unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/Inter-Medium-latin.woff2') format('woff2'); font-weight: 500; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/Inter-Medium-latin-ext.woff2') format('woff2'); font-weight: 500; font-display: swap; unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/Inter-SemiBold-latin.woff2') format('woff2'); font-weight: 600; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/Inter-SemiBold-latin-ext.woff2') format('woff2'); font-weight: 600; font-display: swap; unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/Inter-Bold-latin.woff2') format('woff2'); font-weight: 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Inter'; src: url('../assets/fonts/Inter-Bold-latin-ext.woff2') format('woff2'); font-weight: 700; font-display: swap; unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Roboto'; src: url('../assets/fonts/Roboto-latin-latin.woff2') format('woff2'); font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Roboto'; src: url('../assets/fonts/Roboto-latin-latin-ext.woff2') format('woff2'); font-weight: 100 900; font-display: swap; unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Roboto Mono'; src: url('../assets/fonts/RobotoMono-Regular-latin.woff2') format('woff2'); font-weight: 400; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Roboto Mono'; src: url('../assets/fonts/RobotoMono-Regular-latin-ext.woff2') format('woff2'); font-weight: 400; font-display: swap; unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+/* ================================================================= LE SOCLE
+   TOUT EST ENFERMÉ DANS `.bat-app`. Cette application a vocation à s'ouvrir
+   DANS un CRM : une règle posée sur `h1` ou sur `input` y aplatirait les titres
+   et repeindrait les champs de l'hôte, une règle sur `body` lui prendrait sa
+   page. Rien de ce fichier ne doit sortir du conteneur.
+
+   `:where()` ET PAS `.bat-app` NU : `:where()` ne pèse RIEN dans le calcul de
+   spécificité. `.bat-app input { font-size: … }` vaudrait 0,1,1 et battrait
+   `.hc-size-in { font-size: 9px }` (0,1,0) — le tableau de la feuille changerait
+   de taille rien qu'en enfermant les règles. Avec `:where(.bat-app)`, chaque
+   règle garde EXACTEMENT le poids qu'elle avait.
+
+   Ce qui appartient vraiment à la PAGE (hauteur de `html`, rebond du
+   défilement, fond du document) vit dans `autonome.css`, chargé par
+   `index.html` seul — le CRM, lui, ne le charge pas. */
+:where(.bat-app) *, .bat-app { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+.bat-app {
+  font-family: var(--font);
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-texte);
+  line-height: var(--ligne-texte);
+  background: var(--bg);
+  color: var(--text-1);
+  height: 100%;
+  /* UNE COLONNE : l'en-tête, puis les écrans qui prennent le reste. La hauteur
+     des écrans se DÉDUIT au lieu de se soustraire — elle s'écrivait
+     `calc(100% - var(--barre-h))`, ce qui obligeait la barre à connaître sa
+     hauteur, et l'écran à connaître celle de la barre. L'en-tête du CRM ne
+     promet pas de hauteur fixe (son plancher dépend de `--ctrl-h`), donc la
+     soustraction aurait fini par mentir d'une poignée de pixels — ceux qu'on
+     retrouve en trop au bas de la feuille A4. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;   /* les chiffres tombent à la verticale */
+}
+
+/* Un `<h1>`, un `<h3>`, un `<button>` laissés à leur défaut décident chacun de
+   leur taille et de leur police — c'est une échelle parallèle qui s'installe
+   sans qu'on la voie. On les ramène, ils reprendront leur taille par la
+   charte. */
+:where(.bat-app) h1, :where(.bat-app) h2, :where(.bat-app) h3, :where(.bat-app) h4 { font-size: inherit; font-weight: inherit; line-height: var(--ligne-titre); }
+:where(.bat-app) button, :where(.bat-app) input, :where(.bat-app) select, :where(.bat-app) textarea { font-family: inherit; font-size: var(--taille-texte); color: inherit; }
+
+/* Le curseur ne dit qu'une chose : ça se clique, ou ça se saisit. */
+:where(.bat-app) a, :where(.bat-app) button, :where(.bat-app) summary,
+:where(.bat-app) [role="button"], :where(.bat-app) select { cursor: pointer; }
+:where(.bat-app) input[type="text"], :where(.bat-app) input[type="number"],
+:where(.bat-app) input[type="date"], :where(.bat-app) textarea,
+:where(.bat-app) [contenteditable="true"] { cursor: text; }
+:where(.bat-app) :disabled { cursor: default; }
+
+/* Pas de contour navigateur au clic ; l'anneau ne sort qu'au CLAVIER, et c'est
+   le même partout — l'accent, à 2 px, décollé de 2 px. */
+:where(.bat-app) :focus { outline: none; }
+:where(.bat-app) :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+:where(.bat-app) img, :where(.bat-app) svg { -webkit-user-drag: none; user-select: none; }
+
+/* Barres de défilement : les propriétés standard suffisent, et elles ne
+   demandent aucune valeur en dur. */
+:where(.bat-app) * { scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; }
+
+/* ======================================================== LA BARRE SUPÉRIEURE
+   ELLE N'EXISTE PLUS ICI : c'est `.ecran-tete` du CRM (cf. monter.js), le même
+   composant que ses huit autres écrans. Sont partis avec elle `#topbar`, son
+   jeton `--barre-h`, et la marque (le rond « B » et le nom « BAT Studio ») —
+   dans le CRM, l'onglet allumé dit déjà où l'on est, et un deuxième nom
+   d'application au milieu d'un écran est un doublon qui ne renseigne personne.
+   Ne restent que les ONGLETS, que l'en-tête du CRM porte à sa gauche. */
+
+/* La navigation prend LA BOÎTE — elle se clique, donc elle fait la hauteur de
+   tout ce qui se clique. L'onglet courant ne se signale pas par une couleur
+   de marque mais par sa BULLE et sa GRAISSE : la couleur ne dit qu'un état. */
+#mainnav { display: flex; gap: 2px; align-items: center; }
+.nav-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--pas-1);
+  flex: none; white-space: nowrap;
+  min-height: var(--ctrl-h); padding: 0 var(--pas-3);
+  border: var(--trait-reserve); border-radius: var(--arrondi-champ);
+  background: transparent; color: var(--text-2);
+  font-size: var(--taille-texte); font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.nav-btn svg { width: var(--ic); height: var(--ic); flex: none; }
+.nav-btn:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-1); }
+/* L'ONGLET COURANT PORTE L'ENCRE PLEINE. Une bulle claire pour le courant et
+   une bulle claire pour le désactivé, c'étaient deux gris voisins : « Bon À
+   Tirer », indisponible tant qu'aucun projet n'est ouvert, se lisait comme
+   l'onglet sélectionné. L'encre pleine, elle, ne se confond avec rien. */
+.nav-btn.active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: var(--graisse-forte); }
+.nav-btn.active:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: var(--on-primary); }
+/* Une action qu'on ne peut pas encore faire DIT QUAND MÊME ce qu'elle fera :
+   pas d'`opacity` qui rendrait le libellé illisible au moment précis où l'on
+   cherche quoi faire. Le fond s'éteint, l'encre passe au secondaire. */
+.nav-btn:disabled { background: var(--zone-bg); color: var(--text-2); cursor: default; }
+
+/* La pastille « projet ouvert » : une étiquette, donc la pilule. Elle ne se
+   clique pas, elle ne fait donc pas la boîte. Vide, elle disparaît
+   entièrement — pas de contour fantôme. */
+.topbar-project { margin-left: auto; min-width: 0; }
+.topbar-project.on {
+  display: inline-flex; align-items: center; gap: var(--pas-1);
+  max-width: 460px; min-width: 0; overflow: hidden;
+  padding: 2px var(--pas-2); border-radius: var(--pilule);
+  background: var(--st-neutre-bg); color: var(--st-neutre);
+  font-size: var(--taille-note); font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ); white-space: nowrap;
+}
+.topbar-project .tp-client { color: var(--text-1); font-weight: var(--graisse-forte); }
+.topbar-project .tp-client, .topbar-project .tp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.topbar-project .tp-arts, .topbar-project .tp-sep, .topbar-project .pastille { flex: none; }
+
+/* L'état de la sauvegarde. Absent du flux tant qu'il n'a rien à dire : la
+   barre ne bouge pas quand il paraît (loi 8), et rien ne se réserve « au cas
+   où ». Seul `pending` porte une couleur — c'est le seul état qui dise
+   quelque chose : ça n'est pas encore parti. */
+.save-state { display: none; }
+.save-state.on {
+  display: inline-flex; align-items: center; gap: var(--pas-1); flex: none;
+  padding: 2px var(--pas-2); border-radius: var(--pilule);
+  background: var(--st-neutre-bg); color: var(--st-neutre);
+  font-size: var(--taille-note); font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ); white-space: nowrap;
+  animation: apparait var(--dur-2) var(--ease);
+}
+/* Le libellé court n'existe QU'au téléphone : deux mots dans le document, un
+   sigle dans une barre de 390 px. Le sigle est celui de l'application. */
+.save-state .ss-dot { width: var(--pas-1); height: var(--pas-1); border-radius: var(--pilule); flex: none; background: currentColor; }
+.save-state.saving .ss-dot { animation: bat 1.1s ease-in-out infinite; }
+.save-state.pending { background: var(--st-cours-bg); color: var(--st-cours); cursor: help; }
+/* Un conflit n'est pas une attente : c'est une décision à prendre. Le rouge dit
+   ici un ÉTAT — deux versions coexistent et l'une va disparaître — pas une
+   panne. `--st-bloque` sur son propre fond, mesuré à 5,91 en clair. */
+.save-state.conflit { background: var(--st-bloque-bg); color: var(--st-bloque); cursor: help; }
+@keyframes apparait { from { opacity: 0; } }
+@keyframes bat { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+
+/* L'AVATAR EST PARTI. Il portait l'initiale de l'entreprise, il ne cliquait
+   pas, il n'ouvrait rien — et il occupait un rond de 44 px à l'endroit exact
+   où l'œil cherche un compte utilisateur, dans une application qui n'en a
+   aucun. La marque, à gauche, porte déjà l'identité. */
+
+/* ================================================================ LES ÉCRANS */
+/* ── MONTÉ DANS UN CRM : PAS DE SECONDE NAVIGATION ─────────────────────────
+   Embarquée, l'application est UN ÉCRAN de l'hôte, pas une application dans
+   l'application. Sa barre — marque, quatre onglets, fiche ouverte — répète ce
+   que le CRM affiche déjà en plus grand, et coûte 70 px de hauteur à l'endroit
+   où la feuille A4 en manque le plus.
+   Le `<header>` reste dans le DOM : `nav-bat`, `topbar-project` et `save-state`
+   s'y trouvent par identifiant depuis quatre endroits, et les faire disparaître
+   obligerait à semer des gardes partout pour un gain nul.
+   L'ÉTAT DE SAUVEGARDE, LUI, RESTE VISIBLE. C'est la seule chose de cette barre
+   qui dise quelque chose que l'hôte ignore : « votre travail est enregistré ».
+   Il passe en coin, POSÉ et non inséré — il ne pousse rien (loi 8). */
+.bat-app.sans-chrome { position: relative; }
+.bat-app.sans-chrome #save-state.on {
+  position: absolute; z-index: 41;
+  top: var(--pas-2); right: var(--pas-2);
+}
+
+#screens { flex: 1; min-height: 0; }
+.screen { display: none; height: 100%; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+.screen.active { display: block; }
+
+/* Le voile d'attente : posé, jamais inséré — rien ne bouge quand il paraît. */
+.screen-loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 50; pointer-events: none; }
+.spinner {
+  width: var(--attente); height: var(--attente); border-radius: var(--pilule);
+  border: var(--attente-trait) solid var(--border);
+  border-top-color: var(--primary);
+  animation: tourne .7s linear infinite;
+}
+@keyframes tourne { to { transform: rotate(360deg); } }
+
+/* Échec de démarrage : dernier recours, affiché à la place des écrans quand
+   l'initialisation n'a pas abouti. À ce stade aucun composant n'est monté —
+   il ne dépend donc de rien d'autre que des jetons. */
+.boot-error { max-width: var(--lecture-etroit); margin: 12vh auto; padding: 0 var(--pas-4); text-align: center; }
+.boot-error h1 { font-size: var(--taille-titre); font-weight: var(--graisse-forte); color: var(--text-1); margin-bottom: var(--pas-2); }
+.boot-error p { color: var(--text-2); line-height: var(--ligne-texte); }
+/* La sortie de secours : c'est la seule action de cet écran, elle en prend la
+   couleur. L'écart la décolle du détail technique au-dessus, qui s'adresse à
+   qui débogue — pas à qui veut juste travailler. */
+.boot-error .btn { margin-top: var(--pas-3); }
+.boot-error-detail { margin-top: var(--pas-3); font-family: 'Roboto Mono', ui-monospace, monospace; font-size: var(--taille-note); color: var(--text-3); word-break: break-word; }
+
+/* ====================================================== LES COMMANDES MAISON
+   `.btn`, `.btn.primaire`, `.btn.secondaire`, `.btn.serre` viennent du fichier
+   partagé. Il ne manque QUE le niveau destructif — et il se dit par la
+   couleur de sa bulle, pas par le retrait de sa boîte. */
+/* LE DESTRUCTIF. Il garde LA MÊME BOÎTE et le même trait que ses voisins de
+   rangée — le distinguer en lui retirant sa bulle le rendrait étranger, pas
+   prudent. Ce qui change, c'est QUAND la couleur arrive : au repos il porte
+   l'encre du texte, parce que douze « Supprimer » écarlates sur un écran de
+   projets ne disent plus un état, ils décorent. Le rouge sort à l'instant du
+   geste — au survol, au focus — c'est-à-dire au moment où il sert. */
+.btn.danger { background: transparent; border-color: var(--border); color: var(--text-1); }
+/* SAUF QUAND C'EST LE GESTE LUI-MÊME. Dans une boîte de confirmation, la
+   commande destructive EST celle qui engage : elle porte la bulle pleine, en
+   rouge cette fois, et c'est le seul endroit de l'application où le rouge est
+   au repos. Ailleurs il n'y a rien à confirmer, donc rien à colorer. */
+.btn.danger.primaire { background: var(--danger); border-color: var(--danger); color: var(--on-primary); }
+.btn.danger.primaire:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--on-primary); filter: brightness(1.12); }
+.btn.danger:hover:not(:disabled), .btn.danger:focus-visible {
+  border-color: var(--danger-line); color: var(--danger);
+  background: linear-gradient(var(--danger-bg), var(--danger-bg)), var(--surface);
+}
+.btn svg { width: var(--ic); height: var(--ic); flex: none; }
+.btn.serre svg { width: var(--ic-serre); height: var(--ic-serre); }
+
+/* ===================================================== LE CHAMP ET SON INTITULÉ
+   L'intitulé annonce, le champ se lit : deux tailles sur la surface, pas une
+   de plus. */
+.field { display: flex; flex-direction: column; gap: var(--pas-1); min-width: 0; }
+.field > label { font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); }
+.hint { font-size: var(--taille-note); font-weight: var(--graisse-texte); color: var(--text-2); line-height: var(--ligne-texte); }
+h2.section { font-size: var(--taille-titre); font-weight: var(--graisse-forte); color: var(--text-1); margin-bottom: var(--pas-3); }
+.texte-modale { line-height: var(--ligne-texte); }
+/* La liste des manques d'un BAT : des constats, pas des erreurs — l'encre
+   reste celle du texte, la couleur ne dirait rien de plus ici (l'export n'est
+   pas bloqué, c'est une décision qu'on laisse à l'utilisateur). */
+.liste-manques { display: flex; flex-direction: column; gap: var(--pas-2); margin: 0; padding-left: var(--pas-4); line-height: var(--ligne-texte); }
+.liste-manques li { list-style: disc; }
+
+/* ============================================================== DEUX RANGS
+   Une rangée et une pile, et rien d'autre. Elles existent parce que le JS
+   écrivait ses mises en page en style inline — `gap:8px`, `gap:12px`,
+   `margin-top:12px` : trois écarts qui ne sont dans aucune échelle, invisibles
+   au garde-fou (il lit les feuilles, pas les gabarits) et qui remettaient les
+   sept écarts d'avant par la porte de derrière. */
+.rang { display: flex; align-items: center; flex-wrap: wrap; gap: var(--pas-2); }
+.pile { display: flex; flex-direction: column; gap: var(--pas-3); }
+
+/* ---------------------------------------------------------------- LA CROIX
+   LE MÊME OBJET POUR LE MÊME GESTE : retirer une valeur d'une liste, un
+   article du rail, un coloris d'un produit. C'étaient trois boutons — un rond
+   de 26, un rond de 26 sans trait, et un `<button>` nu laissé à 13,33 px, sur
+   des écrans ouverts à un clic les uns des autres.
+   C'est le rond SERRÉ : il est posé DANS une ligne, il la suit, il ne la fait
+   pas grandir. */
+.chip button, .bt-act, .cr-del {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: var(--rond-serre); height: var(--rond-serre); padding: 0;
+  border: var(--trait-reserve); border-radius: var(--pilule);
+  background: transparent; color: var(--text-2);
+  font-family: inherit; font-size: var(--taille-note); line-height: var(--ligne-champ); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease);
+}
+.chip button svg, .bt-act svg, .cr-del svg { width: var(--ic-serre); height: var(--ic-serre); }
+.chip button:hover, .cr-del:hover, .bt-act.bt-del:hover { background: var(--danger-bg); color: var(--danger); }
+
+/* ============================================================== LES MESSAGES
+   Ils sont POSÉS, jamais insérés : aucune commande ne bouge parce qu'un
+   message paraît ou disparaît. Le conteneur est déjà `fixed` — la règle
+   nucléaire est tenue par construction. Il se lit sur la surface inversée,
+   celle qui s'inverse aussi de nuit. */
+#toasts {
+  position: fixed; z-index: 300;
+  bottom: var(--pas-4); left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: var(--pas-2); align-items: center;
+  padding: 0 var(--pas-3); max-width: 100%; pointer-events: none;
+}
+.toast {
+  display: flex; align-items: center; gap: var(--pas-3);
+  max-width: min(640px, calc(100vw - 2 * var(--pas-4)));
+  padding: var(--pas-3) var(--pas-4);
+  border: 1px solid var(--tip-bg); border-radius: var(--arrondi-carte);
+  background: var(--tip-bg); color: var(--tip-fg);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--taille-texte); font-weight: var(--graisse-note); line-height: var(--ligne-texte);
+  pointer-events: auto;
+  animation: monte var(--dur-2) var(--ease);
+}
+/* L'échec parle, le succès se tait : seul le refus change de couleur. Le fond
+   est COMPOSÉ sur la surface — de nuit `--danger-bg` est translucide, et le
+   texte de la page se lirait au travers. */
+.toast.error {
+  border-color: var(--danger-line);
+  background: linear-gradient(var(--danger-bg), var(--danger-bg)), var(--surface);
+  color: var(--danger);
+}
+.toast .toast-action {
+  flex: none; border: var(--trait-reserve); border-radius: var(--arrondi-champ);
+  padding: var(--champ-y-serre) var(--pas-2);
+  background: transparent; color: inherit;
+  font-size: var(--taille-texte); font-weight: var(--graisse-forte);
+  line-height: var(--ligne-serre); text-decoration: underline; cursor: pointer;
+}
+@keyframes monte { from { opacity: 0; transform: translateY(var(--pas-2)); } }
+
+/* ================================================================ LA MODALE */
+.modal-veil {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center; padding: var(--pas-4);
+  background: var(--voile);
+  animation: apparait var(--dur-2) var(--ease);
+}
+.modal {
+  display: flex; flex-direction: column;
+  min-width: 460px; max-width: 940px; max-height: 100%; overflow: hidden;
+  border: 1px solid var(--card-border); border-radius: var(--arrondi-carte);
+  background: var(--surface); box-shadow: var(--shadow-pop);
+  animation: monte var(--dur-3) var(--ease);
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--pas-3);
+  padding: var(--pas-4) var(--pas-4) var(--pas-3);
+  font-size: var(--taille-titre); font-weight: var(--graisse-forte); color: var(--text-1);
+  line-height: var(--ligne-titre);
+}
+.modal-body { padding: 0 var(--pas-4) var(--pas-4); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; color: var(--text-1); }
+.modal-foot { display: flex; justify-content: flex-end; gap: var(--pas-2); padding: var(--pas-3) var(--pas-4) var(--pas-4); }
+/* Une icône seule : le rond. Le même objet que la flèche « revenir » du
+   fichier partagé — même boîte, même trait, même geste. */
+.modal-close {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: var(--rond); height: var(--rond); padding: 0;
+  border: var(--trait-reserve); border-radius: var(--pilule);
+  background: transparent; color: var(--text-2); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.modal-close:hover { background: var(--surface-hover); color: var(--text-1); }
+.modal-close svg { width: var(--ic); height: var(--ic); }
+
+/* ========================================================= LA CARTE D'OBJET
+   L'écran PRODUITS, désormais seul à s'en servir : les projets sont passés en
+   liste, et une liste n'est pas une carte étirée. Ce qui reste vrai, c'est que
+   les deux écrans partagent leurs PIÈCES — vignette, ligne de titre, ligne de
+   méta, rangée d'actions — plutôt que deux jeux de règles voisines qui ne se
+   ressemblaient plus qu'approximativement (vignette 62 contre 4/3, rembourrage
+   14 contre 10/12, deux gris de titre). */
+.carte-objet {
+  display: flex; flex-direction: column; gap: var(--pas-2); min-width: 0;
+  padding: var(--pas-3);
+  border: 1px solid var(--card-border); border-radius: var(--arrondi-carte);
+  background: var(--surface); box-shadow: var(--shadow-1);
+  transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+.carte-objet:hover { border-color: var(--border-strong); box-shadow: var(--shadow-2); }
+/* LA CARTE OUVRE LA FICHE, comme la ligne ouvre le projet — même geste sur les
+   deux écrans, pas deux conventions à un clic l'une de l'autre. */
+.produit-card { cursor: pointer; }
+.produit-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.pc-body { display: flex; gap: var(--pas-2); align-items: flex-start; min-width: 0; }
+/* Les trois points de la fiche : au bout de la ligne de titre, hors du texte. */
+.pc-menu { flex: none; }
+.pc-thumb {
+  width: var(--vignette); height: var(--vignette); flex: none;
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--bg) center/contain no-repeat;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.pc-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+/* PAS DE VIGNETTE = UNE SILHOUETTE, PAS UN TROU. Une boîte grise vide au milieu
+   d'une grille de photos ne se lit pas comme « ce produit n'a pas d'image » :
+   elle se lit comme une image cassée. La silhouette porte l'encre atténuée —
+   c'est un repère, pas une information à lire. */
+.pc-thumb svg { width: 60%; height: 60%; color: var(--text-3); }
+.pc-text { flex: 1; min-width: 0; }
+.pc-titleline { display: flex; align-items: center; gap: var(--pas-1); min-width: 0; }
+.carte-objet h3 {
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: var(--taille-texte); font-weight: var(--graisse-forte); color: var(--text-1);
+}
+.pc-meta {
+  display: flex; align-items: baseline; gap: var(--pas-2); min-width: 0;
+  margin-top: 2px; white-space: nowrap;
+  font-size: var(--taille-note); color: var(--text-2);
+}
+.pc-meta i { color: var(--text-3); font-style: normal; }
+
+/* Le point de couleur suit la ligne, il ne la fait pas grandir. */
+.pc-dot { width: var(--point); height: var(--point); border-radius: var(--pilule); flex: none; box-shadow: inset 0 0 0 1px var(--state-press); }
+.pc-gname, .pc-gcol { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Le MODÈLE identifie l'article, le libellé de couleur l'accompagne : quand la
+   place manque, c'est la couleur qui cède en premier. */
+.pc-gname { flex: 0 1 auto; color: var(--text-1); font-weight: var(--graisse-note); }
+.pc-gcol { flex: 0 4 auto; color: var(--text-2); }
+.pc-more { flex: none; margin-left: auto; }
+
+/* La rangée d'actions. L'action destructrice est repoussée à droite : elle ne
+   doit pas être collée aux deux autres — un clic distrait ne se rattrape pas. */
+/* UNE COMMANDE SE DIMENSIONNE SUR SON LIBELLÉ, JAMAIS L'INVERSE : dans la
+   rangée, aucune ne rétrécit (c'est la règle du composant partagé). C'est donc
+   la RANGÉE qui doit céder — sans `wrap`, « Supprimer » sortait de la carte par
+   la droite dès que la colonne se resserrait. Et la colonne est calée pour que
+   les trois tiennent sur une ligne dans le cas courant. */
+.pc-actions {
+  display: flex; flex-wrap: wrap; gap: var(--pas-1); align-items: center; margin-top: auto;
+  padding-top: var(--pas-2); border-top: 1px solid var(--row-line);
+}
+.pc-actions .btn.danger { margin-left: auto; }
+.pc-actions .menu-actions { margin-left: auto; }
+
+/* ====================================================== LE MENU D'ACTIONS
+   Ce que la liste ne montre plus. Le geste courant est porté par la ligne (ou
+   par le bouton principal de la carte) ; le reste se range derrière un rond à
+   trois points — la forme d'une icône seule, et une cible de 44 px au doigt.
+   Trente-cinq produits × quatre boutons, c'était cent quarante commandes de
+   même poids sur un écran : plus rien n'y désignait quoi que ce soit. */
+.menu-actions { position: relative; display: inline-flex; flex: none; }
+.menu-actions-btn {
+  border: var(--trait-reserve); background: transparent; color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.menu-actions-btn svg { width: var(--ic); height: var(--ic); }
+.menu-actions-btn:hover { background: var(--surface-hover); color: var(--text-1); }
+.menu-actions-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.menu-actions-btn[aria-expanded="true"] { background: var(--primary-soft); color: var(--text-1); }
+/* Le menu EST le menu du sélecteur de vêtement : mêmes lignes, même bulle,
+   même ombre. Il n'a simplement ni recherche ni en-têtes de famille. */
+.gp-menu { min-width: 180px; padding: var(--pas-1) 0; }
+/* DEUX CLASSES, PAS UNE (0,2,0). `.gp-row` porte déjà `color` et il est écrit
+   PLUS BAS dans ce fichier : à égalité de poids, c'est l'ordre qui tranche, et
+   « Supprimer » restait à l'encre ordinaire. Le rouge dit ici un état — la
+   ligne qui ne se rattrape pas — pas une décoration.
+   Le fond du survol est celui du danger, sur lequel `--danger` est mesuré à
+   5,91 en clair et 8,47 de nuit. */
+.gp-row.gp-row-danger { color: var(--danger); }
+.gp-row.gp-row-danger:hover { background: var(--danger-bg); }
+
+/* ==================================================== LA BARRE DE RECHERCHE
+   Deux listes dépassent l'écran (quinze projets, trente-cinq produits) et
+   aucune des deux n'avait de quoi les réduire. Le composant est CELUI du
+   système (`.champ-recherche`) : seule la largeur se règle ici, parce que la
+   largeur est une affaire de mise en page, pas de composant.
+   Le compteur dit ce que le filtre a laissé — sans lui, une recherche qui ne
+   trouve rien ressemble à une liste qui s'est vidée. */
+.liste-outils { display: flex; align-items: center; gap: var(--pas-2); margin-bottom: var(--pas-3); }
+.liste-outils .champ-recherche { flex: 1 1 320px; max-width: 420px; min-width: 0; }
+.liste-outils .champ-recherche svg { width: var(--ic-serre); height: var(--ic-serre); color: var(--text-2); flex: none; }
+.liste-outils .lo-compte { flex: none; font-size: var(--taille-note); color: var(--text-2); }
+/* Le vide de recherche n'est pas le vide de la liste : il ne propose pas de
+   créer quoi que ce soit, il dit seulement que rien ne correspond. */
+.liste-vide { padding: var(--pas-4); text-align: center; font-size: var(--taille-texte); color: var(--text-2); }
+
+/* ========================================================= L'ÉCRAN PROJETS */
+.projects-wrap { max-width: var(--lecture); margin: 0 auto; padding: var(--pas-4); }
+/* UN SEUL EN-TÊTE D'ÉCRAN (04/09/2026). Cette rangée portait un « Projets » en
+   `--taille-grand` : c'était le titre de l'application autonome, la seule à en
+   avoir un. Dans le CRM, `.ecran-tete` dit déjà « Bon à tirer » juste au-dessus,
+   et l'onglet allumé dit « Projets » — un troisième mot pour la même chose.
+   Ne restent que les commandes, poussées à droite comme avant par la marge
+   automatique que le titre portait. */
+.projects-head { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--pas-2); margin-bottom: var(--pas-4); }
+/* Les deux actions restent solidaires : à l'étroit elles passent à la ligne
+   ENSEMBLE plutôt que de se séparer de part et d'autre du titre. */
+.projects-actions { display: flex; align-items: center; gap: var(--pas-2); flex-wrap: wrap; }
+/* `min-width: 0` sur les colonnes, sans quoi la taille minimale AUTOMATIQUE
+   d'un enfant de grille (sa largeur min-content) l'emporte sur la piste : à
+   390 px la colonne mesurait 486 et la rangée d'actions sortait de la carte,
+   par la droite, sans jamais se replier. C'est le miroir exact du champ en
+   flex qui refuse de rétrécir. */
+/* ============================================================ LA LISTE
+   UNE LIGNE PAR PROJET, pas une carte. Quinze cartes, c'est quinze îlots dont
+   rien ne tombe sur la même verticale : pour comparer deux dates ou deux
+   vêtements, l'œil doit repartir en chasse à chaque fois. En liste, chaque
+   colonne est une colonne — le nom, le vêtement, la date, les actions se lisent
+   d'aplomb, et quinze projets tiennent dans la hauteur qui en montrait six. */
+.projects-liste { display: flex; flex-direction: column; }
+/* L'en-tête de client. Le premier n'a pas de marge haute : il touche déjà le
+   titre de l'écran. */
+.client-head {
+  display: flex; align-items: baseline; gap: var(--pas-2);
+  margin-top: var(--pas-4); padding-bottom: var(--pas-1);
+  border-bottom: 1px solid var(--border);
+}
+.client-head:first-child { margin-top: 0; }
+.client-head h2 {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--taille-titre); font-weight: var(--graisse-forte); color: var(--text-1);
+}
+/* Les brouillons ferment la liste : l'intitulé le dit, sans crier. */
+.client-head.sans-client h2 { color: var(--text-2); font-weight: var(--graisse-note); }
+
+/* LA LIGNE. Sa hauteur SORT de son contenu et de son rembourrage — on ne l'écrit
+   pas. Le filet du bas sépare, le survol désigne. */
+.ligne-projet {
+  display: flex; align-items: center; gap: var(--pas-3);
+  padding: var(--pas-2);
+  border-bottom: 1px solid var(--row-line);
+  color: var(--text-1); cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.ligne-projet:hover { background: var(--row-hover); }
+.ligne-projet:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.ligne-projet .pc-thumb { width: var(--vignette-serre); height: var(--vignette-serre); }
+
+/* Le nom mène la ligne : c'est lui qui cède quand la place manque, mais il cède
+   en dernier — d'où le `flex` le plus généreux de la rangée. */
+/* Le compteur d'articles est une propriété du PROJET, pas du vêtement : il suit
+   le nom. Rangé dans la colonne vêtement, il lui volait le tiers de sa largeur
+   et le modèle s'y coupait au deuxième mot. */
+.lp-nom { flex: 5 1 0; min-width: 0; display: flex; align-items: baseline; gap: var(--pas-1); }
+.lp-titre {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--taille-texte); font-weight: var(--graisse-forte);
+}
+/* Sans nom saisi, le titre s'efface au profit du vêtement, qui devient
+   l'identifiant. */
+.ligne-projet.unnamed .lp-titre { color: var(--text-2); font-weight: var(--graisse-texte); }
+
+.lp-vetement { flex: 4 1 0; min-width: 0; display: flex; align-items: center; gap: var(--pas-1); font-size: var(--taille-note); }
+.lp-nom .pastille { flex: 0 0 auto; }
+/* La date ne se tronque pas : coupée, elle ne dit plus rien. Elle se cale à
+   DROITE sur une largeur exprimée en caractères : les jours chargés rendent
+   l'heure (« 28/08/2026 18:22 ») et les autres non, ce qui donnait deux bords
+   différents d'une ligne à l'autre — or une liste ne vaut que si ses colonnes
+   tombent sur la même verticale. La mesure suit la taille du texte parce
+   qu'elle est écrite dans SON unité, pas en pixels. */
+.lp-date { flex: 0 0 auto; min-width: 16ch; text-align: right; font-size: var(--taille-note); color: var(--text-3); }
+/* SUR UNE LIGNE SANS NOM, LA DATE N'EST PLUS UN REPÈRE : c'est le seul
+   discriminant entre treize lignes autrement identiques. Elle quitte donc
+   l'encre atténuée — celle-ci est réservée à ce qu'on ne lit pas. */
+.ligne-projet.unnamed .lp-date { color: var(--text-2); }
+.ligne-projet .pc-actions { flex: 0 0 auto; margin-top: 0; padding-top: 0; border-top: 0; }
+/* Un PDF glissé sur l'écran : la zone entière est la cible. */
+.projects-wrap.drop-target { outline: 2px dashed var(--primary); outline-offset: calc(-1 * var(--pas-2)); background: var(--primary-soft); }
+
+/* Le choix du projet d'origine d'un BAT antérieur aux PDF modifiables : chaque
+   candidat est une ligne cliquable pleine largeur (souvent une seule). */
+.legacy-list { display: flex; flex-direction: column; gap: var(--pas-2); margin: var(--pas-3) 0 var(--pas-1); }
+.legacy-item {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  padding: var(--pas-2) var(--pas-3);
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); color: var(--text-1);
+  font-family: inherit; font-size: var(--taille-texte); line-height: var(--ligne-champ); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.legacy-item:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.legacy-item .li-name { font-weight: var(--graisse-forte); }
+.legacy-item .li-meta { font-size: var(--taille-note); color: var(--text-2); }
+
+.welcome {
+  text-align: center; padding: var(--pas-4);
+  border: 1px dashed var(--border-strong); border-radius: var(--arrondi-carte);
+  background: var(--surface); color: var(--text-2);
+}
+.welcome h2 { font-size: var(--taille-titre); font-weight: var(--graisse-forte); color: var(--text-1); margin-bottom: var(--pas-2); }
+.welcome p { max-width: 480px; margin: 0 auto var(--pas-4); line-height: var(--ligne-texte); }
+
+/* ==================================================== L'ÉCRAN « BON À TIRER »
+   LES COMMANDES SONT EN HAUT, SUR TOUTE LA LARGEUR. Le rail gauche rendait à
+   la feuille toute la hauteur de la fenêtre, mais il rangeait l'article dans
+   une colonne de 320 px : UNE paire intitulé/champ par ligne, les quantités
+   sous la ligne de flottaison dès qu'un produit avait six tailles, et un
+   défilement à faire pour voir ce qu'on est en train de régler.
+   Le bandeau prend l'autre pari — il coûte de la hauteur à l'aperçu, il rend
+   de la LARGEUR aux commandes. Les cinq blocs (fiche, vêtement, faces,
+   quantités, ce qui s'imprime) se posent CÔTE À CÔTE : tout l'article tient
+   sur un écran, sans rien dérouler.
+   Ce qui rend la chose possible : chaque bloc porte désormais sa PROPRE petite
+   grille au lieu de partager la grille commune du rail. Une grille unique
+   n'aligne des blocs qu'en colonne ; des boîtes autonomes s'alignent en
+   rangée, se remettent à la ligne quand la place manque, et gardent chacune
+   ses deux verticales à elle. */
+.bat-layout { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+/* UNE carte : tout ce qui pilote l'article ouvert y est rangé. Pas
+   d'`overflow: hidden` — les menus débordent volontairement de la carte et
+   seraient rognés.
+   DEUX RANGÉES, ET LA PREMIÈRE EN PORTE DEUX CHOSES. En haut : QUEL article
+   (les onglets) et ce qui TERMINE le travail (historique, export) — deux
+   questions de niveau projet, aux deux bouts de la même ligne. En dessous, sur
+   toute la largeur : les réglages de l'article ouvert.
+   Une grille et non un `flex-wrap` : le pied doit tenir la ligne des onglets
+   quoi qu'il arrive. En flex, un bandeau de réglages plus large que la carte
+   le repoussait sur une ligne à lui — 142 px de carte pour deux boutons. */
+.bat-editor {
+  position: relative;
+  flex: none; margin: var(--pas-1) var(--pas-3) var(--pas-1);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "onglets pied" "reglages reglages";
+  border: 1px solid var(--card-border); border-radius: var(--arrondi-carte);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+/* ── LE BANDEAU EST UN TABLEAU ─────────────────────────────────────────────
+   UNE SEULE GRILLE POUR TOUTE LA BARRE, et rien d'autre. Chaque bloc avait la
+   sienne : cinq jeux de colonnes indépendants, cinq largeurs de champ
+   différentes, et « Faces » qui ne tombait sous aucun intitulé. Rien n'était
+   droit — parce que rien ne PARTAGEAIT de verticale.
+   Les groupes (`.bat-champs`) et les couples (`.bat-champ`) sont donc en
+   `display: contents` : ils cessent d'être des boîtes et laissent leurs
+   intitulés et leurs champs se poser dans la grille du PARENT. Il n'y a plus
+   qu'un jeu de colonnes ; il ne peut plus y en avoir deux qui divergent.
+   Cinq paires « intitulé · champ » de largeur IDENTIQUE (`1fr` partout) : les
+   cinq champs tiennent sur une rangée, tous à la même largeur et tous alignés
+   sur la même ligne de base. Les quantités prennent la rangée suivante, leur
+   intitulé sur la verticale de « Client » et leur première case sur celle du
+   champ de « Client ».
+   Pas d'`overflow` ici : les menus débordent volontairement de la carte. */
+.bat-toolbar {
+  grid-area: reglages; min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, var(--champ-lb) minmax(0, 1fr));
+  align-items: center;
+  column-gap: var(--pas-2); row-gap: var(--pas-1);
+  padding: var(--pas-2) var(--pas-3);
+}
+/* Les groupes ne sont plus des boîtes. Un `<label>` en `display: contents`
+   continue de donner le focus à son champ au clic — le lien est dans le DOM,
+   pas dans la mise en page. */
+.bat-champs, .bat-champ { display: contents; }
+
+/* LES QUANTITÉS PRENNENT LA RANGÉE ENTIÈRE, et commencent où commencent les
+   champs. « Quantités » se pose dans la colonne des intitulés — même verticale
+   que « Client », « Vêtement », « Faces » — et la série occupe tout ce qui
+   reste. C'est ce qui fait que la première case de taille tombe exactement
+   sous le premier champ de la rangée du dessus. */
+#bat-sizes-label { grid-column: 1; }
+.bat-qty-zone {
+  grid-column: 2 / -1; min-width: 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--pas-2) var(--pas-3);
+}
+/* Le compte et les commandes de la série ferment la rangée, poussés à droite :
+   ce sont des à-côtés de la saisie, pas des cases du tableau. */
+.bat-qty-zone > .bat-qty-total { margin-left: auto; }
+
+/* ------------------------------------------------------------- LE PIED
+   CE QUI TERMINE LE TRAVAIL SE TIENT À PART. « Exporter le PDF » est la seule
+   action terminale de l'application : mêlée aux réglages, elle se cherchait —
+   et sa position dépendait du nombre d'articles et de tailles.
+   Elle vit donc au COIN de la carte, sur la ligne des onglets et derrière un
+   filet : toujours au même endroit, quel que soit le nombre d'articles, de
+   tailles ou de faces. */
+.bat-pied {
+  grid-area: pied;
+  display: flex; align-items: center; gap: var(--pas-2);
+  padding: var(--pas-1) var(--pas-3);
+  border-bottom: 1px solid var(--row-line); border-left: 1px solid var(--row-line);
+}
+/* Chacun à sa largeur de texte : c'est la COULEUR de la bulle qui dit lequel
+   termine le travail, jamais la place occupée. */
+.bat-pied .btn { flex: none; }
+/* L'HISTORIQUE S'EFFACE DERRIÈRE L'EXPORT. Deux boîtes du même trait, côte à
+   côte, se disputaient le regard alors qu'une seule termine le travail — et
+   l'historique est une commande qu'on ouvre une fois sur vingt. Il perd donc
+   sa bulle : il ne garde que son mot, dans l'encre secondaire, et ne reprend un
+   fond qu'au survol.
+   Il garde en revanche sa HAUTEUR : discret ne veut pas dire difficile à
+   viser, et la cible de 44 px reste due. */
+.bat-pied #bat-history {
+  border-color: transparent; background: transparent;
+  color: var(--text-2); font-weight: var(--graisse-note);
+  padding: 0 var(--pas-2);
+}
+.bat-pied #bat-history:hover:not(:disabled) {
+  background: var(--surface-hover); border-color: transparent; color: var(--text-1);
+}
+/* LE MESSAGE D'EXPORT NE POUSSE PERSONNE (loi 8). « Composition de la page 2… »
+   apparaît puis disparaît pendant la génération : posé dans le flux du pied, il
+   ferait descendre le bouton d'export de sa propre hauteur puis remonter — la
+   commande qu'on attend bougerait pendant qu'on l'attend.
+   Il se pose donc SOUS la carte, aligné sur le bouton qui l'a déclenché, et
+   flotte au-dessus de la feuille : rien ne bouge, et il se lit là où le regard
+   est déjà. */
+#bat-status {
+  position: absolute; top: 100%; right: var(--pas-3); z-index: 20;
+  /* Ancré sur la CARTE, pas sur le pied : le pied est en haut à droite, un
+     message accroché à lui recouvrirait les réglages au lieu de la feuille. */
+  width: max-content; max-width: min(420px, 60vw);
+  margin-top: 6px; pointer-events: none;
+  padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-1);
+  font-weight: var(--graisse-forte);
+}
+#bat-status:empty { display: none; }
+/* Le déclencheur remplit sa cellule : vêtement et couleur tombent alors sur la
+   même verticale, comme les champs de la fiche juste à côté. */
+.bat-editor .gp-trigger { max-width: none; width: 100%; }
+/* Le champ ne porte plus qu'une ligne — la référence — donc plus de sous-titre
+   à ranger sous elle. */
+.bat-editor .gp-trigger-name { line-height: var(--ligne-champ); }
+
+/* ------------------------------------------- LE CHAMP « VÊTEMENT » EST UN CHAMP
+   Il a la boîte d'un déclencheur (c'est un menu qu'il ouvre) et le
+   comportement d'une saisie (c'est dedans qu'on cherche). D'où un `input` qui
+   emprunte `.gp-trigger` : même bord, même hauteur, même alignement dans le
+   tableau que ses voisins — et rien de ce que le navigateur pose d'office sur
+   un champ texte. */
+.gp-saisie {
+  font-family: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-note);
+  color: var(--text-1); text-align: left;
+  cursor: text; -webkit-appearance: none; appearance: none;
+}
+.gp-saisie::placeholder { color: var(--text-3); font-weight: var(--graisse-texte); }
+.gp-saisie:focus { outline: none; border-color: var(--primary); background: var(--field-focus); }
+
+/* LA LIGNE D'IMPORT ferme le menu, séparée de ce qui s'y choisit : ce qu'elle
+   propose n'est pas un produit du catalogue mais un aller chez le fournisseur.
+   L'encre de la marque le dit sans qu'il faille l'écrire. */
+.gp-import { border-top: 1px solid var(--row-line); color: var(--primary); }
+.gp-import .gp-row-name { color: var(--primary); }
+.gp-import:disabled { color: var(--text-2); cursor: default; }
+.gp-import:disabled .gp-row-name { color: var(--text-2); }
+/* Le MENU, lui, garde sa largeur propre : il liste 35 produits ou 50 couleurs
+   avec vignette et référence, ce qui ne se lit pas dans la largeur d'un champ.
+   Le bandeau étant pleine page, la bulle ne déborde de rien. */
+.bat-editor .gp-panel { width: 340px; max-width: min(340px, calc(100vw - var(--pas-4))); }
+
+/* Le zoom : « − | % | + ». Le pourcentage est un INTERRUPTEUR (ajusté ⇄ taille
+   réelle), pas un libellé : c'est le retour « où j'en suis » ET le retour à
+   zéro, sans un quatrième bouton. Trois actions dans une seule boîte — donc le
+   rectangle arrondi, jamais la pilule. */
+.bat-zoom {
+  display: flex; align-items: stretch; flex: none; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface);
+}
+/* POSÉ SUR LA FEUILLE, PAS INSÉRÉ. Il agit sur l'affichage, il vit donc sur ce
+   qu'il affiche — et il ne coûte plus une ligne de 50 px au rail, qui manque de
+   hauteur et non de largeur. L'ombre le décolle de la page ; `--pas-3` le tient
+   à distance du bord pour qu'il ne mange pas le coin de la feuille. */
+.bat-main { position: relative; }
+.bat-main > .bat-zoom {
+  position: absolute; z-index: 15;
+  right: var(--pas-3); bottom: var(--pas-3);
+  box-shadow: var(--shadow-1);
+}
+.bat-zoom .bz-btn, .bat-zoom .bz-pct {
+  border: 0; background: transparent; color: var(--text-1);
+  font-family: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ); min-height: var(--ctrl-h); padding: 0 var(--pas-2); cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.bat-zoom .bz-btn { width: var(--ctrl-h); font-size: var(--taille-titre); }
+.bat-zoom .bz-pct { flex: 1; white-space: nowrap; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+/* Ajusté à la fenêtre : le pourcentage est subi, pas choisi — il s'efface. */
+.bat-zoom .bz-pct.auto { color: var(--text-2); font-weight: var(--graisse-texte); }
+.bat-zoom .bz-btn:hover:not(:disabled), .bat-zoom .bz-pct:hover { background: var(--surface-hover); }
+.bat-zoom .bz-btn:disabled { color: var(--text-3); cursor: default; }
+
+.bat-scroll.panning { cursor: grabbing; }
+.bat-scroll.panning * { pointer-events: none; }
+
+/* ------------------------------------------------------ LES ONGLETS D'ARTICLE
+   Un projet = une commande : « 2 pochettes, 3 t-shirts, 2 casquettes ». Chaque
+   article a son onglet et sort sur SA page du PDF. Le numéro de l'onglet EST
+   le numéro de page : la liste se lit comme le sommaire du document.
+   EN RANGÉE, ET ELLE DÉFILE CHEZ ELLE. Le pied occupe le bout de la ligne :
+   sans `overflow-x` sur la liste, un cinquième article pousserait « Exporter le
+   PDF » hors de la carte. C'est la liste qui glisse, jamais la carte qui
+   s'étire. */
+.bat-tabs {
+  grid-area: onglets; min-width: 0;
+  display: flex; flex-direction: row; align-items: center; gap: var(--pas-1);
+  padding: var(--pas-1) var(--pas-3); border-bottom: 1px solid var(--row-line);
+  overflow-x: auto; overflow-y: hidden;
+}
+/* UNE SEULE LIGNE, RIEN QUE DU TEXTE. Vignette de 40 px et deux lignes
+   empilées faisaient un onglet de 56 px — 72 px de bandeau pour désigner un
+   article, alors que la photo du vêtement est déjà en grand sur la feuille
+   juste en dessous. Tout se pose sur une ligne : n°, nom, couleur, quantité.
+   `max-width` : un nom de produit entier fait 300 px et plus — sans borne, un
+   seul article large repousserait « + Article » hors de la rangée visible. */
+.bat-tab {
+  display: flex; align-items: center; gap: var(--pas-1); flex: none; max-width: 300px;
+  padding: var(--pas-1) var(--pas-2); text-align: left;
+  border: 1px solid transparent; border-radius: var(--arrondi-champ);
+  background: transparent; color: var(--text-1);
+  font-family: inherit; font-size: var(--taille-texte); line-height: var(--ligne-champ);
+  cursor: pointer; user-select: none;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.bat-tab:hover { background: var(--row-hover); }
+/* L'onglet actif est la page affichée : c'est le seul à porter le trait. */
+.bat-tab.active { background: var(--primary-soft); border-color: var(--border-strong); }
+.bat-tab.dragging { opacity: .5; }
+/* LE NOM EST LE SEUL À CÉDER. Tout le reste de la ligne identifie l'article en
+   quelques caractères (« 1 », « Noir », « 12 ex. ») et ne se tronque jamais ;
+   c'est le nom du produit, long et déjà lisible en tête de feuille, qui prend
+   la place restante et s'arrête aux points de suspension. */
+.bt-num { flex: none; }
+.bt-name {
+  flex: 1 1 auto; min-width: 0;
+  font-size: var(--taille-note); font-weight: var(--graisse-forte); color: var(--text-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bt-dot { flex: none; width: var(--point); height: var(--point); border-radius: var(--pilule); border: 1px solid var(--border); }
+.bt-col { flex: none; font-size: var(--taille-note); color: var(--text-2); white-space: nowrap; }
+.bt-qty { flex: none; font-size: var(--taille-note); color: var(--text-3); white-space: nowrap; }
+.bt-qty::before { content: '· '; }
+
+/* Les actions sont portées par le SEUL onglet actif : la liste reste calme, et
+   la suppression n'est jamais à portée d'un clic distrait sur un autre
+   article. Les onglets inactifs n'en montrent aucune — on les sélectionne
+   d'abord. Elles restent DANS le flux (place réservée) : leur apparition ne
+   déplace rien. */
+.bt-actions { display: flex; gap: 2px; margin-left: auto; flex: none; }
+.bt-act { opacity: 0; pointer-events: none; }
+.bat-tab.active .bt-act { opacity: 1; pointer-events: auto; }
+
+/* Ajouter un article : une commande, donc LA boîte. Le trait pointillé dit
+   qu'elle crée plutôt qu'elle n'ouvre. */
+.bat-tab-add {
+  display: flex; align-items: center; justify-content: center; gap: var(--pas-1); flex: none;
+  min-height: var(--ctrl-h); padding: 0 var(--pas-3);
+  border: 1px dashed var(--border-strong); border-radius: var(--arrondi-champ);
+  background: transparent; color: var(--text-2);
+  font-family: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ); white-space: nowrap; cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.bat-tab-add:hover { background: var(--surface-hover); border-color: var(--primary); color: var(--text-1); }
+.bat-tab-add svg { width: var(--ic-serre); height: var(--ic-serre); }
+
+.bat-main { flex: 1; display: flex; min-width: 0; min-height: 0; }
+/* `scrollbar-gutter: stable` → sur Windows/Linux (barres classiques, qui
+   occupent de la largeur) la gouttière est TOUJOURS réservée. L'apparition
+   d'une barre ne change donc plus `clientWidth`, l'ajustement automatique ne
+   se recalcule plus, et la feuille ne « glisse » plus sous le curseur.
+   Sans effet sur macOS (barres en surimpression, 0 px). */
+.bat-scroll { flex: 1; overflow: auto; scrollbar-gutter: stable; background: var(--bg); overscroll-behavior: contain; }
+.bat-pages { display: flex; flex-direction: column; gap: var(--pas-4); align-items: center; padding: var(--pas-3); width: max-content; margin: 0 auto; }
+.bat-page-wrap { flex: none; }
+
+/* ------------------------------------------- LES SÉLECTEURS PRODUIT / COULEUR
+   Ils remplacent les `<select>` natifs : à plat, 35 produits (jusqu'à 50
+   couleurs chacun) sont illisibles. Le déclencheur EST un champ — il prend
+   donc la boîte, comme tout ce qui se remplit. */
+.gp-combo { position: relative; }
+.gp-trigger {
+  display: flex; align-items: center; gap: var(--pas-2);
+  height: var(--ctrl-h); max-width: 220px; padding: 0 var(--pas-2);
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); color: var(--text-1);
+  font-family: inherit; font-size: var(--taille-texte); line-height: var(--ligne-champ); cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.gp-trigger:hover { border-color: var(--border-strong); }
+.gp-trigger[aria-expanded="true"] { border-color: var(--primary); background: var(--field-focus); }
+.gp-trigger-thumb {
+  width: var(--vignette-serre); height: var(--vignette-serre); flex: none; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--arrondi-champ); background: var(--bg); color: var(--text-3);
+}
+.gp-trigger-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.gp-trigger-thumb svg { width: var(--ic-serre); height: var(--ic-serre); }
+.gp-trigger-dot { width: var(--ic); height: var(--ic); border-radius: var(--pilule); flex: none; border: 1px solid var(--border); }
+.gp-trigger-text { flex: 1; min-width: 0; text-align: left; display: flex; flex-direction: column; }
+.gp-trigger-name, .gp-row-name { font-size: var(--taille-texte); font-weight: var(--graisse-note); color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: var(--ligne-champ); }
+.gp-trigger-sub, .gp-row-meta { font-size: var(--taille-note); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: var(--ligne-champ); }
+.gp-trigger-empty { flex: 1; text-align: left; font-size: var(--taille-texte); color: var(--text-3); }
+.gp-trigger > svg { width: var(--ic-serre); height: var(--ic-serre); flex: none; color: var(--text-2); transition: transform var(--dur-1) var(--ease); }
+.gp-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+
+.gp-panel {
+  position: absolute; top: calc(100% + var(--pas-1)); left: 0; z-index: 30;
+  width: 340px; max-width: min(340px, calc(100vw - var(--pas-4)));
+  border: 1px solid var(--border); border-radius: var(--arrondi-carte);
+  background: var(--surface); box-shadow: var(--shadow-pop); overflow: hidden;
+  animation: monte var(--dur-2) var(--ease);
+}
+.gp-panel.gp-align-right { left: auto; right: 0; }
+.gp-list { max-height: var(--menu-h); overflow-y: auto; overflow-x: hidden; padding: var(--pas-1) 0; }
+/* L'en-tête de famille se colle en haut de la liste : il faut donc une surface
+   OPAQUE derrière lui, sinon les lignes défilent au travers. */
+.gp-fam-head {
+  position: sticky; top: 0; z-index: 1; background: var(--surface);
+  padding: var(--pas-2) var(--pas-3) var(--pas-1);
+  font-size: var(--taille-note); font-weight: var(--graisse-forte); color: var(--text-1);
+}
+.gp-sub-head { padding: var(--pas-1) var(--pas-3); font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); }
+/* La hauteur d'une ligne SORT de son texte et de son rembourrage : rien ne
+   s'écrit. */
+.gp-row {
+  display: flex; align-items: center; gap: var(--pas-2); width: 100%; text-align: left;
+  padding: var(--pas-2) var(--pas-3);
+  border: 0; background: transparent; color: var(--text-1);
+  font-family: inherit; font-size: var(--taille-texte); line-height: var(--ligne-champ); cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.gp-row:hover { background: var(--row-hover); }
+.gp-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.gp-row.active { background: var(--primary-soft); }
+.gp-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gp-row-check { width: var(--ic-serre); height: var(--ic-serre); flex: none; color: var(--primary); }
+.gp-row-dot { width: var(--ic-grand); height: var(--ic-grand); border-radius: var(--pilule); flex: none; border: 1px solid var(--border); }
+.gp-row.active .gp-row-dot { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--primary); }
+.gp-empty-msg { padding: var(--pas-4) var(--pas-3); text-align: center; font-size: var(--taille-texte); color: var(--text-2); }
+
+/* La recherche du menu : un champ de recherche EST un champ. Il se creuse dans
+   son support, et c'est la PILULE qui montre le focus — l'input, lui, n'a ni
+   fond ni trait, sinon le navigateur pose sa propre boîte blanche dans la
+   nôtre. */
+.gp-search {
+  display: flex; align-items: center; gap: var(--pas-2);
+  margin: var(--pas-2); padding: 0 var(--champ-x); height: var(--ctrl-h); min-width: 0;
+  border: 1px solid var(--border); border-radius: var(--pilule);
+  background: var(--search-bg); color: var(--text-2);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.gp-search:focus-within { border-color: var(--primary); background: var(--surface); }
+.gp-search svg { width: var(--ic-serre); height: var(--ic-serre); color: var(--text-2); flex: none; }
+.gp-search input {
+  flex: 1; min-width: 0; padding: 0;
+  border: 0; outline: 0; background: transparent;
+  font-family: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-texte); color: var(--text-1);
+}
+.gp-search input::placeholder { color: var(--text-3); }
+
+/* --------------------------------------------------------- LES QUANTITÉS
+   On les écrit ICI, dans la boîte de l'application, et la taille arrive sur le
+   bon à tirer. */
+/* Le compte de la série : il ferme la rangée des quantités, poussé à droite. */
+.bat-qty-total { font-size: var(--taille-note); font-weight: var(--graisse-forte); color: var(--text-1); }
+
+/* L'INTITULÉ EST À LARGEUR FIXE (--champ-lb), jamais `auto` : c'est la colonne
+   qui tient l'alignement, pas le mot. En `auto`, « Vêtement » décalerait sa
+   paire à lui tout seul et plus rien ne tomberait sur la même verticale.
+   Aucune colonne n'est imposée à la main : l'intitulé prend la case suivante de
+   la grille du bandeau, le champ celle d'après. C'est ce qui permet d'ajouter
+   ou de retirer un champ sans replacer quoi que ce soit. */
+/* L'INTITULÉ SE CLIQUE, DONC IL MONTRE LA MAIN. Il porte un `<label>` : le
+   clic ouvre le menu du vêtement, ou pose le curseur dans le champ. Une flèche
+   sur ce mot disait « ceci ne fait rien » au moment précis où l'œil demande si
+   ça se clique. */
+.bat-champ-lb {
+  min-width: 0; cursor: pointer;
+  font-size: var(--taille-note); font-weight: var(--graisse-forte); color: var(--text-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bat-champ-in { min-width: 0; }
+
+/* TOUTE LA SÉRIE SUR UNE LIGNE : « XS 12 · S 30 · M 24 … ». En rail, chaque
+   taille était une rangée de 50 px et six tailles en faisaient trois ; posées
+   en colonnettes (nom au-dessus, quantité en dessous), elles en demandaient
+   encore deux. C'est la saisie la plus fréquente de l'application — elle ne
+   doit demander ni de balayer deux lignes, ni de faire défiler.
+   Les largeurs sont FIXES : un couple qui s'étirerait au gré de son contenu
+   ferait danser toute la rangée à chaque frappe. Le rembourrage tombe à 4 px —
+   à cette largeur, les 14 px de la boîte standard mangeraient le « 2XL ». */
+.bat-qty { display: flex; flex-wrap: wrap; gap: var(--pas-1) var(--pas-2); }
+.bat-qty-row { display: flex; align-items: center; gap: 3px; flex: none; }
+.bat-qty-row > * { position: relative; }
+.bat-qty-row .champ { padding-left: 4px; padding-right: 4px; }
+/* L'INTITULÉ DE TAILLE EST UN CHAMP. Renommer une taille se faisait dans le
+   tableau de la feuille, sur une case de 16 px de haut ; ici c'est une boîte
+   comme les autres, à gauche de la quantité qu'elle annonce. Les deux sont
+   centrés — « 2XL » et « 8 » se lisent alors sur le même axe.
+   Sa largeur est MESURÉE (cf. `ajusterColonneIntitules`) : « 2XL » et
+   « 10/12 ans » ne demandent pas la même chose, et un intitulé coupé
+   (« 10/1… ») ne dit plus quelle taille on remplit. Les 18 px ajoutés sont le
+   rembourrage plus la place du curseur ; le plancher de 44 px est la cible
+   tactile, jamais franchie. */
+.bat-qty-lb {
+  flex: none; width: calc(var(--qty-lb, 30px) + 18px); min-width: 44px;
+  font-weight: var(--graisse-forte); text-align: center;
+}
+.bat-qty-in { min-width: 0; width: 100%; text-align: center; }
+/* La cellule qui porte la quantité : sa largeur est fixe, comme celle de
+   l'intitulé — un couple qui s'étirerait ferait danser toute la rangée. */
+.bat-qty-cell { display: flex; flex: none; width: 54px; }
+/* LE « + » PREND LA PLACE DE LA CASE SUIVANTE : même hauteur, même arrondi que
+   les quantités qu'il prolonge, et le trait pointillé pour dire qu'il CRÉE au
+   lieu d'ouvrir — comme « + Article » un cran plus haut (loi 10). */
+.bat-qty-add {
+  flex: none; width: var(--ctrl-h); min-height: var(--ctrl-h); padding: 0;
+  border: 1px dashed var(--border-strong); border-radius: var(--arrondi-champ);
+  background: transparent; color: var(--text-2);
+  font-family: inherit; font-size: var(--taille-titre); line-height: 1; cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.bat-qty-add:hover { background: var(--surface-hover); border-color: var(--primary); color: var(--text-1); }
+.bat-qty-add:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Une taille absente de la grille du produit : elle compte, mais elle signale
+   qu'elle vient d'ailleurs. */
+
+/* Les commandes de la SÉRIE, pas d'une taille : ajouter, revenir à la grille du
+   produit, retirer les non commandées. Ce sont des liens et non des boutons à
+   bulle — une bulle par action ferait trois boîtes de 50 px pour des gestes
+   rares, et elles se posent sur la ligne du titre, où il n'y a pas la
+   hauteur. */
+.bat-outils { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pas-2); }
+.lien-outil {
+  border: 0; background: none; padding: 0;
+  font-family: inherit; font-size: var(--taille-note); font-weight: var(--graisse-forte);
+  color: var(--text-2); text-decoration: underline; text-underline-offset: 3px;
+  cursor: pointer; transition: color var(--dur-1) var(--ease);
+}
+.lien-outil:hover { color: var(--text-1); }
+/* UNE TAILLE QU'ON VIENT D'ÉCRIRE EST UNE TAILLE COMME LES AUTRES. Celles qui
+   ne figurent pas dans la grille du produit portaient l'encre secondaire et un
+   trait pointillé : à peine tapée, « TU » s'affichait plus pâle et plus léger
+   que le « XL » d'à côté — l'œil y lit une autre police, ou une saisie qui
+   n'a pas pris.
+   Or ce n'est pas un état de la valeur, c'est une note sur son origine (loi 1 :
+   la couleur dit un ÉTAT). Elle reste dite — par l'infobulle de la rangée, et
+   par « tailles du produit » qui n'apparaît que là où les deux diffèrent. */
+/* ------------------------------------------------------------- LES FACES
+   Le champ dit la combinaison (« Cœur + dos »), le menu la compose. Une ligne
+   à cocher garde la MÊME boîte que les lignes de choix du vêtement et de la
+   couleur — c'est le même menu, il se lit de la même façon (loi 10). La case
+   native reste visible, elle : contrairement à une liste où l'on choisit UNE
+   valeur, ici plusieurs lignes cohabitent, et il faut voir lesquelles. */
+.gp-row-coche { cursor: pointer; user-select: none; }
+.gp-row-coche input {
+  flex: none; width: var(--ic-serre); height: var(--ic-serre); margin: 0;
+  accent-color: var(--primary); cursor: pointer;
+}
+.gp-row-coche:focus-within { outline: 2px solid var(--primary); outline-offset: -2px; }
+/* Indisponible pour ce produit : l'encre passe au secondaire et la ligne ne
+   répond plus — jamais d'`opacity`, qui rendrait le libellé illisible.
+   La flèche est ici légitime, et le sélecteur le PROUVE : elle ne se pose pas
+   sur une ligne « éteinte » au jugé, mais sur une ligne dont la case est
+   réellement désactivée. */
+.gp-row-coche.gp-row-off { color: var(--text-3); }
+.gp-row-coche:has(input:disabled) { cursor: default; }
+.gp-row-coche.gp-row-off:hover { background: transparent; }
+.gp-row-coche.gp-row-off .gp-row-name { color: var(--text-3); }
+/* Aucune face cochée : le BAT serait vide. Le champ le dit dans l'encre des
+   valeurs absentes, comme un intitulé de projet pas encore saisi. */
+.gp-trigger-vide { color: var(--text-3); }
+/* Le compte de logos posés, dans le bouton : la combinaison dit CE QUI EST
+   inclus, ce nombre dit s'il y a quelque chose dessus. */
+.gp-trigger-count {
+  flex: none; padding: 0 var(--pas-1); border-radius: var(--pilule);
+  background: var(--chip-on-tonal); color: var(--primary);
+  font-size: var(--taille-note); font-weight: var(--graisse-forte); line-height: var(--ligne-champ);
+}
+
+/* ============================================================= L'HISTORIQUE */
+.history-list { display: flex; flex-direction: column; gap: var(--pas-1); }
+.history-item {
+  display: flex; align-items: center; gap: var(--pas-3);
+  padding: var(--pas-2) var(--pas-3);
+  border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); font-size: var(--taille-texte);
+}
+.history-item .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-item .sz { color: var(--text-2); font-size: var(--taille-note); }
+
+/* ======================================================= RÉGLAGES / PRODUITS */
+.admin-layout { display: grid; grid-template-columns: 220px 1fr; height: 100%; min-height: 0; }
+.admin-nav {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--pas-3) var(--pas-2);
+  border-right: 1px solid var(--border); background: var(--surface);
+  overflow-y: auto; overflow-x: hidden;
+}
+/* Un onglet de rail se clique : il prend la boîte, comme tout le reste. */
+/* LA BOÎTE SE PREND PAR `min-height`, PAS PAR LE REMBOURRAGE. Bâtie à coups de
+   `padding: var(--champ-y)`, elle rendait 51,4 px — 17 × 1,375 + 2 × 13 = 49,4,
+   PLUS les 2 px du trait réservé, que tout le monde oublie de compter. Un seul
+   écran portait alors une commande de 51,4 quand les trois autres en portaient
+   une de 50 : l'écart ne se voit pas sur l'écran, il se voit ENTRE les écrans.
+   L'intitulé se coupe donc dans un `<span>` : `text-overflow` ne s'applique
+   pas au texte nu d'un conteneur en flex. */
+.admin-nav button {
+  display: flex; align-items: center; text-align: left; overflow: hidden;
+  min-height: var(--ctrl-h); padding: 0 var(--pas-3);
+  border: var(--trait-reserve); border-radius: var(--arrondi-champ);
+  background: transparent; color: var(--text-2);
+  font-family: inherit; font-size: var(--taille-texte); font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.admin-nav button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-nav button:hover { background: var(--surface-hover); color: var(--text-1); }
+.admin-nav button.active { background: var(--primary-soft); color: var(--text-1); font-weight: var(--graisse-forte); }
+.admin-body { overflow-y: auto; overflow-x: hidden; padding: var(--pas-4); overscroll-behavior: contain; }
+.admin-body .inner { max-width: var(--lecture-etroit); display: flex; flex-direction: column; gap: var(--pas-4); }
+.admin-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--pas-3); }
+
+/* Un jeton (une valeur qu'on a ajoutée et qu'on peut retirer) : une étiquette
+   qui porte sa croix. La croix est le rond serré — celui qui est POSÉ DANS une
+   ligne et ne la fait pas grandir. */
+.chips { display: flex; flex-wrap: wrap; gap: var(--pas-1); }
+.chip {
+  display: inline-flex; align-items: center; gap: var(--pas-1);
+  padding: 2px 2px 2px var(--pas-2); border-radius: var(--pilule);
+  background: var(--st-neutre-bg); color: var(--st-neutre);
+  font-size: var(--taille-note); font-weight: var(--graisse-note); line-height: var(--ligne-champ);
+}
+
+/* La table large défile chez elle plutôt que de faire déborder la page. */
+.table-scroll { overflow-x: auto; overflow-y: hidden; }
+.prod-table { width: 100%; border-collapse: collapse; font-size: var(--taille-texte); }
+.prod-table th { text-align: left; padding: var(--pas-2); border-bottom: 1px solid var(--border); font-size: var(--taille-note); font-weight: var(--graisse-note); color: var(--text-2); }
+.prod-table td { padding: var(--pas-2); border-bottom: 1px solid var(--row-line); vertical-align: middle; }
+.prod-table tbody tr:hover { background: var(--row-hover); }
+
+.thumb-strip { display: flex; gap: var(--pas-1); flex-wrap: wrap; }
+.thumb-strip img { height: var(--vignette); border: 1px solid var(--border); border-radius: var(--arrondi-champ); background: var(--surface); }
+.color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--pas-2); }
+.color-cell {
+  display: flex; flex-direction: column; gap: var(--pas-1);
+  padding: var(--pas-2); border: 1px solid var(--border); border-radius: var(--arrondi-champ);
+  background: var(--surface); font-size: var(--taille-note);
+}
+.color-cell .cc-head { display: flex; align-items: center; gap: var(--pas-1); font-weight: var(--graisse-note); }
+.color-cell img { width: 100%; border-radius: var(--arrondi-champ); background: var(--bg); }
+
+/* ------------------------------------------------------------ LA CALIBRATION */
+.calib-stage { position: relative; user-select: none; margin: 0 auto; }
+.calib-stage img { display: block; max-width: 100%; max-height: 54vh; border: 1px solid var(--border); border-radius: var(--arrondi-champ); background: var(--surface); }
+.calib-handle { position: absolute; top: 0; bottom: 0; width: 30px; margin-left: -15px; cursor: ew-resize; }
+.calib-handle::after { content: ''; position: absolute; top: 0; bottom: 0; left: 14px; width: 2px; background: var(--primary); }
+.calib-handle .grip {
+  position: absolute; top: 50%; left: 6px; transform: translateY(-50%);
+  width: 18px; height: var(--rond-serre); border-radius: var(--arrondi-champ);
+  background: var(--primary);
+}
+.calib-span { position: absolute; height: 2px; background: var(--primary); opacity: .45; }
+.calib-foot { display: flex; align-items: center; gap: var(--pas-2); flex-wrap: wrap; margin-top: var(--pas-2); }
+.calib-foot .calib-cm { width: 110px; }
+.calib-foot .calib-readout { flex-basis: 100%; }
+.e-objet { display: flex; align-items: center; gap: var(--pas-2); margin-top: var(--pas-2); cursor: pointer; }
+.e-objet input { width: var(--ic); height: var(--ic); flex: none; accent-color: var(--primary); }
+.e-calib { margin-top: var(--pas-3); padding-top: var(--pas-3); border-top: 1px solid var(--row-line); }
+.e-calib .calib-stage img { max-height: 34vh; }
+
+/* -------------------------------------------------------------- LES PRODUITS */
+.produits-wrap { max-width: var(--lecture); margin: 0 auto; padding: var(--pas-4); }
+.produits-bar { display: flex; gap: var(--pas-3); align-items: center; flex-wrap: wrap; margin-bottom: var(--pas-3); }
+.import-ref { display: flex; gap: var(--pas-2); }
+.import-ref .champ { width: 240px; }
+.produits-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(370px, 100%), 1fr)); gap: var(--pas-3); }
+.pad { padding: var(--pas-3); }
+
+/* L'éditeur de produit manuel. */
+.color-row { display: flex; align-items: center; gap: var(--pas-2); padding: var(--pas-1) 0; border-bottom: 1px solid var(--row-line); }
+.cr-swatch { width: 22px; height: 22px; border-radius: var(--pilule); border: 1px solid var(--border); flex: none; }
+.cr-name { width: 150px; flex: none; }
+.color-row .slot {
+  flex: 1; min-width: 0; min-height: var(--ctrl-h);
+  border: 1px dashed var(--border-strong); border-radius: var(--arrondi-champ);
+  background: var(--surface); color: var(--text-2);
+  font-family: inherit; font-size: var(--taille-texte); line-height: var(--ligne-champ); cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.color-row .slot.drag { border-color: var(--primary); color: var(--text-1); }
+
+/* L'éditeur de zones de placement (Réglages) : mêmes pastilles que le BAT
+   (.zone-dot*, feuille.css — le widget est partagé, seul le cadre qui
+   l'entoure suit la charte ici), posées sur le mockup réel du produit et
+   glissables. */
+.zone-edit { margin-bottom: var(--pas-4); }
+.zone-edit-stage { display: flex; justify-content: center; margin-bottom: var(--pas-3); }
+.zone-edit-frame {
+  position: relative; display: block; width: min(560px, 100%); margin: 0 auto;
+  border-radius: var(--arrondi-carte); overflow: hidden;
+  background: var(--surface); box-shadow: var(--shadow-1); border: 1px solid var(--border);
+  touch-action: none;
+}
+.zone-edit-img { display: block; width: 100%; height: auto; }
+.zone-edit-layer { position: absolute; inset: 0; }
+.zone-edit-blank, .zone-edit-loading {
+  width: min(560px, 100%); aspect-ratio: 4 / 3; margin: 0 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--pas-1);
+  text-align: center; color: var(--text-3); font-size: var(--taille-texte); line-height: var(--ligne-texte);
+  background: var(--zone-bg); border-radius: var(--arrondi-carte); border: 1px solid var(--border);
+}
+.zone-edit-blank small { font-size: var(--taille-note); }
+
+/* Onglets de face (.segmente, phare-composants.css) : le compte de zones déjà
+   posées sur cette face, même objet que .gp-trigger-count (« ce nombre dit
+   s'il y a quelque chose dessus »), en encre neutre — lisible que l'onglet
+   soit actif ou non. */
+.zone-face-count {
+  flex: none; padding: 0 var(--pas-1); border-radius: var(--pilule);
+  background: var(--border-soft); color: var(--text-2);
+  font-size: var(--taille-note); font-weight: var(--graisse-forte); line-height: var(--ligne-champ);
+}
+
+/* Saisie fine d'une zone : même ligne que .color-row juste au-dessus — un
+   champ par valeur, la croix au bout. */
+.zone-row { display: flex; align-items: center; gap: var(--pas-2); padding: var(--pas-1) 0; border-bottom: 1px solid var(--row-line); }
+.zr-name { flex: 2; min-width: 0; }
+.zr-num { flex: 1; min-width: 0; }
+
+
+/* L'import TopTex — l'écran de confirmation. */
+.ic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--pas-1); }
+.ic-color { display: flex; align-items: center; gap: var(--pas-2); padding: var(--pas-1) var(--pas-2); border: 1px solid var(--border); border-radius: var(--arrondi-champ); }
+.ic-label { font-weight: var(--graisse-note); }
+.ic-views { margin-left: auto; color: var(--text-2); font-size: var(--taille-note); }
+/* Un coloris DÉJÀ au catalogue s'efface au profit des nouveaux : il ne porte
+   plus de couleur, il n'a plus rien à dire. */
+.ic-color.is-known { background: var(--zone-bg); color: var(--text-2); }
+.pastille.done { visibility: hidden; }
+.ic-refresh { cursor: pointer; }
+.ic-refresh input { width: var(--ic); height: var(--ic); accent-color: var(--primary); }
+
+/* Les doublons de référence produit : un constat posé en tête de la liste, pas
+   un retour à une action — il reste donc dans le flux, il n'a jamais déplacé
+   de commande. */
+.dup-banners:empty { display: none; }
+.dup-banner {
+  display: flex; align-items: center; gap: var(--pas-3); flex-wrap: wrap;
+  margin-bottom: var(--pas-3); padding: var(--pas-3);
+  border: 1px solid var(--warning-line); border-radius: var(--arrondi-carte);
+  background: linear-gradient(var(--warning-bg), var(--warning-bg)), var(--surface);
+  color: var(--warning);
+}
+.dup-text { flex: 1 1 320px; line-height: var(--ligne-texte); }
+.dup-banner .hint { margin-top: 2px; color: var(--warning); }
+.dup-banner .btn { flex: none; }
+
+/* Entre 900 et 1170 px, cinq paires laisseraient moins de 130 px à chaque
+   champ — « T-shirt écorespon… » n'y tient plus. Trois paires, et le tableau
+   compte simplement une rangée de plus. Le seuil suit les écarts resserrés
+   de `.bat-toolbar` (`--pas-2`, pas `--pas-3`) : au-delà de 1240 px il
+   restait de la place inexploitée avant de basculer à cinq colonnes. */
+@media (max-width: 1170px) {
+  .bat-toolbar { grid-template-columns: repeat(3, var(--champ-lb) minmax(0, 1fr)); }
+}
+
+/* ================================================================ LE REPLI
+   Le bandeau ne bascule plus : ses blocs se remettent simplement à la ligne.
+   Ne restent ici que les trois choses qu'un retour à la ligne ne règle pas. */
+@media (max-width: 900px) {
+  /* Trois rangées au lieu de deux : les onglets, les réglages, puis le pied.
+     Côte à côte, les onglets d'un côté et deux boutons de l'autre ne laissent
+     plus lire ni les uns ni les autres. */
+  .bat-editor {
+    margin: var(--pas-1) var(--pas-2) var(--pas-1);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "onglets" "reglages" "pied";
+  }
+  /* LA FEUILLE NE PEUT PAS ÊTRE ÉCRASÉE À ZÉRO. En hauteur bornée (`height:
+     100%`), un bandeau plus haut que l'écran ne débordait pas : c'est l'aperçu
+     qui encaissait tout — mesuré sur un iPhone 390 × 844, carte de 753 px et
+     feuille de 5 px, avec la commande de zoom retombée sur le bouton d'export.
+     L'écran défile déjà (`overflow-y: auto` sur `.screen`) ; il suffit que la
+     mise en page ait le droit de le dépasser, et que l'aperçu garde un plancher
+     qui le rende utilisable. */
+  .bat-layout { height: auto; min-height: 100%; }
+  .bat-main { min-height: 60vh; }
+  .bat-pied { border-left: 0; border-bottom: 0; border-top: 1px solid var(--row-line); }
+  .bat-pied .btn { flex: 1 1 auto; }
+  /* UNE PAIRE PAR LIGNE. À cette largeur, cinq paires réduiraient chaque champ
+     à une trentaine de pixels. Le tableau garde ses deux verticales, il n'a
+     plus qu'une colonne de paires. */
+  .bat-toolbar { grid-template-columns: var(--champ-lb) minmax(0, 1fr); }
+  /* La pastille « projet ouvert » : à cette largeur, client et projet sont
+     réduits à une lettre suivie de points de suspension — elle n'informe plus,
+     elle encombre. Les deux valeurs sont de toute façon en tête de la feuille,
+     juste en dessous. */
+  .topbar-project.on { display: none; }
+}
+
+/* PAS DE BLOC TÉLÉPHONE. Il y en avait un (`max-width: 640px`) : il masquait
+   le nom de la marque, raccourcissait « Bon À Tirer » en « BAT » et empilait les
+   grilles. Ce dépôt ne cible plus que le PC depuis le 21/08 — les tablettes de
+   l'atelier sont au rebut, personne ne travaille au téléphone — et le CLAUDE.md
+   demande de retirer les restes tactiles quand on passe à côté. Les deux paliers
+   qui restent (1 170 et 900 px) ne sont pas tactiles : ce sont des FENÊTRES
+   étroites sur un écran de bureau, et elles arrivent tous les jours. */
+
+/* Le mouvement part, l'information reste. */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0s !important; transition-duration: 0s !important; }
+}

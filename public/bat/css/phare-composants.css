@@ -1,0 +1,420 @@
+/* ===========================================================================
+   PHAREDESIGN — LES COMPOSANTS PARTAGÉS
+   ---------------------------------------------------------------------------
+   Se charge APRÈS `phare.css`, qui porte les jetons.
+
+   Ce qui vit ici, c'est ce que PLUS D'UN écran porte. La raison est toujours la
+   même, et elle se mesure : deux écrans ouverts à un clic l'un de l'autre
+   avaient chacun leur bouton « revenir » (cinq formes : 32, 36, 40, 44, 46 px,
+   trois arrondis), leur champ de recherche (44 contre 50 px, deux fonds, deux
+   durées) et leur fil d'étapes (bulles de 41 et 47 px, graisses 600 et 800).
+   Aucun ne se reconnaissait d'un écran à l'autre.
+
+   Un composant partagé ne peut plus diverger : il est LITTÉRALEMENT le même,
+   pas deux qui se ressemblent. C'est tout l'objet de ce fichier.
+
+   AUCUNE COULEUR EN DUR ICI NON PLUS. Une teinte qui n'est pas un jeton est un
+   défaut, y compris dans un composant.
+   =========================================================================== */
+
+/* ---------------------------------------------------------- LE SOCLE
+   Le gras du navigateur vaut 700 : une quatrième graisse par la porte de
+   derrière. On la ramène dans l'échelle. */
+/* UN COMPOSANT NE DOIT RIEN DEVOIR AU RESET DE LA PAGE QUI L'ACCUEILLE.
+   Mesuré : sans cette ligne, la pilule de recherche rendait 52 px sur une page
+   sans reset — `height: var(--ctrl-h)` plus ses deux traits — quand le champ
+   d'à côté en faisait 50. Deux contrôles sur la même rangée, l'un dépassant
+   l'autre : exactement ce que la boîte unique existe pour empêcher.
+   La portée reste NOS classes : poser `* { box-sizing }` reviendrait à
+   remettre en page l'application d'accueil au passage. */
+.champ, .btn, .carte, .pastille, .rond, .btn-retour, .champ-recherche,
+.segmente, .segmente__btn, .stepper, .step, .msg-flottant, .msg-ecran {
+  box-sizing: border-box;
+}
+
+:where(.bat-app) b, :where(.bat-app) strong { font-weight: var(--graisse-forte); }
+
+/* Un bouton, un champ et une liste déroulante n'héritent PAS de la police du
+   corps, et décident chacun de leur taille par défaut (13,33 px pour un bouton
+   nu). Les ramener explicitement, sinon l'échelle a des trous qu'on ne voit
+   qu'à la mesure. */
+:where(.bat-app) button, :where(.bat-app) input, :where(.bat-app) select, :where(.bat-app) textarea { font-family: inherit; }
+
+/* ================================================================ LA BOÎTE
+   Tout ce qui se clique et se remplit fait la même hauteur. Elle n'est écrite
+   NULLE PART : elle sort du texte, de l'interligne et du rembourrage.
+   Un champ la prend par `height`, un bouton par `min-height` — un bouton
+   centre son contenu tout seul. */
+.champ {
+  box-sizing: border-box;
+  width: 100%; min-width: 0;         /* min-width:0 : sinon la largeur
+                                        intrinsèque d'un <input> (≈ 20
+                                        caractères) l'emporte sur `flex-basis`
+                                        et la rangée déborde. */
+  height: var(--ctrl-h);
+  padding: 0 var(--champ-x);
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-champ);
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-texte);
+  line-height: var(--ligne-champ);
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+textarea.champ { height: auto; padding: var(--champ-y) var(--champ-x); resize: vertical; }
+.champ:hover { border-color: var(--border-strong); }
+.champ:focus-visible,
+.champ:focus { outline: none; border-color: var(--primary); background: var(--field-focus); }
+.champ::placeholder { color: var(--text-3); }
+.champ:disabled { opacity: .55; cursor: default; }
+
+/* `input[type=date]` prend sa hauteur dans ses parties internes, 2 px de plus.
+   Le correctif n'est PAS une hauteur en dur : ces parties portent leur propre
+   rembourrage — on le remet à zéro et on leur donne l'interligne du champ. */
+.champ::-webkit-datetime-edit,
+.champ::-webkit-datetime-edit-fields-wrapper { padding: 0; line-height: var(--ligne-champ); }
+
+/* =============================================================== LA COMMANDE
+   DEUX NIVEAUX, ET C'EST LA COULEUR DE LA BULLE QUI LE DIT — jamais le retrait
+   de sa boîte. Rendre une action « discrète » en lui ôtant son fond et son
+   rembourrage ne la rend pas discrète : ça la rend ÉTRANGÈRE, et ça casse la
+   règle de la boîte unique sur sa propre rangée. */
+.btn {
+  box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--pas-1);
+  /* UNE COMMANDE SE DIMENSIONNE SUR SON LIBELLÉ, JAMAIS L'INVERSE.
+     Dans une rangée en flex, un bouton rétrécit comme n'importe quel autre
+     enfant : mesuré à 74 px de large, son libellé passait sur TROIS lignes et
+     sa boîte à 86 px là où elle en fait 39. La boîte unique tenait — c'est le
+     libellé qui s'était replié dessous. C'est le miroir exact du champ qui
+     refuse de rétrécir : là on pose `min-width: 0`, ici on refuse le
+     rétrécissement. */
+  flex: 0 0 auto; white-space: nowrap;
+  min-height: var(--ctrl-h);
+  padding: 0 var(--pas-4);
+  border: var(--trait-reserve);
+  border-radius: var(--arrondi-champ);   /* JAMAIS la pilule : la pilule est
+                                            une étiquette, pas une action */
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: var(--taille-texte);
+  font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ------------------------------------------------------------- LE CURSEUR
+   LA FLÈCHE NE SURVOLE JAMAIS CE QUI RÉPOND. Elle dit « ceci ne fait rien » —
+   au moment précis où l'œil demande si ça se clique.
+   UN `<label>` PREND LE CURSEUR DE CE QU'IL COMMANDE : le caret quand il mène
+   à un champ qu'on remplit, la main sinon. Un intitulé qui donne le focus à un
+   champ EST cliquable ; le laisser à la flèche du navigateur, c'est cacher la
+   moitié de la cible.
+   Le verificateur refuse `cursor: default` partout ailleurs qu'une commande
+   désactivée : sans ce refus, la flèche revient une déclaration à la fois. */
+label { cursor: pointer; }
+label:has(textarea),
+label:has(input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"])) { cursor: text; }
+
+
+
+/* Celle qui ENGAGE porte l'encre pleine. Une seule par écran. */
+.btn.primaire { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: var(--graisse-forte); }
+.btn.primaire:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+
+/* Toutes les autres : bordée, transparente. */
+.btn.secondaire { background: transparent; border-color: var(--border); color: var(--text-1); }
+.btn.secondaire:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
+
+/* UNE ACTION QU'ON NE PEUT PAS ENCORE FAIRE DIT QUAND MÊME CE QU'ELLE FERA.
+   Du blanc sur un gris désactivé donne 1,60:1 : le libellé est illisible
+   exactement au moment où l'on cherche ce qu'il faut faire. Le fond s'éclaire,
+   l'encre passe au secondaire — 4,61:1 — et l'écart avec un bouton armé reste
+   évident : celui-là porte l'encre pleine. Pas d'`opacity` sur le tout. */
+.btn:disabled { background: var(--border-soft); border-color: var(--border-soft); color: var(--text-2); cursor: default; }
+
+/* La boîte SERRÉE, pour une action posée DANS une ligne de liste. */
+.btn.serre { min-height: 0; padding: var(--champ-y-serre) var(--pas-3); line-height: var(--ligne-serre); font-size: var(--taille-texte); }
+
+/* ================================================================= LA CARTE */
+.carte {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--arrondi-carte);
+  padding: var(--pas-4);
+  box-shadow: var(--shadow-1);
+}
+
+/* ============================================================== LA PASTILLE
+   La troisième forme : une étiquette, un état, un compteur. Elle ne se clique
+   pas — si elle se clique, c'est une commande, et elle reprend la boîte. */
+.pastille {
+  display: inline-flex; align-items: center; gap: var(--pas-1);
+  padding: 2px var(--pas-2);
+  border-radius: var(--pilule);
+  background: var(--st-neutre-bg);
+  color: var(--st-neutre);
+  font-size: var(--taille-note);
+  font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ);
+  white-space: nowrap;
+}
+.pastille.cours  { background: var(--st-cours-bg);  color: var(--st-cours); }
+.pastille.ok     { background: var(--st-ok-bg);     color: var(--st-ok); }
+.pastille.fort   { background: var(--st-fort-bg);   color: var(--st-fort); }
+.pastille.eteint { background: var(--st-eteint-bg); color: var(--st-eteint); }
+.pastille.bloque { background: var(--st-bloque-bg); color: var(--st-bloque); }
+
+/* ============================================================= LE ROND
+   Une icône seule, une initiale. Il ne porte pas de mot. */
+.rond {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--rond); height: var(--rond); flex: 0 0 auto; padding: 0;
+  border-radius: var(--pilule);
+  font-family: inherit; font-size: var(--taille-texte);
+  line-height: var(--ligne-champ); font-weight: var(--graisse-forte);
+}
+.rond.serre { width: var(--rond-serre); height: var(--rond-serre); font-size: var(--taille-note); }
+
+/* ------------------------------------------------------- REVENIR D'UN CRAN
+   UN SEUL OBJET POUR UN SEUL GESTE : rond, bordé, la flèche à l'encre.
+   Il vit ici et pas dans la feuille d'un écran — c'est ce qui fait que la
+   flèche d'un parcours et celle d'une étape sont le MÊME bouton.
+   La classe bat un sélecteur `button` nu (0,1,0 contre 0,0,1) : un
+   `button { border-radius: … }` posé par une page ne s'applique pas ici. */
+.btn-retour {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--rond); height: var(--rond); padding: 0; flex: 0 0 auto;
+  border: 1px solid var(--border); border-radius: var(--pilule);
+  background: var(--surface); color: var(--text-1);
+  /* UN `<button>` LAISSÉ À SON DÉFAUT DÉCIDE DE SA TAILLE : mesuré à 13,33 px
+     ici, une taille qui n'existe pas dans l'échelle, sur la flèche qu'on
+     regarde le plus souvent. `font-family: inherit` seul ne suffit pas — il
+     faut aussi la taille et l'interligne. */
+  font-family: inherit; font-size: var(--taille-titre);
+  line-height: var(--ligne-champ); cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.btn-retour:hover { border-color: var(--primary); background: var(--surface-hover); }
+.btn-retour:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ==================================================== UN MESSAGE NE POUSSE PERSONNE
+   RÈGLE NUCLÉAIRE. Aucune commande ne bouge parce qu'un message apparaît OU
+   disparaît. Mesuré sur un cas réel : un message de validation posé dans le
+   flux sous un champ faisait gagner 48,5 px à sa cellule, et comme la rangée
+   collait ses cellules en bas, le champ voisin descendait d'autant. Tout ce
+   qui suivait descendait avec.
+
+   RÉSERVER UNE LIGNE VIDE SOUS LE CHAMP NE TIENT PAS LA PROMESSE : le message
+   s'enroule. Deux lignes dans une colonne étroite, trois pour une adresse mal
+   formée. Une hauteur figée est un pari sur la longueur d'un texte qu'on ne
+   connaît pas d'avance — et c'est exactement ce qu'une règle nucléaire
+   interdit de prendre.
+
+   LE MESSAGE SORT DONC DU FLUX. Il ne mesure rien, il ne pousse rien, quelle
+   que soit sa longueur, quelle que soit la largeur de la colonne. Il recouvre
+   ce qui le suit : c'est le prix, et il est payé — `pointer-events: none`
+   laisse cliquable le champ qui passe dessous.
+
+   Seuls les messages de RETOUR flottent (erreur de validation, contrôle d'une
+   saisie). Une aide STATIQUE au contenu fixe reste dans le flux : elle n'a
+   jamais déplacé personne. */
+:has(> .msg-flottant) { position: relative; }
+
+.msg-flottant {
+  position: absolute; top: 100%; left: 0; z-index: 30;
+  /* Au moins la largeur du champ, sinon la largeur du texte — plafonnée.
+     Accroché à une cellule de 60 px, le message y tomberait en colonne d'un
+     mot par ligne. */
+  min-width: 100%; width: max-content; max-width: min(340px, 80vw);
+  margin-top: 4px;
+  pointer-events: none;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--arrondi-champ);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--taille-texte);
+  line-height: var(--ligne-texte);
+  font-weight: var(--graisse-forte);
+}
+/* Vide, il ne reste PAS une pastille posée sur le champ du dessous. */
+.msg-flottant:empty { display: none; }
+/* `hidden` doit rester plus fort que l'affichage : un message masqué qui
+   resterait posé recouvrirait un champ sans rien dire. */
+.msg-flottant.hidden { display: none; }
+
+/* Le rouge dit l'état, il ne décore pas. Deux classes (0,2,0) pour battre un
+   `.error` générique quel que soit l'ordre des fichiers. Le fond est COMPOSÉ
+   sur `--surface` : de nuit `--danger-bg` est translucide, et le texte de la
+   page se lirait au travers. */
+.error.msg-flottant,
+.field-error.msg-flottant {
+  border-color: var(--danger-line);
+  background: linear-gradient(var(--danger-bg), var(--danger-bg)), var(--surface);
+  color: var(--danger);
+}
+
+/* ------------------------------------------------- LE MESSAGE DE TOUT L'ÉCRAN
+   `.msg-flottant` s'accroche à UN champ. Il en faut un autre pour ce qui ne
+   vise aucun champ en particulier.
+
+   Ces phrases-là passent souvent par `alert()`. Une boîte système est la seule
+   surface que la charte ne peut pas habiller — police du système, couleurs du
+   système, et un clic obligatoire à chaque refus. Elle bloque aussi le
+   `focus()` que le code pose juste après : le curseur n'arrive dans le champ
+   fautif qu'une fois la boîte fermée.
+
+   POSÉ, PAS INSÉRÉ : `position: fixed`, donc rien ne bouge quand il paraît.
+   EN BAS, pas en haut — posé sous une barre d'étapes, il masque la navigation
+   pendant six secondes, au moment précis où l'on vient d'être refusé. En bas
+   il ne couvre rien, et il arrive près de la commande qui a refusé.
+   Il se remplace lui-même : deux refus d'affilée ne font pas deux bandeaux. */
+.msg-ecran {
+  position: fixed; z-index: 400;
+  bottom: var(--pas-4); left: 50%;
+  transform: translate(-50%, 12px);
+  max-width: min(560px, calc(100vw - 2 * var(--pas-4)));
+  margin: 0; padding: var(--pas-3) var(--pas-4);
+  border: 1px solid var(--danger-line); border-radius: var(--arrondi-carte);
+  background: var(--danger-bg); color: var(--danger);
+  box-shadow: var(--shadow-pop);
+  font-family: var(--font); font-size: var(--taille-texte);
+  font-weight: var(--graisse-note); line-height: var(--ligne-texte);
+  white-space: pre-line; text-align: left; cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+}
+.msg-ecran.est-la { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { .msg-ecran { transition: none; } }
+
+/* --------------------------------------------------- LA PILULE DE RECHERCHE
+   Un champ de recherche EST un champ : il prend la boîte de l'application.
+   Il se CREUSE dans son support — posé sur une barre blanche, un fond blanc ne
+   se distingue que par son trait. Au focus il remonte au blanc et son trait
+   passe à l'accent : le champ actif est le seul de l'écran à porter l'encre.
+
+   Ce qui reste LOCAL, c'est la largeur : la largeur est une affaire de mise en
+   page, pas de composant. */
+.champ-recherche {
+  display: flex; align-items: center; gap: var(--pas-2);
+  margin: 0; padding: 0 var(--champ-x);
+  height: var(--ctrl-h); min-width: 0;
+  border: 1px solid var(--border); border-radius: var(--pilule);
+  background: var(--search-bg); color: var(--text-2);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.champ-recherche:hover { border-color: var(--border-strong); }
+/* C'est la PILULE qui montre le focus, pas le champ : lui n'a ni fond ni trait.
+   `:focus-within` la fait donc réagir au clic comme à la tabulation. */
+.champ-recherche:focus-within { border-color: var(--primary); background: var(--surface); }
+/* Le champ n'a ni fond ni trait, sinon le navigateur pose sa propre boîte
+   blanche à l'intérieur de la nôtre. */
+.champ-recherche input {
+  flex: 1; min-width: 0;
+  border: 0; outline: 0; background: transparent;
+  font-family: inherit; font-size: var(--taille-texte);
+  font-weight: var(--graisse-texte); color: var(--text-1);
+}
+.champ-recherche input::placeholder { color: var(--text-3); }
+
+/* --------------------------------------------------- LE SÉLECTEUR SEGMENTÉ
+   Deux à quatre choix sur une ligne, dont un seul est actif. */
+.segmente {
+  display: inline-flex; width: fit-content;
+  padding: 3px; gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--pilule);
+}
+.segmente__btn {
+  line-height: var(--ligne-serre);
+  padding: var(--champ-y-serre) var(--pas-3);
+  border: var(--trait-reserve);
+  border-radius: var(--pilule);
+  background: transparent; color: var(--text-2);
+  font-family: inherit; font-size: var(--taille-texte);
+  font-weight: var(--graisse-note); cursor: pointer;
+  flex: 0 0 auto; white-space: nowrap;
+  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+}
+.segmente__btn:hover { color: var(--text-1); }
+.segmente__btn.is-on { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-1); }
+
+/* -------------------------------------------------------- LE FIL DES ÉTAPES
+   TROIS ÉTATS, ET LE VERT NE SERT À RIEN :
+     franchie = coche claire sur pastille encrée ;
+     courante = pilule pleine ;
+     à venir   = gris — mais LISIBLE : « 2. Vérification » dit où l'on va,
+                 c'est de la navigation, pas du décor. Posée sur l'encre
+                 atténuée elle donnait 2,85:1. Ce qui distingue les trois
+                 états, c'est la pastille et le fond de l'étape courante, pas
+                 l'illisibilité des autres.
+   La hauteur ne s'écrit nulle part : elle sort du texte, de l'interligne et du
+   rembourrage, comme toutes les autres boîtes. */
+.stepper { display: flex; flex-wrap: wrap; gap: var(--pas-2); margin-bottom: var(--pas-4); }
+.step {
+  position: relative; flex: 1 1 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: var(--pas-1);
+  border-radius: var(--pilule); padding: 8px 12px; text-align: center;
+  font-size: var(--taille-texte); font-weight: var(--graisse-note);
+  line-height: var(--ligne-champ);
+  color: var(--text-2); background: transparent;
+}
+.step::before {
+  content: ""; flex: 0 0 auto;
+  width: 22px; height: 22px; border-radius: var(--pilule);
+  border: 1.5px solid var(--border-strong);
+  display: grid; place-items: center;
+  font-size: var(--taille-note); font-weight: var(--graisse-forte); line-height: 1;
+}
+/* Le trait qui relie deux étapes, posé à GAUCHE de chaque bulle sauf la
+   première : dans une rangée qui peut se replier, un trait accroché à droite
+   dépasserait de la dernière bulle de la ligne. */
+.step:not(:first-child)::after {
+  content: ""; position: absolute; right: 100%; top: 50%;
+  width: var(--pas-2); height: 2px; margin-top: -1px;
+  background: var(--card-border);
+}
+.step.done { color: var(--text-1); }
+.step.done::before { content: "\2713"; background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.step.done::after, .step.active::after { background: var(--primary); }
+.step.active { background: var(--primary); color: var(--on-primary); font-weight: var(--graisse-forte); }
+/* Posée SUR l'encre, la pastille de l'étape courante se CREUSE dans le fond
+   plutôt que de porter une couleur à elle. De nuit l'accent est clair : elle
+   se creuse alors dans le noir, sans quoi elle disparaîtrait. */
+.step.active::before { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .3); }
+[data-theme="dark"] .bat-app .step.active::before { background: rgba(0, 0, 0, .16); border-color: rgba(0, 0, 0, .3); }
+
+/* ------------------------------------------------------------- LE FOCUS
+   Une case à cocher native ne dit pas qu'elle a le focus dès qu'une feuille
+   pose `outline: 0` plus haut dans la cascade — et la plupart en posent une.
+   Même halo que les commandes, pour que ce soit LE MÊME signal partout. */
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .3);
+}
+
+/* -------------------------------------------------- UNE BASCULE NE REBONDIT PAS
+   On ne vide JAMAIS un conteneur avant d'avoir de quoi le remplacer. La liste
+   sortante reste à l'écran, éteinte et injouable, et le rendu suivant la
+   remplace EN PLACE : la hauteur ne passe jamais par zéro.
+
+   Le voile porte un `transition-delay` : une réponse rapide ne fait donc RIEN
+   clignoter. Ce délai CSS remplace le minuteur qu'il aurait fallu armer, puis
+   annuler, en JavaScript.
+
+   UN SEUL FONDU, PORTÉ PAR LE CONTENEUR, SUR LA SEULE OPACITÉ. Pas de cascade
+   ligne par ligne : rien ne se déplace, et une liste de 400 lignes ne coûte
+   plus que l'animation d'un élément. */
+.en-attente {
+  opacity: .45;
+  pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease) var(--delai-aveu);
+}
+@media (prefers-reduced-motion: reduce) { .en-attente { transition: none; } }

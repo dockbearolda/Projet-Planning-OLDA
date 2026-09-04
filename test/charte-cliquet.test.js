@@ -72,7 +72,17 @@ const PLAFONDS = {
 // permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
 const TOTAL_MAX = 174;
 
-const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public'], {
+// LA FEUILLE BAT EST EXCLUE, ET C'EST LA MEME RAISON QUE LE TICKET.
+// `public/bat/css/feuille/` n'habille pas un ecran : c'est un A4 rendu en
+// 1 pt = 1 px dont CHAQUE cote et CHAQUE teinte sont partagees avec
+// l'exportateur PDF (`bat/js/batlayout.js` → G_HEX / HEX / ROW_H / TBL_FONT*).
+// Une taille de 9 px n'y est pas « une taille hors echelle » : c'est 9 points
+// sur le papier du client, et la passer a l'echelle 14/17/21/32 ne changerait
+// pas un habillage — ca changerait le DOCUMENT, et l'apercu mentirait sur le
+// PDF. Le depot d'origine s'executait deja avec `--exclure feuille` ; l'entete
+// de `feuille.css` dit que cette exclusion EST la frontiere ecrite.
+// Tout le reste de `public/bat/` est note comme le reste du CRM, a zero.
+const res = spawnSync(process.execPath, ['outils/verifier-charte.mjs', 'public', '--exclure', 'feuille'], {
   cwd: RACINE, encoding: 'utf8',
 });
 assert.ok(res.stdout, 'le vérificateur doit produire un rapport');

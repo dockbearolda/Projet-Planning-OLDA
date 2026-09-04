@@ -1,0 +1,85 @@
+/* ===========================================================================
+   BAT STUDIO — LES JETONS QUI MANQUAIENT
+   ---------------------------------------------------------------------------
+   Se charge APRÈS `phare.css`, AVANT `phare-composants.css`.
+
+   Un écran ne redéclare jamais un jeton : il en prend un, ou IL EN MANQUE UN.
+   Ce fichier est l'endroit où se pose ce qui manque, avec son rôle écrit —
+   et rien d'autre. Aucune règle, aucun sélecteur : c'est ce qui permet de
+   contrôler d'un coup d'œil que la liste ne s'allonge pas en douce.
+
+   Rien ici ne REDÉFINIT un jeton de `phare.css`. Ce sont des mesures propres à
+   cette application — une barre, un rail, une vignette — que la charte ne peut
+   pas connaître d'avance. Les couleurs, elles, viennent TOUTES de `phare.css` :
+   il n'y a pas de teinte « maison ».
+
+   La feuille BAT (le document A4) a ses propres jetons, dans
+   `feuille/feuille.css`, et pour une raison écrite là-bas.
+   =========================================================================== */
+
+.bat-app {
+  /* ------------------------------------------------------------- LA BARRE
+     Elle ne se choisit pas : elle SORT de la boîte unique et de l'écart qui
+     la borde, comme toutes les autres hauteurs du système.
+     50 + 2 × 6 = 62. Le même écart que le bandeau d'onglets et le pied de
+     carte, qui encadrent déjà leur propre boîte unique avec `--pas-1` — la
+     barre du haut suit la même règle plutôt que d'en garder une à elle.
+     L'écrire en dur, c'est le jour où la boîte change de hauteur et où la
+     barre, seule, ne suit pas. */
+
+  /* --------------------------------------------------------------- LE RAIL
+     La colonne d'édition, à gauche de la feuille. La feuille est un A4
+     PAYSAGE : c'est sa HAUTEUR qui la bride, jamais sa largeur — un rail ne
+     lui coûte donc que de la largeur, dont elle a du rab. Un bandeau
+     horizontal lui volerait des pixels d'aperçu.
+     Sa largeur SORT de la boîte : une commande pleine largeur, plus ses deux
+     rembourrages, plus de quoi ne pas coller le texte. */
+  /* LA COLONNE D'INTITULÉS DU BANDEAU. Une seule mesure pour TOUT ce qui s'y
+     remplit — client, projet, échéance, vêtement, couleur. C'est elle qui fait
+     de chaque bloc un tableau : deux verticales, et rien qui en sorte. Elle ne
+     se choisit pas au hasard : c'est la largeur du plus long intitulé qui s'y
+     pose, mesurée au corps et à la graisse des intitulés — « Référence »
+     demande 71 px, d'où 72. Un pixel de moins et le mot est coupé ; dix de
+     plus et ils sont pris aux champs. */
+  --champ-lb: 72px;
+
+  /* ----------------------------------------------------------- LES IMAGES
+     Une vignette n'est pas une icône : elle porte une photo de vêtement, et
+     c'est souvent LE repère du projet (la moitié n'ont pas de nom saisi).
+     Deux tailles, et la taille dit la distance de lecture — comme les icônes. */
+  --vignette:        64px;   /* carte de projet, carte de produit */
+  --vignette-serre:  40px;   /* onglet d'article dans le bandeau */
+
+  /* Le point de couleur d'un vêtement : posé DANS une ligne de texte, il la
+     suit et ne la fait pas grandir. */
+  --point: 10px;
+
+  /* --------------------------------------------------------- LE MENU LONG
+     Un menu déroulant qui liste 35 produits ou 50 couleurs doit s'arrêter
+     quelque part : passé cette hauteur, il défile chez lui plutôt que de
+     couvrir l'écran. Une hauteur, pas un nombre de lignes — les lignes n'ont
+     pas toutes la même. */
+  --menu-h: 340px;
+
+  /* ------------------------------------------------------------- L'ATTENTE
+     Le rond qui tourne. Une seule taille : il n'y a qu'une attente. */
+  --attente: 32px;
+  --attente-trait: 3px;
+
+  /* ---------------------------------------------------------------- LE VOILE
+     Le fond posé derrière une modale. Ce n'est pas une ombre : c'est ce qui
+     éteint l'écran DERRIÈRE, et il s'assombrit de nuit comme de jour. */
+  --voile: rgba(17, 24, 39, .45);
+
+  /* -------------------------------------------------- LA LARGEUR DE LECTURE
+     Un écran étiré sur un ultra-wide ne se lit plus : l'œil perd la ligne.
+     Deux bornes, et chacune a son métier. */
+  --lecture:      1100px;   /* une grille de cartes */
+  --lecture-etroit: 900px;  /* une colonne de formulaire */
+}
+
+[data-theme="dark"] .bat-app {
+  /* De nuit le voile ne s'éclaircit pas — il s'APPUIE : la page derrière est
+     déjà sombre, un voile clair la révélerait au lieu de l'éteindre. */
+  --voile: rgba(0, 0, 0, .65);
+}

@@ -29,11 +29,23 @@ function fichiers(dossier, ext) {
   });
 }
 
-// `node --check` analyse sans exécuter. Le mode compte : un fichier qui porte
-// `import`/`export` en tête de ligne est un module, les autres sont des
-// scripts classiques (pont.js, textile-catalog.js, sw.js).
+// `node --check` analyse sans exécuter. Le mode compte : un module et un
+// script n'ont pas la même grammaire, et analyser l'un pour l'autre invente une
+// faute là où il n'y en a pas.
+//
+// TROIS SIGNES, PAS UN SEUL. La règle était « `import`/`export` en tête de
+// ligne » ; elle marchait tant que tout le JavaScript du dépôt était écrit à la
+// main. Les bibliothèques arrivées avec BAT Studio sont MINIFIÉES : tout le
+// fichier tient sur une ligne, et son `export{…}` final est précédé de
+// quarante mille caractères. `pdf-lib.esm.min.js` passait donc pour un script
+// classique, et le test annonçait cassé un fichier parfaitement valide.
+//   · `import`/`export` en tête de ligne — le code écrit à la main ;
+//   · le même, précédé d'un `;` ou d'un `}` — le code minifié ;
+//   · `.esm.` ou `.mjs` dans le nom — ce que le paquet dit de lui-même.
 function analyser(source, nom) {
-  const module = /^[ \t]*(import|export)[ \t{*]/m.test(source);
+  const module = /^[ \t]*(import|export)[ \t{*]/m.test(source)
+    || /[;}]\s*export\s*[{*]/.test(source)
+    || /\.esm\.|\.mjs$/.test(nom);
   try {
     execFileSync(process.execPath,
       module ? ['--check', '--input-type=module'] : ['--check', '--input-type=commonjs'],
