@@ -21,12 +21,17 @@ const path = require('node:path');
 const RACINE = path.join(__dirname, '..');
 const VENTE = ecran('vente-directe');
 
-// Le bloc va de son ouverture au champ de l'heure : c'est là que tout se joue.
+// ⚠ LE « BLOC » N'EN EST PLUS UN DEPUIS LE 02/09. La saisie est une FEUILLE DE
+// CALCUL — l'intitulé à gauche, la case à droite (`.rangs` / `.rang`,
+// charte.css, la grammaire du devis flash). Les deux groupes encadrés ont
+// fusionné : les traits de la feuille séparent déjà rangée par rangée, et un
+// cadre de plus dans une carte-volet faisait un niveau de trop.
+// Ce que ce fichier tient reste le MÊME : la date de commande qui quitte
+// l'écran sans quitter le dossier, et rien d'empilé dans la cellule d'une date.
 const deb = VENTE.indexOf('<input id="orderDate"');
 assert.ok(deb > 0, 'la date de commande existe toujours dans la page');
-const bloc = VENTE.slice(VENTE.lastIndexOf('<div class="bloc">', deb),
-                         VENTE.indexOf('<div class="actions">', deb));
-assert.ok(bloc.length > 0 && bloc.includes('deliveryTime'), 'le bloc des dates est bien découpé');
+const bloc = VENTE.slice(deb, VENTE.indexOf('<div class="actions">', deb));
+assert.ok(bloc.length > 0 && bloc.includes('deliveryTime'), 'la feuille de saisie est bien découpée');
 
 // --- 1. La date de commande quitte l'écran, PAS le dossier -----------------
 // Elle est toujours celle du jour et personne ne la saisit. Mais huit endroits
@@ -50,15 +55,16 @@ for (const usage of [
 assert.ok(/function isoDate\(date\)\{[^}]*getTimezoneOffset\(\)/.test(VENTE),
   'la date du jour est la date civile locale, pas un toISOString() nu');
 
-// --- 2. La rangée ne porte plus que des dates ------------------------------
-// Deux cellules, un seul intitulé chacune. Tout le reste est descendu.
-assert.ok(/<div class="grid">\s*<div class="field">\s*<label for="deliveryDate">/.test(bloc),
-  'la rangée commence par « Date souhaitée »');
-assert.ok(/<label for="deliveryTime">/.test(bloc),
-  '… et « Heure souhaitée » est une CELLULE, plus un second intitulé empilé');
-// Tout ce qui n'est pas une date vient APRÈS la dernière cellule de la rangée :
-// plus rien n'est empilé dans la cellule de « Date souhaitée ».
-const finRangee = bloc.indexOf('<label for="deliveryTime">');
+// --- 2. Chaque date est une RANGÉE, et rien n'y est empilé -----------------
+// Un intitulé, une case, un trait. « Date souhaitée » portait à elle seule huit
+// enfants et deux intitulés ; elle n'en porte plus qu'un.
+assert.ok(/<label class="rang__k" for="deliveryDate">Date souhaitée \*<\/label>/.test(bloc),
+  '« Date souhaitée » est une rangée de la feuille');
+assert.ok(/<label class="rang__k" for="deliveryTime">Heure souhaitée \*<\/label>/.test(bloc),
+  '… et « Heure souhaitée » est une RANGÉE À ELLE, plus un second intitulé empilé');
+// Tout ce qui n'est pas une date vient APRÈS la dernière rangée : plus rien
+// n'est empilé dans la case de « Date souhaitée ».
+const finRangee = bloc.indexOf('for="deliveryTime"');
 assert.ok(finRangee > -1, 'la cellule de l’heure est dans le bloc');
 for (const orphelin of ['delay-quick', 'deadlineInfo']) {
   const ou = bloc.indexOf(orphelin);
@@ -83,32 +89,40 @@ assert.match(VENTE, /document\.addEventListener\("DOMContentLoaded", charger\);/
 assert.ok(!/baremeSave|baremeCancel|baremeMsg/.test(VENTE),
   'le script de l’éditeur est parti avec ses boutons');
 
-// LE SECOND INTITULÉ ÉTAIT LA CAUSE DE L'EXCEPTION. Une rangée qui contient un
-// champ à deux intitulés renonce au partage de lignes (`label~label`) — c'était
-// « le seul cas des deux écrans ». La règle reste, elle ne mord plus ici.
-assert.ok(/\.grid:has\(>\.field label~label\)/.test(VENTE),
-  'la règle d’exception existe toujours pour qui en aurait besoin');
+// LE SECOND INTITULÉ ÉTAIT LA CAUSE D'UNE EXCEPTION — une rangée à deux
+// intitulés renonçait au partage de lignes (`label~label`), « le seul cas des
+// deux écrans ». Elle est partie AVEC la grille de champs le 02/09 : sur une
+// feuille de calcul, une rangée porte un intitulé et une case, il n'y a plus
+// de lignes à partager ni d'exception à écrire.
+// Sur la feuille DÉPOUILLÉE : la note qui explique le départ de la règle en
+// porte le nom, et la chercher ferait échouer le test sur sa propre explication.
+assert.ok(!/label~label/.test(VENTE.replace(/\/\*[\s\S]*?\*\//g, ' ')) && !/class="field"/.test(VENTE),
+  'plus de grille de champs sur cet écran, donc plus d’exception à tenir');
 
-// --- 3. Le délai sous la rangée, sur deux lignes stables -------------------
-// Une seule ligne déborderait (385 + 420 + 150 px pour 910 disponibles), et une
-// rangée qui se replie change de hauteur selon la longueur du texte.
-assert.ok(/<div class="delai-rangee">/.test(bloc), 'le délai a sa propre rangée');
-assert.ok(!/\.delai-rangee\{[^}]*justify-content:\s*flex-end/.test(VENTE),
-  'ce qui ferme la rangée à droite se pose par une marge automatique, '
-  + 'jamais par un flex-end, qui rogne par la gauche');
+// --- 3. Les raccourcis sous la feuille, sur toute la largeur ---------------
+// `.delai-rangee` est partie avec le barème : elle mettait les trois raccourcis
+// et le réglage du barème sur une ligne, et le barème a quitté cet écran le
+// 27/08 — il ne restait qu'un conteneur à un seul enfant.
+assert.ok(/<div class="delay-quick">/.test(bloc), 'les trois raccourcis sont sous la feuille');
+assert.ok(!/delai-rangee/.test(VENTE.replace(/\/\*[\s\S]*?\*\//g, ' ')),
+  'le conteneur à un seul enfant est parti avec le barème qu’il accompagnait');
 
 // L'AVIS DE SUPPLÉMENT CHANGE DE TEXTE À CHAQUE DATE. Sur toute la largeur il a
 // la marge qui lui manquait dans une cellule de 430 px. Vérifié dans le
 // navigateur : ses quatre textes font 22 px, le bloc 224 px, et le bouton
 // « Ajouter l'article » ne bouge pas d'un pixel.
 assert.ok(/<div id="deadlineInfo" class="help delai-etat"><\/div>/.test(bloc),
-  'l’avis de supplément prend toute la largeur du bloc');
+  'l’avis de supplément prend toute la largeur');
 
 // --- 4. `minmax(0, 1fr)`, jamais `1fr` -------------------------------------
-// Sans le minimum à zéro, une cellule refuse de se réduire sous son contenu :
-// le menu des heures déséquilibrait la rangée.
-assert.ok(/\.grid-3\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/.test(VENTE),
-  'les colonnes peuvent se réduire : sinon un libellé long les déséquilibre');
+// Sans le minimum à zéro, une piste refuse de se réduire sous son contenu :
+// une désignation longue pousserait les trois colonnes de nombres hors de la
+// carte. La règle a suivi la feuille de calcul : elle est sur les pistes du
+// TABLEAU maintenant, plus sur une grille de champs qui n'existe plus.
+assert.ok(/\.lignes\{--lignes-cols:minmax\(0,1fr\) /.test(VENTE),
+  'la désignation peut se réduire : sinon elle pousse les nombres hors de la carte');
+assert.ok(/\.rangs\{--rangs-k:\d+px\}/.test(VENTE),
+  'la colonne des intitulés est un JETON de cet écran : ses libellés sont plus longs que ceux du devis');
 
 // --- 5. La validation de la vente ferme la ligne, à droite -----------------
 // Cette barre flottait au CENTRE, large de 385 px pour 1071 de carte.

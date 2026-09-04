@@ -149,68 +149,24 @@
    lui qui porte l'écart de la carte, une seule fois.
    =========================================================================== */
 .dvf-cat { display: block; }
-/* LA POIGNÉE PREND LA BOÎTE DE L'APPLICATION. Mesuré à 1280 px : la tête d'une
-   carte des Réglages fait 23 px (elle ne se clique pas) ; ici, le rembourrage du
-   volet la portait à 45 — un nombre que personne n'a choisi, et qui ne tombe sur
-   rien. Elle se CLIQUE : c'est donc `--ctrl-h`, la boîte de tout ce qui se
-   clique et se remplit dans l'application.
+/* LA POIGNÉE PREND LA BOÎTE DE L'APPLICATION, ET LA RÈGLE EST PARTIE DANS LA
+   CHARTE (02/09). Mesuré à 1280 px : la tête d'une carte des Réglages fait
+   23 px (elle ne se clique pas) ; ici, le rembourrage du volet la portait à 45
+   — un nombre que personne n'a choisi. Elle se CLIQUE : c'est donc `--ctrl-h`.
+   Depuis que l'écran de VENTE replie ses cartes de la même façon, cette
+   hauteur ne peut plus être écrite ici : deux écrans à un clic l'un de l'autre
+   la partagent, donc elle vit dans `.volet-carte` (charte.css) et les deux la
+   portent. La classe est posée par `carte()` dans devis-flash.js.
    ⚠ L'ÉCART AVEC LES RÉGLAGES RESTE, ET IL SE DIT : une tête qu'on déplie n'est
    pas une tête qu'on lit. Ce qui est égalisé, c'est ce qui est comparable — les
-   quatre poignées de cet écran entre elles, et la boîte de l'application. */
-.dvf-cat > summary { min-height: var(--ctrl-h); }
+   quatre poignées de cet écran, celles de la vente, et la boîte de
+   l'application. */
 .dvf-cat__corps {
   display: flex;
   flex-direction: column;
   gap: var(--pas-3);
   padding-top: var(--pas-3);
 }
-/* ===========================================================================
-   LA FEUILLE DE SAISIE — une rangée par champ (01/09/2026)
-   ---------------------------------------------------------------------------
-   « Les lignes simples à remplir façon Google Sheet. » L'intitulé passe à
-   GAUCHE et la case à droite : le regard descend une seule colonne de cases
-   au lieu de sauter d'un intitulé à sa boîte, deux fois par rangée.
-
-   L'intitulé reste `.fa-lab` et la case `.fa-in` — les composants de
-   l'application. C'est la MISE EN PLACE qui change, pas la grammaire.
-
-   LES TRAITS VIENNENT DE LA GRILLE, PAS DE CHAQUE RANGÉE : une bordure écrite
-   par rangée en pose une de trop sous la dernière.
-   =========================================================================== */
-.dvf-grille {
-  --dvf-k: 176px;   /* la colonne des intitulés : « Personne à contacter »,
-                       le plus long des trois catégories, tient dedans en une
-                       ligne au cran des libellés. */
-  display: grid;
-  grid-template-columns: var(--dvf-k) minmax(0, 1fr);
-  /* ⚠ PAS D'`align-items: center` ICI (02/09). Il faisait tomber chaque cellule
-     sur SA hauteur de contenu au lieu de la hauteur de la rangée : l'intitulé
-     sortait en 33,3 px, la case en 59, et leurs deux traits de séparation se
-     retrouvaient à 12,9 px l'un de l'autre — mesuré au rendu. Les mots, eux,
-     étaient bien alignés : c'est la ligne sous eux qui ne l'était pas.
-     Les cellules s'étirent donc (le défaut d'une grille), et c'est l'intitulé
-     qui centre son texte DANS sa cellule. */
-  column-gap: var(--pas-3);
-}
-.dvf-rang { display: contents; }
-/* L'INTITULÉ EST SUR LE RAIL DE SA CASE : même rangée, même hauteur, même
-   trait au pied. Il se replie plutôt que de pousser sa colonne — un intitulé
-   long ne doit pas rétrécir toutes les cases de la feuille. */
-.dvf-rang__k {
-  display: flex;
-  align-items: center;
-  line-height: var(--ligne-texte);
-}
-/* La case remplit sa piste : une grille étire ses enfants, il n'y a donc
-   qu'à ne pas l'en empêcher. Le padding vertical fait l'écart d'une rangée à
-   la suivante — écrit sur la grille, il en aurait mis un sous la dernière. */
-.dvf-rang__v { display: grid; min-width: 0; padding: calc(var(--lab-gap) / 2) 0; }
-/* LE TRAIT D'UNE RANGÉE À LA SUIVANTE — c'est lui qui fait la feuille de
-   calcul. Il est sur les DEUX cellules (`display: contents` ne dessine rien
-   sur la rangée elle-même), et la dernière rangée n'en a pas : la carte ferme
-   déjà le bloc. */
-.dvf-rang__k, .dvf-rang__v { border-bottom: 1px solid var(--border-soft); }
-.dvf-rang:last-child > .dvf-rang__k, .dvf-rang:last-child > .dvf-rang__v { border-bottom: 0; }
 
 /* L'AJUSTEMENT GLOBAL (03/09/2026) — un montant et son unité (€ / %) sur la
    même rangée. Les deux cases viennent de `.fa-in` : même hauteur que
@@ -220,153 +176,32 @@
 .dvf-ajustement > select { flex: 0 0 auto; width: 68px; }
 
 /* ===========================================================================
-   LE TABLEAU DES ARTICLES (01/09/2026)
+   CE QUE CET ÉCRAN GARDE DU TABLEAU (02/09/2026)
    ---------------------------------------------------------------------------
-   Un article tenait dans un bloc de cinq rangées à intitulés : huit champs,
-   huit étiquettes, et les mêmes huit étiquettes réécrites à l'article suivant.
-   En tableau, l'intitulé se lit UNE fois en tête de colonne.
-
-   CE QUE LA TABLE PORTE, C'EST LA LIGNE COMMERCIALE — ce qu'on vend, combien,
-   à quel prix. Le reste dit comment on le PRODUIT et vit sous la ligne : ça ne
-   se compare pas d'un article à l'autre, et ça n'entre pas dans la largeur.
-   Mesuré dans la coquille à 1280 px — le plus petit poste de l'atelier : la
-   colonne de saisie fait 574 px, et les huit colonnes en demandaient 772.
-
-   LES PISTES SONT ÉCRITES UNE FOIS, sur le tableau, et l'en-tête comme les
-   rangées les lisent. Deux écritures, ce serait un intitulé qui coiffe la
-   mauvaise case au premier changement.
+   La feuille de calcul (`.rangs` / `.rang`), le tableau des lignes
+   commerciales (`.lignes`), le nombre (`.nb`) et les totaux (`.tot`) sont
+   partis dans `charte.css` : l'écran de VENTE les porte aussi depuis le 02/09,
+   et deux écrans du même poste ne peuvent pas avoir deux grammaires de ligne.
+   Ce qui reste ici, c'est ce qui n'appartient qu'au devis — le détail d'un
+   article sous sa ligne, et les cinq pistes de SON tableau.
    =========================================================================== */
-.dvf-tab {
-  /* CINQ PISTES DEPUIS LE 02/09 : la référence est descendue dans le détail.
-     À six, elle sortait à 50 px au plus petit poste — deux caractères de
-     « NS300 » — et son intitulé chevauchait celui de « Qté ». Ce qu'elle rend,
-     la désignation le prend : c'est la seule colonne qui porte une phrase. */
-  /* LA COLONNE DU TOTAL TIENT SON NOMBRE. Mesuré au rendu le 02/09 : elle
-     faisait 84 px dont 56 utiles, et « 184,56 € » en demande 77,6 — les
-     montants débordaient déjà de leur boîte, et « À chiffrer » s'y coupait en
-     deux lignes. Douze pixels de plus, et le rembourrage GAUCHE rendu (voir
-     `.dvf-tab__lu` : un nombre calé à droite n'a rien à respirer à sa
-     gauche) : 82 px utiles, sans rien prendre de plus à la désignation, qui
-     est déjà la piste la plus serrée au petit poste. */
-  /* SIX PISTES DEPUIS LE 03/09 : le PU TTC rejoint le PU HT, même largeur —
-     Charlie : « pouvoir modifier l'un ou l'autre mais qu'il reste lié ». */
-  --dvf-cols: minmax(0, 1fr) 56px 76px 76px 96px var(--ctrl-h);
-  display: flex;
-  flex-direction: column;
-  gap: var(--pas-2);
-}
-.dvf-tab__tete,
-.dvf-tab__rang {
-  display: grid;
-  grid-template-columns: var(--dvf-cols);
-  gap: var(--pas-1);
-  align-items: center;
-}
-/* L'EN-TÊTE TOMBE SUR LE RAIL DES LIGNES, PAS À CÔTÉ. Mesuré au rendu le
-   02/09 : il portait son propre rembourrage (6 px) quand la rangée hérite de
-   celui du bloc d'article (10 px) plus son trait — ses cinq intitulés
-   tombaient 5 px à côté de leurs colonnes. Il reprend donc EXACTEMENT la boîte
-   du bloc : même rembourrage, et un trait transparent pour le pixel du bord.
-   Sans lui, l'écart revient à 1 px, ce qui est pire — on ne le voit plus, et il
-   est toujours là.
-   Il reste une ligne de LECTURE : il ne prend pas la boîte de l'application, il
-   prend la place de son texte. */
-.dvf-tab__tete {
-  padding: 0 var(--pas-2);
-  border: 1px solid transparent;
-}
-/* UN INTITULÉ DE COLONNE NE DÉBORDE JAMAIS SUR SA VOISINE. Sans ça, « Désignation »
-   sort de sa piste dès que la colonne rétrécit — rail ouvert, coupe tirée à
-   gauche — et vient s'imprimer par-dessus « Qté » : mesuré au rendu, on lisait
-   « DésignaQtéion ». Il s'ellipse, et la colonne garde son rang. */
-.dvf-tab__tete > * {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dvf-tab__tete[hidden] { display: none; }
-/* LE NOMBRE QUI NE SE TAPE PAS. Il prend la boîte des cases pour tomber sur
-   elles, mais ni fond ni bordure : ce qui a une boîte se remplit, et un total
-   ne se remplit pas. */
-.dvf-tab__lu {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: var(--ctrl-h);
-  min-width: 0;
-  /* À DROITE COMME LES CASES, ET RIEN À GAUCHE. C'est le bord DROIT qui aligne
-     la colonne — un montant se lit par la virgule. Le rembourrage gauche d'une
-     case sert à écarter le texte de sa bordure ; ici il n'y a pas de bordure,
-     et ces quatorze pixels manquaient au nombre. */
-  padding: 0 var(--champ-x) 0 0;
-  font-size: var(--taille-texte);
-  font-weight: var(--graisse-forte);
-  color: var(--text-1);
-}
-/* UNE CASE CALCULÉE SE DIT. La quantité devient la somme des tailles dès
-   qu'une taille est remplie : sans ce fond, on tape dedans et rien ne bouge,
-   sans savoir pourquoi. C'est le gris des zones de l'application, celui qui
-   dit « ici on lit ». */
-.dvf-tab__calc { background: var(--zone-bg); color: var(--text-2); cursor: default; }
-/* CE QU'ON N'A PAS ENCORE CHIFFRÉ. Le total d'une ligne sans prix ne dit pas
-   « 0,00 € » — il dit ce qui manque, dans le gris atténué de l'application et
-   à la taille des notes : c'est une CONSIGNE, pas un montant, et elle ne doit
-   pas se lire comme les autres nombres de la colonne. */
-.dvf-tab__vide {
-  justify-content: flex-end;
-  /* DEUX MOTS NE FONT PAS DEUX LIGNES. Un montant ne s'enroule pas (l'espace
-     des milliers est insécable) ; « À chiffrer » en porte une vraie, et la
-     case doublait de hauteur — dans une rangée dont toutes les autres font
-     `--ctrl-h`. */
-  white-space: nowrap;
-  font-size: var(--taille-note);
-  font-weight: var(--graisse-texte);
-  color: var(--text-2);
-}
+/* LES PISTES DE SON TABLEAU, ET RIEN D'AUTRE. La grammaire de ligne
+   (`.lignes`, `.lignes__tete`, `.lignes__rang`, `.nb`, `.tot`) vit dans
+   `charte.css` : le devis et la vente donnent le même composant, pas deux qui
+   se ressemblent. Tout ce que cet écran redéclarait ici est parti là-bas.
 
-/* LES TAILLES LIBRES — « je crée ma bulle » (03/09/2026, Charlie). Conteneur
-   PROPRE À CET ÉCRAN, distinct de `.fa-tailles` (fiche-atelier.css, lue aussi
-   par l'écran de l'atelier) : un nombre variable de bulles ne doit pas
-   déborder une grille qui n'a pas été pensée pour ça. */
-.dvf-libres-cadre { display: flex; flex-wrap: wrap; align-items: center; gap: var(--pas-2); }
-/* `[hidden]` SEUL NE SUFFIT PAS : la règle `display: flex` ci-dessus, posée
-   par l'auteur, bat la règle `display: none` de l'agent utilisateur à
-   spécificité égale — piège déjà payé sur cet écran (`.dvf-tab__tete[hidden]`,
-   plus haut). Sans ce correctif, une tasse (qui n'a pas de tailles) garde son
-   bouton « + Taille » visible, cliquable, sans rien au-dessus. */
-.dvf-libres-cadre[hidden] { display: none; }
-/* MÊME PIÈGE, TROUVÉ EN VÉRIFIANT (03/09/2026) : `.fa-tailles` (fiche-
-   atelier.css) porte elle aussi `display: flex`, sans override `[hidden]` —
-   et `cases.hidden = estTasse` (devis-flash.js, vente-flash.js) ne masquait
-   donc RIEN. Une tasse affichait six cases vides sous chaque ligne, en
-   production, depuis que ce masquage existe (01/09). `fiche-atelier.js` (la
-   vraie fiche de l'atelier) ne masque jamais `.fa-tailles` : la règle reste
-   donc scopée à `.dvf-art`, propre à ces deux écrans, sans toucher
-   fiche-atelier.css ni son usage réel côté atelier. */
-.dvf-art .fa-tailles[hidden] { display: none; }
-.dvf-libres { display: flex; flex-wrap: wrap; gap: var(--pas-2); }
-.dvf-taille-libre { display: flex; align-items: center; gap: var(--pas-1); }
-/* MÊME HAUTEUR QUE LES CASES FIXES : le jeton de hauteur du champ de saisie
-   (fiche-atelier.css) est déjà celui du bouton de suppression
-   (`.reg-tarif-del`, --ctrl-h) — rien à réécrire ici, seule la LARGEUR se
-   pose, à l'échelle d'un mot court. */
-.dvf-taille-libre .fa-in:first-child { width: 88px; }
-.dvf-taille-libre .fa-in:last-of-type { width: 64px; }
+   RESTENT LES PISTES, parce que la charte dit elle-même que chaque écran règle
+   `--lignes-cols` chez lui — le devis compte en HT, la vente en TTC, et leurs
+   colonnes diffèrent.
 
-/* --- Un article : sa ligne, son détail, ses tailles ------------------------
-   Le bloc reprend la zone douce de l'application (`--zone-bg`) : ce n'est pas
-   une carte dans une carte, c'est un groupe DANS la carte des articles. */
-.dvf-art {
-  display: flex;
-  flex-direction: column;
-  gap: var(--pas-2);
-  padding: var(--pas-2);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--arrondi-bloc);
-  background: var(--zone-bg);
+   SIX, PAS CINQ, et c'est le point où deux branches se sont croisées : la
+   valeur par défaut de la charte en compte cinq, mesurées avant que le PU TTC
+   ne rejoigne le PU HT le 03/09 (Charlie : « pouvoir modifier l'un ou l'autre
+   mais qu'il reste lié »). Sans cette ligne, la sixième case passe à la ligne
+   suivante et chaque intitulé coiffe la colonne d'à côté. */
+.devis-flash .lignes {
+  --lignes-cols: minmax(0, 1fr) 56px 76px 76px 96px var(--ctrl-h);
 }
-.dvf-liste { display: flex; flex-direction: column; gap: var(--pas-2); }
 /* LE DÉTAIL D'UN ARTICLE TIENT À TROIS PAR RANGÉE — la référence, la couleur,
    le marquage — avec l'intitulé au-dessus (`.fa-case`) : ce sont des cases
    isolées, pas des colonnes qui se lisent d'un article à l'autre. La note prend
@@ -391,38 +226,10 @@
    (`.fa-tailles`, display: flex) se masquent de la même façon — une tasse
    n'affiche pas les champs d'un t-shirt, et réciproquement. */
 .dvf-r3[hidden],
-.dvf-art .fa-case[hidden],
-.dvf-art .fa-tailles[hidden] { display: none; }
+.lignes__art .fa-case[hidden],
+.lignes__art .fa-tailles[hidden] { display: none; }
 
-/* UN NOMBRE SE LIT PAR LA DROITE, et ses chiffres font tous la même largeur :
-   sans ça, deux prix l'un sous l'autre ne s'alignent pas sur la virgule. */
-.dvf-nb { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* --- Le résultat du calcul, sous les trois réglages d'argent --------------
-   Les mêmes nombres que la feuille, dans la même colonne que les réglages qui
-   les produisent : c'est là qu'on les regarde en parlant au client. Ils
-   viennent tous de `calculerDevis`, comme le papier — deux calculs qui se
-   ressemblent finissent par se contredire. */
-.dvf-totaux { display: flex; flex-direction: column; }
-.dvf-tot {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--pas-3);
-  padding: var(--pas-2) 0;
-  border-bottom: 1px solid var(--border-soft);
-  font-size: var(--taille-texte);
-  color: var(--text-2);
-}
-.dvf-tot b { color: var(--text-1); font-weight: var(--graisse-forte); font-variant-numeric: tabular-nums; }
-.dvf-tot--grand {
-  border-bottom: 0;
-  border-top: 2px solid var(--text-1);
-  padding-top: var(--pas-3);
-  color: var(--text-1);
-  font-weight: var(--graisse-forte);
-}
-.dvf-tot--grand b { font-size: var(--taille-grand); letter-spacing: -.02em; }
 
 /* --- Ce que la recherche client propose ------------------------------------
    LA LISTE NE POUSSE RIEN. Elle sort du flux, sous la pilule de recherche :
@@ -472,17 +279,7 @@
    redisait sous le menu ce que le menu venait de dire (« Commande groupée » →
    « Dépend de la prochaine commande groupée »), et le compte du catalogue
    (« 82 objets, 0 tarifé ») se lisait une fois puis se franchissait à chaque
-   devis. Charlie : « on s'en fout ».
-
-   --- Quand la carte des articles est vide -------------------------------- */
-.dvf-vide {
-  padding: var(--pas-4);
-  border: 1px dashed var(--border);
-  border-radius: var(--arrondi-bloc);
-  text-align: center;
-  font-size: var(--taille-texte);
-  color: var(--text-2);
-}
+   devis. Charlie : « on s'en fout ». */
 
 /* SOUS 1180 px, LA FEUILLE PASSE SOUS LE FORMULAIRE. Deux moitiés de 520 px
    donnent un formulaire à quatre champs par rangée illisible ET une feuille

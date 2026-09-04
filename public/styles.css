@@ -111,32 +111,13 @@ textarea { line-height: var(--ligne-texte); }
    pas encore prête ne doit jamais s'afficher en toutes lettres (« dashboard »,
    « search »…) — et comme le fichier est local, l'attente se compte en
    millisecondes, y compris au premier chargement d'une tablette. */
-@font-face {
-  font-family: 'Material Symbols Outlined';
-  font-style: normal;
-  font-weight: var(--graisse-texte) 500;
-  font-display: block;
-  src: url('olda-icones.woff2') format('woff2');
-}
-
-.material-symbols-outlined {
-  font-family: 'Material Symbols Outlined';
-  width: 1em;
-  overflow: hidden;
-  flex-shrink: 0;
-  font-weight: normal;
-  font-style: normal;
-  line-height: var(--ligne-glyphe);
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-block;
-  white-space: nowrap;
-  direction: ltr;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  -webkit-font-feature-settings: 'liga';
-  -webkit-font-smoothing: antialiased;
-  user-select: none;
-}
+/* LA POLICE D'ICÔNES A DÉMÉNAGÉ DANS `charte.css` (02/09/2026). Elle était
+   déclarée ICI, dans la feuille du CRM — les deux écrans du comptoir, qui ne
+   lisent que la charte, n'y avaient donc pas droit : le glyphe s'y rendait en
+   TEXTE, et « draw » s'affichait en toutes lettres dans un bouton de 50 px.
+   C'est un composant partagé : il vit là où les trois écrans le lisent.
+   Le fichier ne se télécharge que si un glyphe le demande — un écran qui n'en
+   pose aucun ne paie rien pour la déclaration. */
 
 /* Ossature : LE RAIL TIENT TOUTE LA COLONNE DE GAUCHE, du haut de l'écran
    jusqu'en bas — sa première famille commence donc à la première ligne de
