@@ -194,7 +194,7 @@ b,strong{font-weight:var(--graisse-forte)}
    ticket, dont plus aucune autre classe n'est posée. Le ticket lui-même est
    plus bas — il compose en Courier, sur du 80 mm : c'est un document, il garde
    ses propres tailles. */
-.ticket-footer{margin-top:28px;padding-top:16px;border-top:1px solid #d0d5dd;font-size:11px;color:#667085;display:flex;justify-content:space-between;gap:16px}
+.ticket-footer{margin-top:28px;padding-top:16px;border-top:1px solid #d0d5dd;color:#667085;display:flex;justify-content:space-between;gap:16px}
 @media print{body *{visibility:hidden!important}#ticketArea,#ticketArea *{visibility:visible!important}#ticketArea{position:absolute;left:0;top:0;width:100%;box-shadow:none;border:none;padding:18mm}}
 
 
@@ -1064,21 +1064,51 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 @media(max-width:600px){
 .ticket-export-buttons{grid-template-columns:1fr}
 }
+/* LES QUATRE CRANS DU TICKET DU COMPTOIR (04/09/2026)
+   Il en avait ONZE a l'ecran — 11, 12, 12.5, 13, 14, 15, 16, 18, 19, 24, 28 —
+   et c'est le SEUL fichier du depot qui ecrivait encore une taille en clair :
+   les neuf autres feuilles sont a zero. Onze crans ne font pas une hierarchie,
+   ils font du desordre, et un ecart d'un demi-pixel (12 contre 12,5) ne se lit
+   que comme de la negligence. Le ticket de l'atelier a ete gueri de la meme
+   maladie — il en avait dix — et son apercu au comptoir ne l'avait pas ete.
+
+   C'EST UN PAPIER, DONC IL GARDE SES PROPRES CRANS : l'echelle de l'ecran
+   (14/17/21/32) ne le regarde pas, exactement comme pour `ticket.js` et
+   `bureau.js`. Ce qui est commun aux papiers, c'est la GRAMMAIRE, pas la
+   taille. Trois crans, plus celui des intitules :
+
+     --tkc-geant  ce qu'on cherche du regard : l'entete et le TOTAL ;
+     --tkc-cle    ce qui decide : le client, l'article, son prix, le retrait ;
+     --tkc-texte  ce qui se lit : les descriptions, les lignes, le pied ;
+     --tkc-cap    les intitules, qu'on saute pour aller a la valeur.
+
+   Poses sur `#ticketArea` ET sur `.ticket` : la feuille est dans la zone, et
+   un jeton absent ne vaut pas une taille de repli, il vaut RIEN — la regle
+   tombe et le texte herite. Deux ancres coutent une ligne et ferment le cas. */
+#ticketArea,
+.ticket{
+  --tkc-geant:26px; --tkc-cle:19px; --tkc-texte:15px; --tkc-cap:12px}
 .ticket{
   max-width:700px;
-  margin:0 auto}
+  margin:0 auto;
+  /* LA FEUILLE POSE SA PROPRE BASE. Sans cette ligne, `.ticket` heritait des
+     17 px de l'application : un cinquieme cran s'invitait sur le papier par la
+     bande, pour tout ce qu'aucune regle ne nomme. Un papier ne lit pas dans
+     l'echelle de l'ecran, il lit dans la sienne — c'est ce que fait le ticket
+     de l'atelier (`.tk`, dans ticket.js). */
+  font-size:var(--tkc-texte)}
 .ticket-head{
   padding:26px 24px}
 .ticket-head h2{
-  font-size:28px;
+  font-size:var(--tkc-geant);
   letter-spacing:.04em}
 .ticket-head div{
-  font-size:14px}
+  font-size:var(--tkc-texte)}
 .ticket-body{
   padding:24px}
 .ticket-client-box{
   padding:16px 18px;
-  font-size:16px;
+  font-size:var(--tkc-texte);
 /* LE TICKET GARDE SES PROPRES INTERLIGNES, comme il garde ses propres tailles
    et son encre noire : c'est un PAPIER, pas un ecran. Il compose sur 80 mm et
    se relit a l'etabli — l'echelle de l'application ne le regarde pas. Partout
@@ -1088,40 +1118,40 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   border:1px solid #d9dee7}
 .ticket-section-label{
   margin:20px 0 10px;
-  font-size:12px;
+  font-size:var(--tkc-cap);
   letter-spacing:.12em}
 .ticket-product{
   padding:18px 0}
 .ticket-product-name{
-  font-size:19px;
+  font-size:var(--tkc-cle);
   line-height:1.35}
 .ticket-product-description{
   margin-top:6px;
-  font-size:14px;
+  font-size:var(--tkc-texte);
   line-height:1.5;
   color:#475467}
 .ticket-product-price{
-  font-size:18px}
+  font-size:var(--tkc-cle)}
 .ticket-extra-line{
   margin:10px 0 0 16px;
   padding:10px 12px;
-  font-size:15px;
+  font-size:var(--tkc-texte);
   line-height:1.4}
 .ticket-extra-price{
-  font-size:15px}
+  font-size:var(--tkc-texte)}
 .ticket-total-line{
   margin-top:22px;
   padding-top:18px;
-  font-size:24px}
+  font-size:var(--tkc-geant)}
 .ticket-payment-line{
   margin-top:16px;
   padding:12px 14px;
   border-radius:10px;
   background:#f5f7fa;
-  font-size:15px}
+  font-size:var(--tkc-texte)}
 .ticket-footer{
   padding:17px 20px;
-  font-size:13px}
+  font-size:var(--tkc-texte)}
 .ticket-preview-actions{
   margin-top:20px}
 .ticket-preview-actions button{
@@ -1130,21 +1160,20 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 @media print{
 #ticketArea{
     padding:0}
+/* A L'IMPRESSION, LES QUATRE CRANS DESCENDENT D'UN COUP. Ils etaient reecrits
+   regle par regle, et les deux blocs d'impression de ce fichier se
+   contredisaient : 25px pour l'entete ici, 22px!important trois cents lignes
+   plus bas. Un seul endroit, une seule verite. */
+#ticketArea,
+.ticket{
+    --tkc-geant:22px; --tkc-cle:17px; --tkc-texte:13px; --tkc-cap:11px}
 .ticket{
     max-width:none;
-    font-size:14px}
+    font-size:var(--tkc-texte)}
 .ticket-head{
     padding:20px}
-.ticket-head h2{
-    font-size:25px}
 .ticket-body{
     padding:20px}
-.ticket-product-name{
-    font-size:18px}
-.ticket-product-description{
-    font-size:13px}
-.ticket-total-line{
-    font-size:22px}
 }
 .ticket,
 .ticket-body,
@@ -1212,7 +1241,7 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
   padding-top:9px;
   border-top:1px solid #777;
   color:#000;
-  font-size:15px;
+  font-size:var(--tkc-cle);
   font-weight:var(--graisse-forte)}
 @media print{
 .ticket{
@@ -1228,8 +1257,6 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 .ticket-head h2,
   .ticket-head div{
     color:#000!important}
-.ticket-head h2{
-    font-size:22px!important}
 .ticket-body{
     padding:14px!important;
     background:#fff!important}
@@ -1259,18 +1286,17 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
     -webkit-print-color-adjust:economy!important;
     print-color-adjust:economy!important}
 }
-#ticketArea .ticket-details{font-size:12.5px;font-weight:var(--graisse-note);line-height:1.5;color:#344054;margin-top:8px}
+#ticketArea .ticket-details{font-size:var(--tkc-texte);font-weight:var(--graisse-note);line-height:1.5;color:#344054;margin-top:8px}
 #ticketArea .ticket-details .tl{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid #eaecf0}
-#ticketArea .ticket-details .tl span{color:#667085;font-weight:var(--graisse-note);font-size:12px}
+#ticketArea .ticket-details .tl span{color:#667085;font-weight:var(--graisse-note);font-size:var(--tkc-cap)}
 /* LE LIBELLE PREND LA GRAISSE DE NOTE, LA VALEUR CELLE DE TITRE. Les deux
    etaient a 700 : sur un ticket lu a l'etabli, rien ne separait « Couleur » de
    « Noir » que la teinte de l'encre — et l'encre, sur une imprimante noir et
    blanc reglee en economie, ne separe plus grand-chose. */
-#ticketArea .ticket-details .tl strong{color:#101828;font-weight:var(--graisse-forte);font-size:12.5px;white-space:pre-line}
-#ticketArea .ticket-client-box{font-size:14px!important}
-#ticketArea #ticketClient{font-size:15px}
-#ticketArea #ticketOrder{font-size:14px}
-#ticketArea #ticketPickup{font-size:13px}
+#ticketArea .ticket-details .tl strong{color:#101828;font-weight:var(--graisse-forte);font-size:var(--tkc-texte);white-space:pre-line}
+#ticketArea #ticketClient{font-size:var(--tkc-cle)}
+#ticketArea #ticketOrder{font-size:var(--tkc-texte)}
+#ticketArea #ticketPickup{font-size:var(--tkc-cle)}
 #ticketArea .ticket-product-description{white-space:pre-line}
 @media print{
   body *{visibility:hidden!important}

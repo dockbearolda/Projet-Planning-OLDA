@@ -975,15 +975,25 @@ function menuBornes(peau){
 function menuPlacer(etat){
   const {panneau,peau}=etat;
   const marge=12,b=menuBornes(peau),champ=peau.getBoundingClientRect();
-  const dispo=b.droite-b.gauche-2*marge;
-  const largeur=Math.max(champ.width,Math.min(560,dispo));
-  panneau.style.width=Math.round(largeur)+'px';
-  /* Aligné sur le champ, puis ramené dans les bornes — dans cet ordre : un
-     champ collé au bord droit doit rendre un panneau collé au bord droit, pas
-     un panneau qui sort. */
+  /* LA LARGEUR SE PREND À PARTIR DU CHAMP, PAS AU MILIEU DE L'ÉCRAN (04/09).
+     Elle se mesurait sur toute la largeur disponible, puis le panneau, trop
+     large pour finir dans les bornes, se faisait RAMENER vers la gauche — et
+     il tombait alors à côté du champ qui l'ouvre. Mesuré au comptoir sur
+     « Couleur textile » : champ de 246,7 px, panneau de 560, posé 32,7 px à
+     GAUCHE du champ et débordant de 280,7 px à droite, par-dessus la colonne
+     voisine. C'est le défaut déjà payé sur le menu de « Nouveau Projet », qui
+     tombait 13,7 px de travers — celui-ci est deux fois et demie pire.
+     On aligne d'abord, on mesure la place qui RESTE À DROITE de cet
+     alignement, et le panneau prend cette place-là. Il ne se décale donc plus
+     jamais pour tenir : il ne demande jamais plus que ce qu'il y a. */
   let gauche=champ.left;
-  if(gauche+largeur>b.droite-marge)gauche=b.droite-marge-largeur;
   if(gauche<b.gauche+marge)gauche=b.gauche+marge;
+  const placeADroite=Math.max(0,b.droite-marge-gauche);
+  const largeur=Math.max(champ.width,Math.min(560,placeADroite));
+  panneau.style.width=Math.round(largeur)+'px';
+  /* Dernier recours SEULEMENT : un champ si près du bord que même sa propre
+     largeur ne tient pas. Là, et là seulement, le panneau se décale. */
+  if(gauche+largeur>b.droite-marge)gauche=Math.max(b.gauche+marge,b.droite-marge-largeur);
   panneau.style.left=Math.round(gauche)+'px';
   panneau.style.right='auto';
   /* Vertical : TOUJOURS SOUS LE CHAMP (30/08). Charlie : « tous les menus

@@ -49,9 +49,9 @@ const RACINE = path.join(__dirname, '..');
 // Un fichier absent de cette table doit être à ZÉRO : c'est ce qui rend le
 // cliquet valable pour les fichiers À VENIR.
 const PLAFONDS = {
-  'public/comptoir/demande-devis.css': 98,
+  'public/comptoir/demande-devis.css': 80,
   'public/comptoir/vente-directe.css': 41,
-  'public/styles.css': 21,
+  'public/styles.css': 19,
   'public/dashboard.css': 4,
   'public/clients.css': 2,
   'public/montravail.css': 4,
@@ -70,7 +70,15 @@ const PLAFONDS = {
 // desserre : il laisserait réintroduire ce qu'on vient de retirer.
 // LE TOTAL EST UN CLIQUET, LUI AUSSI. Sans lui, découper un fichier en deux
 // permettrait de répartir les mêmes écarts sans qu'aucun plafond ne bouge.
-const TOTAL_MAX = 174;
+// REDESCENDU LE 04/09 : 174 → 154. Les DIX-HUIT tailles de texte en dur de
+// `demande-devis.css` sont parties d'un coup — l'apercu du ticket du comptoir
+// avait ONZE crans a l'ecran et cinq de plus a l'impression, et il n'en a plus
+// que QUATRE, poses en jetons sur la feuille (`--tkc-*`), comme les deux autres
+// papiers. C'etait le SEUL fichier du depot qui ecrivait encore une taille en
+// clair. Et les DEUX `min-height: 38px` du rail sont parties avec la boite
+// unique de `.stage` (`--ctrl-h-serre`) : un titre de phase faisait 33,3 px
+// quand sa sous-etape en faisait 39,4.
+const TOTAL_MAX = 154;
 
 // LA FEUILLE BAT EST EXCLUE, ET C'EST LA MEME RAISON QUE LE TICKET.
 // `public/bat/css/feuille/` n'habille pas un ecran : c'est un A4 rendu en

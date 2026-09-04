@@ -1830,7 +1830,7 @@ function saveTextileNeed(){
   /* L'indice se lit AVANT que `cancelTextileEdit` ne remette editingTextile
      à -1 : après, la ligne modifiée serait confondue avec la dernière. */
   const pose=editingTextile>=0?editingTextile:needs.length-1;
-  cancelTextileEdit();renderNeeds();updateSidebar();
+  cancelTextileEdit();txReporter(d);renderNeeds();updateSidebar();
   return pose;
 }
 
@@ -2032,6 +2032,44 @@ function editTextileNeed(i){
   $('txCancelBtn').classList.remove('hidden');
   $('txRef').scrollIntoView({behavior:'smooth',block:'center'});
 }
+/* CE QUI NE CHANGE PAS D'UN ARTICLE AU SUIVANT RESTE POSÉ (04/09/2026).
+   Mesuré à l'écran : TREIZE champs pour un article, et DEUX seulement remplis
+   une fois la référence choisie — puis le formulaire les vidait TOUS à
+   l'ajout. Un client qui prend le même t-shirt en trois couleurs faisait donc
+   trois fois le tour complet : référence, genre, emplacement du marquage,
+   couleur du marquage, transport — alors que seules la couleur et les tailles
+   changeaient d'un article à l'autre.
+   C'est le levier de vitesse retenu au comptoir : le NOMBRE de champs et les
+   valeurs DÉJÀ POSÉES, pas la façon de circuler entre eux.
+
+   CE QUI SE REPORTE EST CE QUI DÉCRIT LE TRAVAIL DE L'ATELIER — le vêtement,
+   son genre, où et de quelle couleur on marque, comment il arrive.
+   CE QUI NE SE REPORTE PAS EST CE QUI DÉFINIT L'ARTICLE — la couleur du
+   textile, les tailles, la note, l'ajustement tarifaire : ce sont justement
+   les raisons pour lesquelles on en ajoute un deuxième.
+
+   UN PRODUIT LIBRE NE SE REPORTE PAS : sa référence, son prix d'achat et sa
+   désignation sont saisis à la main pour CE produit-là. Les reporter à moitié
+   (la référence sans le prix) rendrait une ligne fausse d'apparence complète.
+   Rien n'est verrouillé : un champ reporté se change comme un champ vide. */
+function txReporter(d){
+  if(!d||!d.ref||d.isCustom)return;
+  $('txRef').value=d.ref;
+  /* La référence D'ABORD, seule : c'est elle qui repeuple le genre, les
+     coloris et le tableau des tailles. Poser le genre avant elle, c'est le
+     voir effacé une milliseconde plus tard. */
+  onTextileRefChange();
+  const poser=(id,v)=>{const e=$(id);if(e&&v)e.value=v;};
+  poser('txGenre',d.genre);
+  poser('txPrintType',d.printType);
+  poser('txMarkColor',d.markColor);
+  poser('txTransport',d.transport);
+  /* Les menus maison HABILLENT ces champs : changer la valeur sans les
+     prévenir laisse le déclencheur afficher l'ancienne. */
+  menusRafraichirTous();
+  previewTextile();
+}
+
 function cancelTextileEdit(){
   editingTextile=-1;
   /* LE VOLET SE REFERME AVEC LA LIGNE QU'ON VIENT DE POSER. Sa mémoire existe

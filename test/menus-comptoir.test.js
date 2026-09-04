@@ -238,10 +238,18 @@ assert.ok(/const brut=etat\.libre\?\(etat\.filtrer\?etat\.hote\.value:''\):etat\
 // ramené dans les bornes réelles — voir menu-ne-fait-pas-defiler.test.js.
 assert.ok(/function menuPlacer\(etat\)/.test(MENU),
   'le panneau est placé à la main');
-assert.ok(/if\(gauche\+largeur>b\.droite-marge\)gauche=b\.droite-marge-largeur/.test(MENU),
+// LE REPLI EXISTE TOUJOURS, MAIS IL EST DEVENU LE DERNIER RECOURS (04/09).
+// Il se déclenchait à CHAQUE ouverture : la largeur se prenait sur toute la
+// largeur des bornes, le panneau ne finissait donc jamais dedans, et cette
+// ligne le ramenait vers la gauche — 32,7 px À CÔTÉ du champ qui l'ouvre,
+// mesuré sur « Couleur textile » au comptoir. La largeur se mesure maintenant
+// à partir de l'alignement sur le champ ; ce repli ne sert plus que pour un
+// champ si près du bord que même sa propre largeur ne tient pas.
+// Le garde de l'alignement, lui, vit dans menu-ne-fait-pas-defiler.test.js.
+assert.ok(/if\(gauche\+largeur>b\.droite-marge\)gauche=Math\.max\(b\.gauche\+marge,b\.droite-marge-largeur\)/.test(MENU),
   'un panneau qui ne tient pas à droite est ramené à l’intérieur');
 assert.ok(/if\(gauche<b\.gauche\+marge\)gauche=b\.gauche\+marge/.test(MENU),
-  '… et il ne sort pas par la gauche pour autant');
+  '… et il ne sort pas par la gauche pour autant — la borne gauche est tenue des deux côtés');
 assert.ok(/menuPlacer\(etat\);/.test(bloc(MENU, 'menuOuvrir')),
   'le placement se recalcule à chaque ouverture');
 
