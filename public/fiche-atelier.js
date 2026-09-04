@@ -879,6 +879,30 @@ export function dessinerFicheAtelier(r, ctx) {
     }
     droite.append(idt);
 
+    // --- CE QU'IL Y A A MARQUER, tel que le comptoir l'a ecrit (04/09/2026) --
+    // Charlie : « les references, couleurs, etc. doivent rester dessus, c'est
+    // obligatoire ». Sur une commande prise en boutique, les trois champs
+    // au-dessus sont VIDES : ils lisent `fiche.prod`, que le comptoir n'ecrit
+    // pas. Ce que le parcours ecrit, c'est `fiche.production` — une ligne par
+    // marquage, avec sa reference et sa couleur :
+    //     H-016 - Wet sand - L
+    //     AR = SUR-07 Noir
+    //     AV = FLE-pi Noir
+    // Elle avait ete retiree de la fiche le 29/08 avec cette justification :
+    // « zero dossier sur 187 le portait en production ». C'etait vrai ce
+    // jour-la. Remesure le 04/09 : 82 dossiers sur 215. Le comptoir a commence
+    // a la remplir apres la mesure — un chiffre qui a servi a retirer du code
+    // se remesure avant qu'on s'appuie dessus une deuxieme fois.
+    //
+    // ELLE SE LIT, ELLE NE SE REMPLIT PAS : c'est l'archive de la prise de
+    // commande, pas un champ de plus. Ce qui se corrige se corrige au-dessus,
+    // dans `fiche.prod`, ou sur le ticket de l'atelier qui la porte deja.
+    // Absente, la rangee n'existe pas — un cadre autour de rien est un defaut.
+    const marquage = typeof fiche.production === 'string' ? fiche.production.trim() : '';
+    if (marquage) {
+      droite.append(rangee('Ce qu’il y a à marquer', el('div', 'fa-lu fa-lu--lignes', marquage)));
+    }
+
     // --- LES TAILLES ------------------------------------------------------
     // LE NOMBRE S'ÉCRIT (28/08). Les « + / − » ajoutaient une pièce par clic :
     // pour passer de 30 à 100 il fallait soixante-dix clics, et ils prenaient
@@ -1511,7 +1535,50 @@ export function dessinerFicheAtelier(r, ctx) {
   // lire le dossier, on ecrit ce qui ne rentrait dans aucune case, puis on
   // regarde l'argent. Elle prend toute la largeur — c'est du texte libre, il n'a
   // pas de raison de tenir dans une demi-colonne.
-  scene.append(travail, blocNote, panneau);
+  // =========================================================================
+  // CE QUE LA VENDEUSE A SAISI AU COMPTOIR (04/09/2026)
+  // =========================================================================
+  // Charlie : « il est primordial que sur les commandes que la vendeuse rentre
+  // en boutique, elle puisse en cliquant dessus retrouver toutes les
+  // informations — actuellement il n'y a rien, c'est completement vide ».
+  //
+  // RIEN N'AVAIT ETE PERDU. Le serveur archive la prise de commande ENTIERE
+  // dans `requests.fiche` — deux blocs de paires libelle/valeur, `client` et
+  // `details` (21 a 55 paires, 36 en moyenne) — et le commentaire de
+  // `server.js` dit encore que « c'est lui que le tiroir du planning rouvre,
+  // ligne a ligne ». Ce tiroir a ete retire le 29/08 (`6ba6d0f`) : il etait
+  // mort au sens strict, plus rien ne l'ouvrait depuis la veille. Mais il etait
+  // le SEUL a lire ces deux blocs, et la fiche ne les a jamais repris. L'ecran
+  // continuait de s'ouvrir, simplement vide de ce que la vendeuse avait tape.
+  //
+  // UN VOLET, ET LE VOLET DE LA CHARTE : c'est le meme composant que les cartes
+  // du devis flash et de la vente flash, a un clic d'ici. Referme par defaut —
+  // trente-six lignes deroulees repousseraient le paiement hors de l'ecran, et
+  // la fiche se lit d'abord pour PRODUIRE. Ce qui doit se voir sans un clic
+  // (les references, les couleurs) est deja dans la colonne Production.
+  //
+  // TOUT Y EST, DANS L'ORDRE DU PARCOURS, et rien n'est choisi a la place de la
+  // vendeuse : on ne sait pas laquelle des trente-six lignes elle vient
+  // chercher. Une paire sans valeur ne s'affiche pas — elle n'apprend rien.
+  const paires = [
+    ...(Array.isArray(fiche.client) ? fiche.client : []),
+    ...(Array.isArray(fiche.details) ? fiche.details : []),
+  ].filter((x) => x && x.k && x.v != null && String(x.v).trim() !== '');
+  let saisie = null;
+  if (paires.length) {
+    saisie = el('details', 'fa-saisie volet-plus volet-carte');
+    const titre = el('summary', null, fiche.source
+      ? `Saisi au comptoir — ${fiche.source}`
+      : 'Saisi au comptoir');
+    saisie.append(titre);
+    const liste = el('div', 'fa-saisie__liste');
+    for (const paire of paires) {
+      liste.append(rangee(String(paire.k), el('div', 'fa-lu', String(paire.v))));
+    }
+    saisie.append(liste);
+  }
+
+  scene.append(travail, blocNote, ...(saisie ? [saisie] : []), panneau);
   const carte = el('div', 'fa-carte');
   // LE BLOC DE PIED EST RETIRÉ (29/08, Charlie). Il portait deux lignes : le nom
   // du produit — déjà écrit dans l'entête, à trois centimètres, et c'est

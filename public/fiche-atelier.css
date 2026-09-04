@@ -1019,3 +1019,39 @@ select.fa-in { appearance: none; cursor: pointer; }
   font-size: var(--taille-texte); line-height: var(--ligne-texte);
   color: var(--primary); text-decoration: underline; text-underline-offset: 3px;
 }
+
+/* --- CE QUI SE LIT ET NE SE REMPLIT PAS -----------------------------------
+   Une valeur d'archive n'a pas de boite : ce qui a une boite se remplit, et
+   la prise de commande du comptoir est FIGEE — elle se corrige au comptoir,
+   sur le ticket de l'atelier, ou dans les champs modifiables au-dessus.
+   Elle prend l'encre et le cran de l'application, pas les siens. */
+.fa-lu {
+  min-width: 0;
+  color: var(--text-1);
+  font-size: var(--taille-texte);
+  line-height: var(--ligne-texte);
+  overflow-wrap: anywhere;
+}
+/* CE QU'IL Y A A MARQUER TIENT SUR PLUSIEURS LIGNES : le comptoir en ecrit une
+   par marquage (« AR = SUR-07 Noir »), separees par des sauts de ligne. Sans
+   `pre-line`, les trois se collent en une phrase illisible. */
+.fa-lu--lignes { white-space: pre-line; }
+
+/* --- LE VOLET DE LA PRISE DE COMMANDE (04/09/2026) ------------------------
+   Il ferme la fiche, sous la note : on a lu le dossier, on va chercher ce qui
+   a ete tape en boutique. Le VOLET vient de la charte (`.volet-carte`,
+   `.volet-plus`) — c'est celui du devis flash et de la vente flash, a un clic
+   d'ici ; il n'est pas redessine ici, seule sa place l'est.
+   DEUX COLONNES : trente-six paires en une seule pile font deux ecrans de
+   defilement pour une archive qu'on parcourt du regard. */
+.fa-saisie {
+  padding: var(--pas-3) var(--pas-4);
+  border-top: 1px solid var(--border);
+}
+.fa-saisie__liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-items: start;
+  gap: var(--rangee);
+  padding-top: var(--pas-3);
+}
