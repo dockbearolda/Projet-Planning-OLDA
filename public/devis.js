@@ -287,6 +287,7 @@ export function modeleDevis(saisie, entreprise) {
     projet: texte(s.projet),
     client: {
       nom: nomClientAffiche(texte(c.nom), c.type),
+      adresse: texte(c.adresse),
       ville: texte(c.ville),
       contact: texte(c.contact),
       tel: texte(c.tel),
@@ -530,7 +531,7 @@ export function dessinerDevis(t, doc) {
   grille.append(el('div', 'dv__section-k pap-cap', 'CLIENT'),
     el('div', 'dv__section-k pap-cap', 'DOSSIER'));
   const gauche = [
-    ['VILLE', t.client.ville], ['CONTACT', t.client.contact],
+    ['ADRESSE', t.client.adresse], ['VILLE', t.client.ville], ['CONTACT', t.client.contact],
     ['TÉLÉPHONE', t.client.tel], ['E-MAIL', t.client.email],
   ].filter(([, v]) => v);
   const droite = [
