@@ -560,10 +560,21 @@ const oublierFlags = () => { flagsCache = null; };
 //   marge      : voir les coûts et la marge
 //   forcer     : débloquer, passer outre une étape
 //   reglages   : tout ce qui vaut pour tous les postes
+//   bat        : composer un bon à tirer et le déposer sur une fiche
+//
+// POURQUOI `bat` N'EST PAS `clients` (04/09/2026). Le dépôt d'un PDF sur une
+// fiche passe par `exige('clients')` — la boutique et la Direction, pas
+// l'atelier. Or « Préparation du BAT » est une sous-étape de l'ATELIER : le
+// chef d'atelier est précisément celui qui compose le bon à tirer. Lui refuser
+// l'écran l'aurait renvoyé à demander à quelqu'un d'autre de cliquer, ce que
+// personne ne fait — on rouvre alors la porte de service qu'on vient de
+// fermer. Une capacité à part dit la règle sans mentir : composer un BAT n'est
+// pas gérer un client, et ce n'est pas non plus « travailler » (l'opérateur
+// exécute, il ne s'engage pas auprès du client).
 const CAPACITES = {
-  direction: ['travailler', 'production', 'clients', 'argent', 'marge', 'forcer', 'reglages'],
-  chef_atelier: ['travailler', 'production'],
-  boutique: ['travailler', 'clients', 'argent'],
+  direction: ['travailler', 'production', 'clients', 'argent', 'marge', 'forcer', 'reglages', 'bat'],
+  chef_atelier: ['travailler', 'production', 'bat'],
+  boutique: ['travailler', 'clients', 'argent', 'bat'],
   operateur: ['travailler'],
 };
 
@@ -683,9 +694,21 @@ const MOTIFS_BLOCAGE = [
 // connecter, celle par où l'on se connecte, et le numéro de version (la bulle
 // « mise à jour disponible » interroge celle-là en boucle, y compris sur un
 // poste au repos).
+//
+// ⚠ ELLE COUVRE AUSSI `/bat/api/` (04/09/2026). BAT Studio est monté sous son
+// propre préfixe : ses routes ne commencent donc PAS par `/api/`, et la porte
+// les laissait toutes passer. Mesuré, comptes allumés et personne de connecté :
+// `PUT /api/requests/<id>/pdf/bat` répondait 401 pendant que
+// `PUT /bat/api/crm/bat/<id>` déposait le PDF et répondait 200 — la même
+// écriture, sur la même fiche, par la porte de service. `POST
+// /bat/api/menage/mockups`, qui EFFACE des images, était ouvert de la même
+// façon. Un préfixe n'est pas une frontière de sécurité : la liste des
+// préfixes protégés l'est, et elle s'écrit ici.
+const PREFIXES_PROTEGES = ['/api/', '/bat/api/'];
 const PORTE_OUVERTE = new Set(['/api/session', '/api/version']);
 app.use((req, res, next) => {
-  if (!req.path.startsWith('/api/')) return next();   // le site, ses pages, ses polices
+  // le site, ses pages, ses polices, et tout le statique de `/bat`
+  if (!PREFIXES_PROTEGES.some((p) => req.path.startsWith(p))) return next();
   if (PORTE_OUVERTE.has(req.path)) return next();
   flags().then((f) => {
     if (!f.comptes || req.moi) return next();
@@ -3448,7 +3471,17 @@ async function deposerPdf({ id, kind, buf, nom, qui }) {
 }
 
 // PUT /api/requests/:id/pdf/:kind  (corps = PDF brut, ?name=<nom de fichier>)
-app.put('/api/requests/:id/pdf/:kind', exige('clients'),
+//
+// LA CAPACITÉ SUIT LE DOCUMENT, PAS LA ROUTE (04/09/2026). Les trois
+// emplacements passaient par `exige('clients')` — la boutique et la Direction.
+// Le BAT n'est pourtant pas un document de client : « Préparation du BAT » est
+// une sous-étape de l'ATELIER, et le chef d'atelier se voyait refuser la
+// pastille de sa propre étape (403) alors que le même dépôt lui était ouvert
+// par `PUT /bat/api/crm/bat/:id`. Une même écriture, deux réponses selon la
+// porte empruntée : c'est la porte qu'on répare, pas l'utilisateur.
+const capacitePdf = (req, res, next) =>
+  (req.params.kind === 'bat' ? exige('bat') : exige('clients'))(req, res, next);
+app.put('/api/requests/:id/pdf/:kind', capacitePdf,
   express.raw({ type: () => true, limit: '12mb' }),
   asyncH(async (req, res) => {
     const { statut, corps } = await deposerPdf({
@@ -3462,7 +3495,11 @@ app.put('/api/requests/:id/pdf/:kind', exige('clients'),
 // la seule chose que le CRM lui prête. Tout ce qui est sous `/bat/api` lui
 // appartient ; le reste de `/bat` (js, css, polices, vendor) est du statique
 // ordinaire, servi par `express.static` comme le reste de `public/`.
-monterBat(app, { deposerPdf, asyncH, quiDemande });
+// `exige` PART AVEC LE RESTE, et ce n'est pas décoratif : sans lui, les routes
+// d'écriture de BAT Studio n'avaient AUCUN contrôle de capacité, là où la route
+// qu'elles appellent (`PUT /api/requests/:id/pdf/:kind`) en a un. Deux chemins
+// vers la même écriture, un seul gardé.
+monterBat(app, { deposerPdf, asyncH, quiDemande, exige });
 
 // Range la version COURANTE à l'historique, avant qu'on l'écrase.
 async function archiverVersion(id, kind, qui, essai = 0) {
@@ -3539,7 +3576,10 @@ app.get('/api/requests/:id/pdf/:kind', asyncH(async (req, res) => {
 }));
 
 // DELETE /api/requests/:id/pdf/:kind
-app.delete('/api/requests/:id/pdf/:kind', exige('clients'), asyncH(async (req, res) => {
+// MÊME RÈGLE QU'AU DÉPÔT (`capacitePdf`) : qui peut poser le BAT peut le
+// retirer. Deux capacités différentes pour poser et pour reprendre, ce serait
+// une pastille qu'on remplit sans jamais pouvoir la vider.
+app.delete('/api/requests/:id/pdf/:kind', capacitePdf, asyncH(async (req, res) => {
   const { id, kind } = req.params;
   if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
   const { rowCount } = await pool.query(
