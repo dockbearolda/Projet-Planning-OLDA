@@ -163,7 +163,7 @@ Rien ne les relie. Une ligne peut porter l'un, l'autre, les deux ou aucun.
 | Les documents dans la ligne | **Les deux** : le PDF déposé (pour l'envoyer) *et* la réouverture du modèle (pour le relire et le corriger). |
 | Naissance du BAT | **À la création de la ligne**, automatiquement. |
 | Périmètre du BAT | **Le textile seulement** — « casquette, t-shirt, sweat, pochette, sac, etc. Le reste, on fait encore les BAT sur Illustrator. » |
-| Fin de vie du BAT | Le projet **disparaît** : le PDF part sur la Dropbox du client, les anciens BAT pèsent pour rien. **Ligne archivée = BAT effacé.** |
+| Fin de vie du BAT | **Modifiable autant qu'on veut.** Il disparaît quand le dossier entre en **« Paiement & clôture »** (`stage = 'paiement'`) : le PDF est parti sur la Dropbox du client, le projet ne sert plus à rien. |
 
 ### Ce que la combinaison des deux dernières donne
 
@@ -366,21 +366,61 @@ demander un déploiement pour recevoir des BAT — même raison que
 
 ### 5.6 Le cycle de vie du BAT
 
+Charlie, 04/09 : « on doit pouvoir modifier le BAT tant qu'on le souhaite, mais
+dès que le dossier est dans paiement et clôture, le BAT est supprimé de la
+ligne, inutile de le conserver pour rien. »
+
 ```
 ligne textile créée
         │
         ├─→ projet BAT créé, pré-rempli, VIDE DE LOGOS
         │
-   [Mélina/Charlie posent les logos]
+   ┌────┴──────────────────────────────────────────────┐
+   │  On pose les logos. On exporte. Le client répond.  │
+   │  On corrige. On réexporte. AUTANT DE FOIS QU'ON    │
+   │  VEUT — le projet reste vivant et modifiable.      │
+   │  Chaque export dépose son PDF sur la ligne ;       │
+   │  `attachment_versions` garde les précédents.       │
+   └────┬──────────────────────────────────────────────┘
         │
-        ├─→ PDF exporté ──→ attachments(id,'bat')  +  bat_requis = true
-        │                   (le PDF part sur la Dropbox du client)
-        │
-        └─→ ligne ARCHIVÉE (deleted_at)
+        └─→ le dossier entre en « Paiement & clôture » (stage = 'paiement')
                     │
                     └─→ PURGE : le projet BAT et SES IMAGES PROPRES
-                        Le PDF reste sur la ligne archivée.
+                        Le PDF reste sur la ligne. Définitivement.
 ```
+
+**Le déclencheur est l'ENTRÉE DANS LA FAMILLE, pas l'export, pas l'archivage.**
+
+- Pas l'export : un BAT existe pour être corrigé. `bat_modif` (« BAT –
+  Modification demandée ») est une sous-étape du pipeline — effacer à l'export
+  obligerait à recomposer une feuille blanche à chaque aller-retour client.
+- Pas l'archivage : à `paiement`, la commande est produite, remise et payée. Le
+  BAT n'a plus rien à dire, et le dossier peut rester des mois en `archive`
+  (une sous-étape de `paiement`) avant qu'on y touche. Attendre coûte de la
+  place pour rien.
+- `paiement` est la DERNIÈRE des cinq familles (`app.js`, `FAMILIES`), et ses
+  trois sous-étapes — `paiement_a_controler`, `paiement_valide`, `archive` — ne
+  sont que des degrés de clôture. Franchir la porte de la famille suffit.
+
+**Où ça se branche.** Une seule écriture change la famille d'un dossier :
+`PATCH /api/requests/:id` (et la copie/l'envoi Fiverr, qui en créent un neuf).
+La purge s'accroche là, après le `broadcast`, jamais avant :
+
+```
+si (stage passe de ≠ 'paiement'  →  'paiement')     alors purger le BAT
+```
+
+Trois règles pour que ça ne morde jamais la main :
+
+1. **Le PDF n'est jamais touché.** `attachments(id,'bat')` et ses versions
+   restent. C'est la trace, et c'est ce que le client a signé.
+2. **La purge ne fait pas échouer le changement d'étape.** Elle est un confort,
+   comme le journal : un magasin qui tousse ne doit pas empêcher de solder une
+   commande. `.catch()` et une ligne de log, jamais un 500.
+3. **Un retour en arrière ne ressuscite rien, et le dit.** Ramener un dossier de
+   `paiement` vers `production` ne recrée pas le projet — on ne fabrique pas un
+   BAT vide qui aurait l'air d'être l'ancien. La ligne garde son PDF ; refaire
+   un BAT est un geste explicite.
 
 **Ce qu'il faut purger, et ce n'est pas ce qu'on croit.** Mesuré sur le volume
 en ligne le 04/09 :
@@ -398,17 +438,10 @@ en ligne le 04/09 :
 > vivant ne réclame plus. Purger le JSON seul donnerait le sentiment d'avoir
 > nettoyé sans rendre un mégaoctet.
 
-**Ce qui n'est pas purgé à l'export du PDF, et pourquoi.** Charlie : « une fois
-le PDF téléchargé [les projets] doivent disparaître ». Le déclencheur retenu est
-l'**archivage**, pas l'export, pour une raison : un BAT existe pour être
-**corrigé**. Le client renvoie ses remarques, on fait une V2 — c'est même une
-sous-étape du pipeline (`bat_modif`, « BAT – Modification demandée »). Effacer le
-projet à l'export obligerait à tout recomposer depuis zéro à chaque aller-retour.
-
-Le compromis proposé : l'export **marque** le projet « sorti » et purgeable ; la
-ligne archivée **purge**. Un bouton « Purger les BAT sortis » dans Réglages, à
-côté du Ménage, rend la place quand on la veut sans jamais l'arracher sous les
-doigts de quelqu'un qui prépare une V2. **À confirmer par Charlie** (§8).
+**Ordre de grandeur.** ~200 dossiers par an, dont une part textile ; un projet
+BAT et ses mockups custom pèsent quelques mégaoctets. La purge à la clôture rend
+donc de la place au rythme où l'atelier en consomme, au lieu de laisser le
+magasin monter tout seul. Rappel : il est **à 3,07 Go sur 5**.
 
 ---
 
@@ -455,21 +488,54 @@ postes qui enregistrent le même devis en même temps → 3 lignes, pas 6.
 À l'impression du devis / à l'émission de la facture, l'écran dépose aussi le
 PDF sur chaque ligne du groupe.
 
-- ⚠ **C'est le lot le plus cher, et il faut le dire.** Les écrans IMPRIMENT
-  (un cadre hors écran, `window.print()`) ; ils ne fabriquent aucun octet de
-  PDF. jsPDF a été retiré du dépôt le 25/08.
-- Ce qui reste, et qui est déjà là : **`pdf-lib` est vendorisé**
-  (`public/bat/vendor/pdf-lib.esm.min.js`, 523 Ko) et `batpdf.js` écrit déjà une
-  feuille A4 avec.
-- La forme qui respecte la règle des deux papiers : **un troisième consommateur
-  du MÊME modèle**. `modeleDevis(saisie)` rend un objet pur ; `dessinerDevis`
-  l'écrit en HTML ; on ajoute `pdfDevis(modele)` qui l'écrit en PDF. La
-  grammaire (intitulés, encre, filets, crans) reste dans `papier.js` et ne se
-  réécrit pas — ce sont deux RENDUS d'un modèle, pas deux papiers.
-- Le garde-fou : un test qui compare les deux rendus sur le même modèle —
-  mêmes lignes, mêmes totaux, mêmes intitulés, même numéro.
-- Poids : un devis A4 par pdf-lib ≈ 40-80 Ko, +33 % en base64. Sur 200 dossiers
-  par an, ~20 Mo. Négligeable devant les 3,07 Go du magasin BAT.
+**Comment on fabrique le PDF — c'est tranché.** Les écrans IMPRIMENT
+(`window.print()` dans un cadre hors écran) ; ils ne produisent aucun octet de
+PDF, et jsPDF a été retiré du dépôt le 25/08. On écrit donc **un troisième
+consommateur du MÊME modèle** :
+
+```
+modeleDevis(saisie, entreprise)   ← objet pur, aucune dépendance au DOM
+        │
+        ├── dessinerDevis(t, doc) ──→ HTML   (l'aperçu vivant, et l'impression)
+        └── pdfDevis(t)           ──→ PDF    (ce qu'on dépose et qu'on envoie)
+```
+
+Trois raisons, et une seule suffirait :
+
+1. **La séparation existe déjà.** `modeleDevis` (devis.js:265) et
+   `modeleFacture` (facture.js:79) sont des fonctions pures ; `dessinerDevis`
+   (155 lignes) et `dessinerFacture` (161 lignes) ne font que les mettre en DOM.
+   Un frère qui les met en PDF est de la même taille, et il ne réécrit **aucune
+   règle** : la grammaire — intitulés, encre, filets, marge de feuille, les
+   quatre crans de texte — reste dans `papier.js`, comme pour les deux papiers.
+   Ce sont deux RENDUS d'un modèle, pas deux papiers.
+2. **L'outil est déjà là, hébergé par nous.** `pdf-lib`
+   (`public/bat/vendor/pdf-lib.esm.min.js`, 523 Ko) et `fontkit` sont
+   vendorisés, et `batpdf.js` (611 lignes) écrit déjà une feuille A4 avec. Rien
+   de neuf ne vient d'un autre domaine.
+3. **La chaîne « produire un PDF au navigateur → le déposer sur la ligne » est
+   prouvée.** C'est celle du BAT : `deposerDansCrm(id, bytes, nom)` →
+   `PUT /bat/api/crm/bat/:id?kind=` — et **`kind` est déjà un paramètre**. Le
+   lot 3 la réemploie telle quelle, il n'en invente pas une seconde.
+
+**Ce qu'on refuse, et pourquoi.** Rasteriser l'écran (`html2canvas` & co.) : une
+dépendance de plus, venue d'ailleurs, pour une facture floue et lourde — un
+document opposable ne se photographie pas. Un rendu serveur (Chrome sans tête) :
+contraire à « aucun build, le moins de dépendances possible ». Déposer le PDF à
+la main depuis la boîte d'impression : ce n'est pas « automatiquement ».
+
+**Le garde-fou contre la dérive** — c'est le seul vrai risque de ce lot : deux
+rendus du même modèle peuvent cesser de dire la même chose. Un test les compare
+sur le même modèle : mêmes lignes, mêmes totaux, mêmes intitulés, même numéro,
+même mention de régime. Un cran de texte ajouté d'un côté et pas de l'autre est
+un test rouge, pas une réimpression.
+
+**L'ordre à l'intérieur du lot** : la **facture d'abord**. Elle est plus simple
+— aucune ligne « à chiffrer », aucune version, un seul état — et c'est elle qui
+part chez un comptable. Le devis ensuite, qui hérite du même socle.
+
+Poids : un A4 par pdf-lib ≈ 40-80 Ko, +33 % en base64. Sur 200 dossiers par an,
+~20 Mo — négligeable devant les 3,07 Go du magasin BAT.
 
 **Ce qui se teste** : émettre une facture → la pastille `facture` de chaque
 ligne est remplie, le PDF s'ouvre, et son total est celui du papier imprimé.
@@ -494,13 +560,14 @@ n'a pas de bouton.
 ### Lot 5 — Le pré-remplissage, et la fin de vie
 
 La jointure du §5.4, la création automatique à la naissance d'une ligne textile,
-la purge à l'archivage.
+la purge à l'entrée en « Paiement & clôture » (§5.6).
 
 **Ce qui se teste** : une vente de 30 K3025 Light Olive Green, 12 M / 18 L,
 Cœur + Dos → le BAT s'ouvre sur le bon produit (**par `K3025IC`**), la bonne
 couleur, 12 M et 18 L, deux zones nommées Cœur et Dos, **aucun logo** — il ne
-reste qu'à les poser. Et une ligne archivée ne laisse plus ni projet ni images
-orphelines.
+reste qu'à les poser. Un dossier passé en « Paiement & clôture » ne laisse plus
+ni projet ni images orphelines, **et garde son PDF**. Et l'y ramener depuis une
+autre famille ne ressuscite rien.
 
 ---
 
@@ -529,26 +596,29 @@ orphelines.
 
 ---
 
-## 8. Ce qui reste à trancher
+## 8. Ce qui est tranché, et par qui
 
-1. **La purge à l'export du PDF.** Le §5.6 propose « marqué purgeable à
-   l'export, effacé à l'archivage », parce qu'un BAT existe pour être corrigé
-   (`bat_modif` est une sous-étape du pipeline). Si Charlie veut vraiment
-   l'effacement à l'export, une V2 repartira d'une feuille blanche à chaque
-   aller-retour client — c'est jouable, il faut juste le vouloir.
+Plus aucune question ouverte : tout ce qui bloquait la construction a une
+réponse écrite ici.
 
-2. **Le sort des devis existants.** Le lot 2 propose de **ne pas découper le
-   passé**. À confirmer : les dossiers de devis déjà au planning gardent leur
-   forme d'une ligne pour N articles.
+| # | Question | Réponse | Qui |
+|---|---|---|---|
+| 1 | Granularité des lignes | **1 article = 1 ligne partout** ; la reprise d'un devis repart du NUMÉRO (§5.2) | Charlie, 04/09 |
+| 2 | Ce que porte la ligne | **Le PDF *et* le modèle** (§5.3) | Charlie, 04/09 |
+| 3 | Naissance du BAT | **Auto**, et **sur les lignes textile seulement** (§5.5) | Charlie, 04/09 |
+| 4 | Fin de vie du BAT | Modifiable sans limite ; **purgé à l'entrée en « Paiement & clôture »**, PDF conservé (§5.6) | Charlie, 04/09 |
+| 5 | Comment fabriquer le PDF | **`pdf-lib`, en frère de rendu du même modèle** ; facture d'abord (Lot 3) | tranché ici |
+| 6 | Les devis déjà au planning | **On ne découpe pas le passé.** Ils gardent leur forme d'une ligne pour N articles ; `fiche.devisArticle = null` les marque, et la reprise sait lire les deux formes. Découper rétroactivement changerait des montants déjà annoncés à des clients | tranché ici |
+| 7 | Le plafond `PROD_ENTREES_MAX` | **12 → 24.** Une commande de staff à 9 tailles ET 6 emplacements existe, et le plafond d'aujourd'hui la tronquerait EN SILENCE. 24 reste borné : cette structure repart vers chaque poste à chaque rafraîchissement | tranché ici |
+| 8 | Le produit absent du catalogue BAT | On ouvre le BAT **en nommant le manque** et en proposant l'import TopTex (§5.4). Jamais un BAT muet qui a l'air d'avoir marché | tranché ici |
 
-3. **Le plafond de `PROD_ENTREES_MAX`** (12 aujourd'hui). Remonter à combien ?
-   Une commande de staff peut avoir 9 tailles ET 6 emplacements.
+### La seule chose qui n'est pas dans ce cahier
 
-4. **Les 3,07 Go du magasin BAT.** Ce cahier ajoute des projets ; il n'enlève
-   rien tant que le ménage (821 orphelins, 101,6 Mo) et le ré-encodage des 449
-   packshots bruts (705,5 Mo) ne sont pas faits. Les deux transforment ou
-   effacent des images de production : c'est l'affaire de Charlie, pas une passe
-   d'entretien.
+**Les 3,07 Go du magasin BAT.** Ce cahier ajoute des projets et en purge à la
+clôture ; il ne rend rien sur l'existant. Les deux gestes qui rendraient ~800 Mo
+— le Ménage (821 orphelins, 101,6 Mo) et le ré-encodage des 449 packshots bruts
+(705,5 Mo) — **transforment ou effacent des images de production**. C'est une
+décision, pas une passe d'entretien, et elle t'appartient.
 
 ---
 
