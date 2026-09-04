@@ -31,12 +31,12 @@
 // ===========================================================================
 
 const express = require('express');
+const fs = require('node:fs');
 const path = require('path');
-const url = require('node:url');
 const dns = require('node:dns/promises');
 const net = require('node:net');
 
-const { batLire, batEcrire, batSupprimer, batLister, batTailles } = require('./db');
+const { batLire, batEcrire, batSupprimer, batLister, batTailles, getTaillesLogo } = require('./db');
 
 // ---------------------------------------------------------------------------
 // Le proxy d'images — recopié tel quel de BAT Studio
@@ -176,14 +176,28 @@ async function toptexAuth() {
   return toptexJeton;
 }
 
-// `producttype.js` est un module ES du navigateur, et ce fichier-ci est en
-// CommonJS : on le fait venir par un import dynamique, une seule fois. C'est
-// LE MÊME fichier que celui servi à la page — la normalisation d'un produit
-// TopTex ne peut donc pas différer entre le serveur et l'écran.
+// `producttype.js` est un module ES du NAVIGATEUR, et ce fichier-ci est en
+// CommonJS. On le fait venir une seule fois, et c'est LE MÊME fichier que celui
+// servi à la page : la normalisation d'un produit TopTex ne peut donc pas
+// différer entre le serveur et l'écran — c'est tout l'intérêt.
+//
+// PAS UN `import()` DU CHEMIN, ET ÇA A ÉCHOUÉ AVANT D'ÊTRE ÉCRIT AINSI. Le
+// `package.json` du CRM déclare `"type": "commonjs"` : Node lit alors TOUT
+// fichier `.js` du dépôt comme un script classique, y compris celui-là, et
+// répond « Unexpected token 'export' ». Le symptôme est trompeur — l'appel à
+// TopTex a déjà réussi, c'est la mise en forme de sa réponse qui tombe.
+//
+// Trois sorties existaient. Recopier le fichier en `.mjs` : deux exemplaires
+// qui divergent, exactement ce qu'on évite. Poser un `package.json`
+// `{"type":"module"}` dans `public/bat/js/` : un fichier invisible dont rien
+// ne peut expliquer la présence, JSON n'acceptant pas de commentaire. Reste
+// celle-ci — on LIT la source et on l'importe telle quelle. `producttype.js`
+// n'importe rien lui-même (vérifié), donc rien à résoudre autour.
 let normaliserProduit = null;
 async function chargerNormalisation() {
   if (!normaliserProduit) {
-    const mod = await import(url.pathToFileURL(path.join(__dirname, 'public', 'bat', 'js', 'producttype.js')).href);
+    const source = fs.readFileSync(path.join(__dirname, 'public', 'bat', 'js', 'producttype.js'), 'utf8');
+    const mod = await import('data:text/javascript;base64,' + Buffer.from(source, 'utf8').toString('base64'));
     normaliserProduit = mod.normalizeToptexProduct;
   }
   return normaliserProduit;
@@ -199,6 +213,16 @@ async function toptexProduit(ref) {
     r = await fetch(adresse, { headers: { 'x-api-key': key, 'x-toptex-authorization': jeton } });
   }
   if (r.status === 400) throw new Error('Référence inconnue ou paramètre invalide.');
+  // « API TopTex : HTTP 504 » n'apprenait rien à personne, et c'est la réponse
+  // la PLUS COURANTE : mesuré le 04/09/2026, leur passerelle coupe à 29,5 s sur
+  // les références à beaucoup de coloris (NS300, NS305, K3025), quand une
+  // référence plus légère (BY190) répond en 10 s. Ce n'est ni la clé, ni le
+  // réseau d'ici, ni la référence : c'est leur serveur qui n'a pas fini à temps.
+  // Le dire évite de chercher la panne du mauvais côté.
+  if (r.status === 502 || r.status === 503 || r.status === 504) {
+    throw new Error('TopTex n\'a pas répondu à temps (' + r.status + '). Leur API coupe à 30 s sur les '
+      + 'références à beaucoup de coloris — réessayer plus tard, ou saisir le produit à la main.');
+  }
   if (!r.ok) throw new Error('API TopTex : HTTP ' + r.status);
   const normaliser = await chargerNormalisation();
   const norm = normaliser(await r.json());
@@ -207,103 +231,85 @@ async function toptexProduit(ref) {
 }
 
 // ---------------------------------------------------------------------------
-// La grille des tailles — miroir en LECTURE de l'app « Tailles Logo DTF »
+// La grille des tailles — CELLE DU CRM, ET PLUS CELLE D'UNE AUTRE APPLICATION
 // ---------------------------------------------------------------------------
-// Le réseau ne doit jamais bloquer le BAT : la réponse sort d'un cache mémoire
-// (TTL court) doublé d'un cache EN BASE, qui prend le relais dès que l'app
-// distante est lente, en panne ou injoignable — la grille reste alors celle du
-// dernier chargement réussi plutôt que rien.
-const TAILLES_BASE = String(process.env.TAILLES_API_URL || 'https://taille-logo-app-production.up.railway.app').replace(/\/+$/, '');
-const TAILLES_TTL = 10 * 60_000;
-const TAILLES_DELAI = 6000;
-const TAILLES_CACHE = 'tailles-cache.json';
+// BAT Studio recopiait ses tailles de l'app « Tailles Logo DTF »
+// (taille-logo-app-production.up.railway.app), par un appel serveur avec cache
+// de repli. DEUX RAISONS DE NE PLUS LE FAIRE, et la première suffit :
+//
+//   1. CETTE APPLICATION N'EXISTE PLUS. Vérifié le 04/09/2026 : Railway répond
+//      « Application not found ». La grille ne se rafraîchissait donc plus
+//      depuis un moment, et le BAT tournait sur un cache dont personne ne
+//      savait l'âge.
+//   2. LE CRM PORTE LA MÊME TABLE, écran compris (onglet « Tailles logos »,
+//      `app_meta.tailles_logo`) : c'est là que l'atelier la tient à jour. Deux
+//      sources pour une donnée, c'est celle qu'on ne met pas à jour qui décide.
+//
+// CE QU'ON Y GAGNE AU PASSAGE — LA FACE PAR SON NOM. L'ancienne grille ne
+// connaissait que deux colonnes, « devant » et « dos ». Le CRM, lui, mesure
+// SIX faces sur un textile : Coeur, Poitrine, Avant, Dos, Manche DR, Manche GA
+// — et un Coeur fait 60 à 70 mm quand un Dos en fait 240 à 320. Les ramener à
+// « devant » revenait à donner la même cote à deux marquages qui n'ont rien à
+// voir. Or le BAT sait DÉJÀ sur quelle zone le logo est posé : `l.zoneName`,
+// qui porte exactement ces noms-là. On sert donc les faces telles quelles, et
+// c'est le nom qui apparie — aucune correspondance à deviner.
+//
+// Une face que le CRM ne mesure pas rend `null`, et le BAT retombe sur la
+// largeur du logo posé : c'est le comportement d'avant, inchangé.
+const CODE_RAYON = {
+  HOMME: 'HOMME', FEMME: 'FEMME', ENFANT: 'ENFANT', BEBE: 'BEBE',
+  // Le BAT devine un rayon depuis la désignation du produit (`guessSizeCategory`)
+  // et il l'écrit au SINGULIER. La famille du CRM, elle, est au pluriel : sans
+  // cette ligne, une pochette ne retrouvait jamais ses tailles par son nom.
+  POCHETTES: 'POCHETTE', POCHETTE: 'POCHETTE',
+};
 
-const chaine = (v) => String(v == null ? '' : v).trim();
-const nombre = (v) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : null);
-
-async function taillesJson(adresse) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), TAILLES_DELAI);
-  try {
-    const r = await fetch(adresse, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    // L'app distante est un SPA : une route inconnue renvoie 200 + index.html.
-    const corps = await r.text();
-    if (!/^\s*[[{]/.test(corps)) throw new Error('réponse non JSON');
-    return JSON.parse(corps);
-  } finally { clearTimeout(t); }
+// « Bébé » → « BEBE ». Le code sert de clé des deux côtés : il ne doit dépendre
+// ni de la casse, ni des accents, ni du pluriel des cinq rayons connus.
+function codeFamille(nom) {
+  const brut = String(nom || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+  return CODE_RAYON[brut] || brut;
 }
 
-function taillesNormaliser(grid) {
-  const code = chaine(grid && grid.category && grid.category.code).toUpperCase();
-  const sizes = [...((grid && grid.sizes) || [])].sort((a, b) => (a.ordre || 0) - (b.ordre || 0));
-  const labels = sizes.map((s) => chaine(s.label)).filter(Boolean);
-  const products = ((grid && grid.products) || []).map((p) => {
-    const m = (p && p.measurements) || {};
-    const rows = [];
-    for (const s of sizes) {
-      const cell = m[String(s.id)];
-      const label = chaine(s.label);
-      if (!cell || !label) continue;
-      rows.push({ label, devant: nombre(cell.devant), dos: nombre(cell.dos) });
-    }
-    return { code: chaine(p && p.code), reference: chaine(p && p.reference), category: code, sizes: rows };
-  }).filter((p) => p.code || p.reference);
-  return { code, label: chaine(grid && grid.category && grid.category.label) || code, labels, products };
-}
-
-async function taillesDistantes() {
-  const cats = await taillesJson(`${TAILLES_BASE}/api/categories`);
-  if (!Array.isArray(cats) || !cats.length) throw new Error('aucune catégorie');
-  const grids = await Promise.all(
-    cats.map((c) => taillesJson(`${TAILLES_BASE}/api/categories/${encodeURIComponent(c.code)}/grid`).then(taillesNormaliser)),
-  );
+// La table du CRM, dans la forme que `js/tailles.js` attend.
+//   categories : le rayon → ses tailles (la série à laquelle un produit
+//                incomplet a le droit de se compléter) ;
+//   products   : une entrée par référence, ses tailles MESURÉES et, pour
+//                chacune, la largeur de chaque face en millimètres.
+function grilleDepuisCrm(table) {
   const categories = {};
   const products = [];
-  for (const g of grids) {
-    if (!g.code) continue;
-    categories[g.code] = { label: g.label, sizes: g.labels };
-    products.push(...g.products);
+  for (const f of (table && table.familles) || []) {
+    const code = codeFamille(f.nom);
+    if (!code) continue;
+    categories[code] = { label: f.nom, sizes: [...(f.tailles || [])] };
+
+    // Les références MESURÉES : leurs tailles sont celles où au moins une face
+    // porte une cote. Une référence dont la table ne connaît que « L » ne
+    // propose donc que « L » en propre — et `findSizeReference` la complète
+    // avec la série de son rayon, comme avant.
+    for (const [reference, parFace] of Object.entries(f.refs || {})) {
+      const sizes = [];
+      for (const label of f.tailles || []) {
+        const faces = {};
+        for (const [face, parTaille] of Object.entries(parFace || {})) {
+          const mm = parTaille && parTaille[label];
+          if (Number.isFinite(mm) && mm > 0) faces[face] = mm;
+        }
+        if (Object.keys(faces).length) sizes.push({ label, faces });
+      }
+      products.push({ code: '', reference, category: code, sizes });
+    }
+
+    // Les références DÉCLARÉES à la main, sans aucune mesure : elles n'ont rien
+    // à dire sur les largeurs, mais elles rattachent le produit à son rayon —
+    // donc à ses tailles. Sans elles, un sac à dos repartait en XS…2XL.
+    for (const reference of f.references || []) {
+      if (f.refs && f.refs[reference]) continue;
+      products.push({ code: '', reference, category: code, sizes: [] });
+    }
   }
-  if (!products.length) throw new Error('aucun produit');
-  return { source: TAILLES_BASE, fetchedAt: new Date().toISOString(), categories, products };
-}
-
-let taillesMemo = null;      // { table, at } — dernier chargement réussi
-let taillesEnVol = null;     // requête en cours, partagée entre appels concurrents
-
-async function taillesGrille() {
-  if (taillesMemo && Date.now() - taillesMemo.at < TAILLES_TTL) return taillesMemo.table;
-
-  if (!taillesMemo) {
-    try {
-      const enBase = await batLire(TAILLES_CACHE);
-      const disque = enBase && JSON.parse(enBase.octets.toString('utf8'));
-      if (disque && disque.products && disque.products.length) taillesMemo = { table: disque, at: 0 };
-    } catch (_) { /* cache absent ou illisible : on ira au réseau */ }
-  }
-
-  if (!taillesEnVol) {
-    taillesEnVol = taillesDistantes()
-      .then(async (table) => {
-        taillesMemo = { table, at: Date.now() };
-        await batEcrire(TAILLES_CACHE, Buffer.from(JSON.stringify(table))).catch(() => {});
-        return table;
-      })
-      .catch((e) => {
-        // Échec réseau : on garde la grille précédente et le TTL réessaiera. Si
-        // l'on n'a JAMAIS rien eu, l'erreur remonte — l'app retombe alors sur
-        // ses tailles par défaut, sans afficher d'erreur.
-        if (taillesMemo) { taillesMemo.at = Date.now(); return taillesMemo.table; }
-        throw e;
-      })
-      .finally(() => { taillesEnVol = null; });
-  }
-
-  // Une grille périmée en poche vaut mieux qu'une attente : on la sert tout de
-  // suite et le rafraîchissement se poursuit en tâche de fond.
-  if (taillesMemo) { taillesEnVol.catch(() => {}); return taillesMemo.table; }
-  return taillesEnVol;
+  return { source: 'crm', fetchedAt: new Date().toISOString(), categories, products };
 }
 
 // ---------------------------------------------------------------------------
@@ -578,13 +584,21 @@ function monterBat(app, { deposerPdf, asyncH, quiDemande }) {
   }));
 
   r.get('/api/tailles', asyncH(async (_req, res) => {
-    // 404 quand rien n'a jamais pu être chargé → l'app garde ses tailles par
-    // défaut sans afficher d'erreur.
-    try { res.set('Cache-Control', 'no-cache').json(await taillesGrille()); }
-    catch (e) { res.status(404).json({ error: String(e.message || e) }); }
+    // PAS DE CACHE, ET IL N'EN FAUT PLUS : ce n'est plus un appel réseau vers
+    // une autre application, c'est UNE ligne d'`app_meta`. Le cache existait
+    // pour survivre à une panne distante ; il ne servirait plus qu'à servir
+    // des tailles périmées le lendemain d'une correction de l'atelier.
+    const table = await getTaillesLogo();
+    const grille = grilleDepuisCrm(table);
+    // 404 quand la table est vide → le BAT garde ses tailles par défaut sans
+    // afficher d'erreur. C'est le contrat d'avant, mot pour mot.
+    if (!Object.keys(grille.categories).length) {
+      return res.status(404).json({ error: 'aucune famille dans le tableau des tailles' });
+    }
+    res.set('Cache-Control', 'no-cache').json(grille);
   }));
 
   app.use('/bat', r);
 }
 
-module.exports = { monterBat, isPrivateIp, sniffImageType, taillesNormaliser, mockupsReclames };
+module.exports = { monterBat, isPrivateIp, sniffImageType, grilleDepuisCrm, codeFamille, mockupsReclames };

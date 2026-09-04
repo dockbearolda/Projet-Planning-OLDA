@@ -1,11 +1,14 @@
 // Tailles produit : les lignes du tableau de production (« Taille · Qté »)
-// viennent de l'app « Tailles Logo DTF », où elles sont déjà tenues à jour
-// produit par produit. Plus rien à retaper à chaque BAT : choisir le vêtement
-// suffit.
+// viennent du TABLEAU DES TAILLES DU CRM (onglet « Tailles logos »), où
+// l'atelier les tient à jour famille par famille et référence par référence.
+// Plus rien à retaper à chaque BAT : choisir le vêtement suffit.
 //
-// Lecture seule, et jamais bloquant : si la grille est injoignable (app
-// distante en panne, variante bureau sans serveur), on retombe sur les tailles
-// par défaut — un BAT reste toujours créable.
+// Elles venaient jusqu'au 04/09/2026 d'une application à part
+// (« Tailles Logo DTF »), qui n'existe plus — et le CRM portait la même table.
+// Deux sources pour une donnée, c'est celle qu'on ne met pas à jour qui décide.
+//
+// Lecture seule, et jamais bloquant : si la grille est vide, on retombe sur les
+// tailles par défaut — un BAT reste toujours créable.
 
 import { uid } from './util.js';
 import { chemin } from './base.js';
@@ -94,25 +97,36 @@ export function findProductSizes(t, product) {
   return cat ? [...t.categories[cat].sizes] : null;
 }
 
-// Face du BAT → colonne de la grille. Les manches n'ont pas de cote définie
-// dans l'app tailles : leur marquage reste piloté par le logo posé.
-const FACE_FIELD = { front: 'devant', back: 'dos' };
-
-// Largeur d'impression (cm) prévue pour ce produit, cette face et cette taille.
-// C'est la valeur métier du BAT : elle grandit avec la taille (H-001 au dos :
-// 24 cm en XS, 32 cm en XL), là où la largeur du logo posé sur le mockup est
+// Largeur d'impression (cm) prévue pour ce produit, cette ZONE et cette taille.
+// C'est la valeur métier du BAT : elle grandit avec la taille (NS300 au dos :
+// 24 cm en XS, 32 cm en 2XL), là où la largeur du logo posé sur le mockup est
 // la même partout. Null quand la grille ne la renseigne pas — l'appelant
 // retombe alors sur la largeur du logo.
-export function findPrintWidthCm(t, product, faceKey, sizeLabel) {
-  const field = FACE_FIELD[faceKey];
-  if (!field || !sizeLabel) return null;
+//
+// LA ZONE, ET PLUS LA FACE (04/09/2026). Il y avait ici une table
+// `{ front: 'devant', back: 'dos' }` : la grille distante ne connaissait que
+// ces deux colonnes, donc tout ce qui se pose DEVANT recevait la même cote.
+// Le tableau du CRM, lui, mesure chaque emplacement — et l'écart n'est pas un
+// détail : sur NS300, un Coeur fait 60 à 70 mm quand un Dos en fait 240 à 320.
+// Les zones du BAT (`store.js`, `defaultZones`) portent déjà les noms du CRM :
+// « Coeur », « Poitrine », « Avant », « Dos », « Manche gauche »… C'est donc le
+// NOM qui apparie, et il n'y a rien à traduire.
+//
+// Un nom que le tableau ne connaît pas (« Placement libre », « Avant G », une
+// manche non mesurée) rend `null` : le repli sur la largeur du logo posé est
+// exactement le comportement d'avant.
+export function findPrintWidthCm(t, product, zoneName, sizeLabel) {
+  if (!zoneName || !sizeLabel) return null;
   const rows = findProduct(t, product)?.sizes || [];
-  const mm = rows.find(r => normLabel(r.label) === normLabel(sizeLabel))?.[field];
+  const faces = rows.find(r => normLabel(r.label) === normLabel(sizeLabel))?.faces;
+  if (!faces) return null;
+  const cle = Object.keys(faces).find(f => normLabel(f) === normLabel(zoneName));
+  const mm = cle ? faces[cle] : null;
   return Number.isFinite(mm) && mm > 0 ? mm / 10 : null;
 }
 
-export const printWidthCm = (product, faceKey, sizeLabel) =>
-  findPrintWidthCm(table, product, faceKey, sizeLabel);
+export const printWidthCm = (product, zoneName, sizeLabel) =>
+  findPrintWidthCm(table, product, zoneName, sizeLabel);
 
 // Un produit porte-t-il des tailles ? Les objets (mug, gourde, tapis…) n'en
 // ont pas : leur BAT ne demande qu'une quantité. L'ABSENCE du champ vaut

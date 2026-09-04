@@ -264,10 +264,72 @@ assert.ok(/import\('\.\/bat\/js\/monter\.js'\)/.test(APPJS),
       `identifiant refusé : ${JSON.stringify(mauvais)} (reçu ${r.status})`);
   }
 
+  // --- LES TAILLES VIENNENT DU CRM, ET LA FACE S'APPARIE PAR SON NOM -------
+  // Elles venaient d'une application à part (« Tailles Logo DTF ») qui n'existe
+  // plus — Railway répond « Application not found ». Le CRM porte la même
+  // table, et il la porte avec SES faces : Coeur, Poitrine, Avant, Dos…
+  await fetch(`${base}/api/tailles-logo/familles`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nom: 'Essai BAT', tailles: ['XS', 'XL'], faces: ['Coeur', 'Dos'] }),
+  });
+  for (const [face, taille, mm] of [['Coeur', 'XS', 60], ['Coeur', 'XL', 70], ['Dos', 'XS', 240], ['Dos', 'XL', 320]]) {
+    const r = await fetch(`${base}/api/tailles-logo`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ famille: 'Essai BAT', reference: 'ZZ-ESSAI', face, taille, largeur: mm }),
+    });
+    assert.strictEqual(r.status, 200, `la mesure ${face}/${taille} doit s'enregistrer`);
+  }
+
+  const grille = await (await fetch(`${base}/bat/api/tailles`)).json();
+  assert.strictEqual(grille.source, 'crm', 'la grille vient du CRM, plus du réseau');
+  assert.deepStrictEqual(grille.categories['ESSAI BAT'].sizes, ['XS', 'XL'],
+    'le rayon porte ses tailles — c\'est la série à laquelle un produit incomplet se complète');
+  const ns300 = grille.products.find((x) => x.reference === 'ZZ-ESSAI');
+  assert.ok(ns300, 'la référence mesurée devient un produit de la grille');
+  assert.strictEqual(ns300.category, 'ESSAI BAT');
+  assert.deepStrictEqual(ns300.sizes, [
+    { label: 'XS', faces: { Coeur: 60, Dos: 240 } },
+    { label: 'XL', faces: { Coeur: 70, Dos: 320 } },
+  ], 'chaque taille porte la largeur de CHAQUE face, en millimètres');
+
+  // LE CŒUR N'EST PAS LE DOS, et c'est tout l'enjeu du changement : l'ancienne
+  // grille n'avait que « devant » et « dos », donc les deux marquages de devant
+  // recevaient la même cote. Ici 6 cm contre 24 — une réimpression d'écart.
+  const { findPrintWidthCm } = await import(
+    'data:text/javascript;base64,' + Buffer.from(
+      fs.readFileSync(path.join(RACINE, 'public/bat/js/tailles.js'), 'utf8')
+        // Le module tire deux voisins dont on n'a pas besoin ici : on ne teste
+        // que l'appariement, pas le chargement.
+        .replace(/^import .*$/gm, '')
+        .replace(/\buid\(\)/g, "'x'")
+        .replace(/guessSizeCategory\(/g, '(() => null)('),
+      'utf8').toString('base64'));
+  const produit = { refInternal: '', refSupplier: 'ZZ-ESSAI' };
+  assert.strictEqual(findPrintWidthCm(grille, produit, 'Dos', 'XL'), 32, 'Dos en XL : 32 cm');
+  assert.strictEqual(findPrintWidthCm(grille, produit, 'Coeur', 'XL'), 7, 'Cœur en XL : 7 cm');
+  assert.strictEqual(findPrintWidthCm(grille, produit, 'coeur', 'XL'), 7, 'la casse ne compte pas');
+  assert.strictEqual(findPrintWidthCm(grille, produit, 'Placement libre', 'XL'), null,
+    'une zone que le tableau ne mesure pas rend null — le BAT retombe sur la largeur du logo posé');
+  assert.strictEqual(findPrintWidthCm(grille, produit, 'Dos', 'M'), null,
+    'une taille non mesurée aussi');
+
+  // LES CINQ RAYONS QUE LE BAT DEVINE gardent leur code. Il les ecrit au
+  // SINGULIER (`guessSizeCategory`) quand la famille du CRM est au pluriel :
+  // sans la table de correspondance, une pochette ne retrouvait jamais ses
+  // tailles par le nom de son produit.
+  for (const code of ['HOMME', 'FEMME', 'ENFANT', 'BEBE', 'POCHETTE']) {
+    assert.ok(grille.categories[code], `le rayon ${code} existe sous le nom que le BAT emploie`);
+  }
+
+  // LE CATALOGUE DE MOCKUPS SORT DU MAGASIN, sous son préfixe.
+  const vignette = await fetch(`${base}/bat/catalogue/mockups/T/rouge.webp`);
+  assert.strictEqual(vignette.status, 200, 'une image du catalogue se sert comme le reste');
+
   // Le CRM est là — il sert la page. Plus rien à configurer.
   assert.deepStrictEqual(await (await fetch(`${base}/bat/api/crm`)).json(), { actif: true });
 
   console.log('✓ BAT Studio dans le CRM : magasin en base (octets intacts, sous-arbre, conflit 409), '
-    + 'routes sous /bat, dépôt direct sur la fiche, et une seule charte');
+    + 'routes sous /bat, dépôt direct sur la fiche, tailles du CRM appariées par nom de face, '
+    + 'et une seule charte');
   process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -128,7 +128,7 @@ export function syncGrid(article) {
       if (seen.has(l.id)) continue;
       seen.add(l.id);
       const base = l.zoneName || 'Placement libre';
-      ordered.push({ l, base, faceKey });
+      ordered.push({ l, base });
       baseCount.set(base, (baseCount.get(base) || 0) + 1);
     }
   }
@@ -137,7 +137,7 @@ export function syncGrid(article) {
   // suffixé par un numéro d'ordre (« Manche droite 1 », « Manche droite 2 »…) ;
   // un nom unique reste tel quel (pas de « 1 » superflu).
   const idxByBase = new Map();
-  for (const { l, base, faceKey } of ordered) {
+  for (const { l, base } of ordered) {
     let name = base;
     if (baseCount.get(base) > 1) {
       const n = (idxByBase.get(base) || 0) + 1;
@@ -149,7 +149,10 @@ export function syncGrid(article) {
     const fallback = fmt1(l.widthCm);
     const dims = {};
     for (const s of sizes) {
-      const cm = printWidthCm(product, faceKey, s.taille);
+      // `base` EST LE NOM DE LA ZONE (« Coeur », « Dos »…), pas la face : c'est
+      // lui que le tableau des tailles du CRM mesure. `faceKey` ne distinguait
+      // pas un Coeur d'une Poitrine, qui n'ont pourtant pas la même cote.
+      const cm = printWidthCm(product, base, s.taille);
       dims[s.id] = cm === null ? fallback : fmt1(cm);
     }
     const auto = {
