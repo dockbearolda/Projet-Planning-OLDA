@@ -428,6 +428,11 @@ async function init() {
   // Les deux tasses que la grille sous-tarifait de 1 € et de 6 €.
   await corrigerTarifsTasseMagasin();
 
+  // L'IDENTITÉ DE L'ATELIER, si personne ne l'a jamais saisie. Depuis que
+  // l'application émet des FACTURES, une identité vide n'est plus une lacune
+  // cosmétique : c'est un document sans valeur. Ne remplit que le vide.
+  await semerIdentiteAtelier();
+
   // Les faces de la tasse, que l'instantané ne pouvait plus poser en place.
   await semerFacesTasse();
   await semerFacesCouteau();
@@ -2731,6 +2736,129 @@ async function setEntreprise(patch) {
   return propre;
 }
 
+// L'IDENTITÉ RÉELLE, SEMÉE UNE FOIS (03/09/2026)
+// ---------------------------------------------------------------------------
+// LA FACTURE A CHANGÉ LA DONNE. Tant que les papiers de la maison étaient le
+// ticket et le bon de commande, une identité vide « restait honnête » : un
+// champ absent ne s'imprimait pas, et aucun de ces documents n'engageait
+// l'entreprise. Depuis le 03/09 l'application émet des FACTURES — et une
+// facture sans SIRET, sans adresse et sans RCS n'est pas un document
+// incomplet, c'est un document qui ne vaut rien. Vérifié le 03/09 : la clé
+// `entreprise` n'existait pas en production, `getEntreprise()` retombait donc
+// sur `ENTREPRISE_DEFAULTS` et la facture serait sortie avec le NOM SEUL.
+//
+// CE N'EST PAS UNE CONSTANTE, C'EST UNE SEMENCE. La règle « l'identité de
+// l'atelier est un RÉGLAGE » ne bouge pas : après ce passage, la carte
+// « Identité de l'atelier » des Réglages reste la seule autorité, et un
+// déménagement ne demande toujours aucun déploiement. La semence ne fait que
+// poser la valeur de départ que personne n'avait jamais saisie.
+//
+// ⚠ ELLE NE REMPLIT QUE LE VIDE. Un champ déjà saisi n'est jamais écrasé :
+// une valeur posée à la main est une décision, pas une case oubliée (même
+// principe que `corrigerTarifsTasseMagasin`). La garde `app_meta` lui est
+// PROPRE (deux incidents réels sont venus d'une garde partagée).
+//
+// Source : Documents/Doc OLDA/atelieroldaidentite.md, lui-même tiré des pages
+// légales de myolda.com — vérifié le 03/09/2026.
+//
+// Down : DELETE FROM app_meta WHERE key = 'entreprise_seed_v1';
+//        DELETE FROM app_meta WHERE key = 'entreprise';
+const IDENTITE_ATELIER = Object.freeze({
+  // La DÉNOMINATION SOCIALE, pas l'enseigne : c'est elle qui engage sur une
+  // facture. La forme juridique en fait partie, d'où « SARL » dans le nom.
+  nom: 'Atelier OLDA SARL',
+  adresse: "1 rue Opale, Route de l'Espérance",
+  ville: '97150 Grand-Case, Saint-Martin',
+  // Dix chiffres nus : `telLisible` les groupe par deux au moment d'imprimer.
+  tel: '0590771304',
+  email: 'atelierolda@gmail.com',
+  web: 'myolda.com',
+  // Quatorze chiffres nus : `siretLisible` pose les groupes de l'INSEE.
+  siret: '97829695200028',
+  ape: '1813Z',
+  // SANS le préfixe : `maisonPapier` écrit déjà « RCS ». La valeur « RCS
+  // Saint-Martin » sortirait « RCS RCS Saint-Martin » au pied du papier.
+  rcs: 'Saint-Martin',
+  tva: 'FR86978296952',
+  capital: '500,00 €',
+  // OÙ VERSER UN ACOMPTE — pour le DEVIS, pas pour la facture (elle se règle à
+  // la remise). Déjà publiques dans les CGV de myolda.com.
+  banque: 'Crédit Mutuel',
+  iban: 'FR7610278053600002171400271',
+  bic: 'CMCIFR2A',
+});
+
+async function semerIdentiteAtelier() {
+  const { rows: meta } = await pool.query("SELECT value FROM app_meta WHERE key = 'entreprise_seed_v1'");
+  if (meta[0] && meta[0].value === '1') return;
+
+  const actuelle = await getEntreprise();
+  const patch = {};
+  for (const [cle, valeur] of Object.entries(IDENTITE_ATELIER)) {
+    // Le nom fait exception au « ne remplir que le vide » : `ENTREPRISE_DEFAULTS`
+    // lui pose « Atelier OLDA », qui n'est pas une saisie mais un repli. La
+    // dénomination sociale le remplace ; tout autre nom déjà en place reste.
+    const vide = !String(actuelle[cle] || '').trim()
+      || (cle === 'nom' && actuelle.nom === ENTREPRISE_DEFAULTS.nom);
+    if (vide) patch[cle] = valeur;
+  }
+  if (Object.keys(patch).length) {
+    await setEntreprise(patch);
+    console.log(`ℹ  Identité de l'atelier : ${Object.keys(patch).length} champ(s) posé(s) — la facture porte enfin ses mentions légales.`);
+  }
+  await poserMeta('entreprise_seed_v1', '1');
+}
+
+// --- La mention qui justifie une exonération ---------------------------------
+// TROIS RÉGIMES, TROIS PHRASES LIBRES (03/09/2026). Le papier sait déjà dire
+// QUEL régime s'applique — « TGCA 4 % », « TGCA non applicable — Revente »,
+// « … — Exportation ». Ce qu'il ne savait pas dire, c'est POURQUOI : une
+// exonération se justifie par un texte, et c'est cette référence que le
+// comptable du client cherche sur la facture.
+//
+// ⚠ CE N'EST PAS UNE CONSTANTE, ET SURTOUT PAS UNE QUE NOUS INVENTONS.
+// Saint-Martin a son propre code des contributions — la TGCA n'est pas la TVA
+// métropolitaine, et recopier ici un article du CGI parce qu'il « ressemble »
+// mettrait une citation FAUSSE sur un document opposable. La phrase se saisit
+// dans les Réglages, telle que le comptable la donne. Vide = rien ne
+// s'imprime : c'est la règle des quatre papiers, et elle vaut ici aussi.
+//
+// FIGÉE À L'ÉMISSION, comme l'identité de l'atelier : la facture archive la
+// phrase du jour (voir `document.saisie.mentionRegime`, server.js). Un
+// changement de texte plus tard ne réécrit aucune facture déjà sortie.
+// Down : DELETE FROM app_meta WHERE key = 'mentions_regime';
+const MENTIONS_REGIME_CHAMPS = Object.freeze(['tgca', 'revente', 'export']);
+const MENTIONS_REGIME_DEFAULTS = Object.freeze({ tgca: '', revente: '', export: '' });
+const MENTION_REGIME_MAX = 240;
+
+function nettoyerMentionsRegime(brut) {
+  const out = { ...MENTIONS_REGIME_DEFAULTS };
+  if (!brut || typeof brut !== 'object') return out;
+  for (const cle of MENTIONS_REGIME_CHAMPS) {
+    if (!(cle in brut)) continue;
+    const v = brut[cle];
+    if (typeof v !== 'string') continue;
+    out[cle] = v.replace(/\s+/g, ' ').trim().slice(0, MENTION_REGIME_MAX);
+  }
+  return out;
+}
+
+async function getMentionsRegime() {
+  const { rows } = await pool.query("SELECT value FROM app_meta WHERE key = 'mentions_regime'");
+  if (!rows[0] || typeof rows[0].value !== 'string') return { ...MENTIONS_REGIME_DEFAULTS };
+  try {
+    return nettoyerMentionsRegime(JSON.parse(rows[0].value));
+  } catch {
+    return { ...MENTIONS_REGIME_DEFAULTS };
+  }
+}
+
+async function setMentionsRegime(patch) {
+  const propre = nettoyerMentionsRegime({ ...(await getMentionsRegime()), ...(patch || {}) });
+  await poserMeta('mentions_regime', JSON.stringify(propre));
+  return propre;
+}
+
 // --- Tailles de logo ----------------------------------------------------------
 // LA LARGEUR DU LOGO À IMPRIMER, en millimètres : par famille, par référence,
 // par FACE et par taille. Ce n'est pas une constante par référence — sur NS300
@@ -4044,6 +4172,12 @@ module.exports = {
   // Exportée pour être rejouée SEULE : pg-mem ne relit pas `schema.sql` deux
   // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.
   semerFaceDefaut, renommerFondEnDessous,
+  // Exportée pour la même raison que les deux ci-dessus : ce qui compte n'est
+  // pas la base vierge (le démarrage le prouve à chaque fois), c'est qu'un
+  // second passage NE RÉÉCRIVE PAS une identité saisie à la main. Un test doit
+  // pouvoir rejouer la semence sans redémarrer le service.
+  semerIdentiteAtelier,
+  getMentionsRegime, setMentionsRegime,
   // Exportée pour la même raison : le chemin qui compte n'est pas le nominal,
   // c'est celui d'une base qui porte DÉJÀ des numéros en double. Un test doit
   // pouvoir le rejouer sans redémarrer le service.

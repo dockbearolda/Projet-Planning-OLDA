@@ -98,7 +98,7 @@ function saisieNeuve() {
     // suit le dossier au planning, jamais le papier remis au client.
     noteInterne: '',
     client: {
-      nom: '', code: '', ville: '', contact: '', tel: '', email: '', type: 'pro',
+      nom: '', code: '', adresse: '', ville: '', contact: '', tel: '', email: '', type: 'pro',
       // LE WHATSAPP N'EST PAS LE TÉLÉPHONE. À Saint-Martin, c'est par là qu'on
       // relance : le planning en fait une pastille cliquable (`whatsapp.js`).
       whatsapp: '',
@@ -699,6 +699,12 @@ function carteClient() {
   // moment-là, qu'on ne peut pas deviner avant.
   const code = entree('dvf-cl-code', { valeur: saisie.client.code, exemple: 'attribué automatiquement' });
   code.readOnly = true;
+  // L'ADRESSE DU CLIENT EST UNE MENTION OBLIGATOIRE DE LA FACTURE (03/09/2026)
+  // — pas une coordonnée de confort comme le WhatsApp. Elle est ici, et pas
+  // seulement dans l'écran de vente, parce que les deux cartes client sont le
+  // MÊME composant à un clic l'une de l'autre : un champ posé dans une seule
+  // des deux en refait deux cartes différentes dès que l'une bouge.
+  const adresse = entree('dvf-cl-adresse', { valeur: saisie.client.adresse, exemple: 'Numéro et rue' });
   const ville = entree('dvf-cl-ville', { valeur: saisie.client.ville, exemple: '97150 Saint-Martin' });
   const email = entree('dvf-cl-email', { type: 'email', valeur: saisie.client.email, exemple: 'facultatif' });
   const contact = entree('dvf-cl-contact', { valeur: saisie.client.contact, exemple: 'facultatif' });
@@ -711,13 +717,13 @@ function carteClient() {
   // `saisie.client.type` ne bouge pas pour autant : il voyage jusqu'au planning.
   corps.append(feuille(
     rang('Client / société', nom), rang('Code client', code),
-    rang('Ville', ville), rang('E-mail', email),
-    rang('Personne à contacter', contact), rang('Téléphone', tel),
-    rang('WhatsApp', wa),
+    rang('Adresse', adresse), rang('Ville', ville),
+    rang('E-mail', email), rang('Personne à contacter', contact),
+    rang('Téléphone', tel), rang('WhatsApp', wa),
   ));
 
   // `code` N'EST PAS DANS CETTE LISTE : lecture seule, rien à écouter.
-  for (const [n, cle] of [[nom, 'nom'], [ville, 'ville'],
+  for (const [n, cle] of [[nom, 'nom'], [adresse, 'adresse'], [ville, 'ville'],
     [email, 'email'], [contact, 'contact'], [tel, 'tel'], [wa, 'whatsapp']]) {
     n.addEventListener('input', () => { saisie.client[cle] = n.value; redessiner(); });
   }
@@ -769,7 +775,12 @@ function prendreClient(cl) {
   saisie.client = {
     nom: cl.entreprise || '',
     code: cl.code || '',
-    ville: cl.ville || '',
+    adresse: cl.adresse || '',
+    // `zone` EN REPLI DE `ville` : la fiche client porte les deux, et c'est
+    // `zone` qui est remplie (76 fiches sur 168 le 03/09, contre 5 pour
+    // `ville`). Sans ce repli, la localité existe en base et le papier sort
+    // quand même sans elle.
+    ville: cl.ville || cl.zone || '',
     contact: cl.nom || '',
     tel: cl.telephone || '',
     // La base clients ne tient qu'UN numéro : il sert des deux côtés tant que
@@ -779,6 +790,7 @@ function prendreClient(cl) {
     type: cl.type === 'perso' ? 'perso' : 'pro',
   };
   for (const [id, v] of [['#dvf-cl-nom', saisie.client.nom], ['#dvf-cl-code', saisie.client.code],
+    ['#dvf-cl-adresse', saisie.client.adresse],
     ['#dvf-cl-ville', saisie.client.ville], ['#dvf-cl-email', saisie.client.email],
     ['#dvf-cl-contact', saisie.client.contact], ['#dvf-cl-tel', saisie.client.tel],
     ['#dvf-cl-wa', saisie.client.whatsapp]]) {
@@ -2123,10 +2135,28 @@ function peindre() {
     // toujours sous les yeux.
     const manquants = compte.lignes.filter((l) => l.sansPrix).length;
     const reste = manquants ? ` · ${manquants} à chiffrer` : '';
+    // L'ADRESSE MANQUANTE SE DIT ICI, au même endroit que « à chiffrer » :
+    // c'est une mention obligatoire de la facture (art. L441-9 du code de
+    // commerce), et le compteur est le seul texte encore sous les yeux quand
+    // la carte Client est repliée — c'est-à-dire au moment où l'on clique.
+    //
+    // ELLE N'EMPÊCHE PAS D'ÉMETTRE, et c'est délibéré : un particulier qui
+    // paie comptant ne donne pas toujours la sienne, et bloquer la file du
+    // comptoir pour une donnée rattrapable dans la fiche client coûterait plus
+    // que le manque. Elle ne se dit donc que pour un PROFESSIONNEL — la
+    // facture qui part chez un comptable est celle qui se fait refuser.
+    // ET SEULEMENT UNE FOIS LE CLIENT NOMMÉ : sur une vente vierge, « adresse
+    // client manquante » reproche un oubli à quelqu'un qui n'a encore rien
+    // saisi. Trouvé en ouvrant l'écran vide (03/09) — le même défaut que le
+    // « TOTAL TTC 0,00 € » d'une facture sans ligne.
+    const sansAdresse = String(saisie.client.nom || '').trim()
+      && saisie.client.type !== 'perso'
+      && !String(saisie.client.adresse || '').trim();
+    const adresseDue = sansAdresse ? ' · adresse client manquante' : '';
     // ET LE COMPTEUR NE PORTE UN MONTANT QUE S'IL EN EXISTE UN : « 0 article ·
     // 0,00 € · brouillon local » annoncerait une vente à zéro euro dès l'ouverture.
     const montant = compte.aucunPrix ? '' : ` · ${euro(compte.ttc)}`;
-    compteur.textContent = `${n} article${n > 1 ? 's' : ''}${montant}${reste} · ${etatDevis}`;
+    compteur.textContent = `${n} article${n > 1 ? 's' : ''}${montant}${reste}${adresseDue} · ${etatDevis}`;
   }
   const bSave = $('#dvf-enregistrer');
   if (bSave) {
@@ -2225,6 +2255,7 @@ async function emettreFacture() {
       comment: saisie.noteInterne,
       client_info: [
         ['Client', saisie.client.nom], ['Type de client', saisie.client.type === 'perso' ? 'Particulier' : 'Professionnel'],
+        ['Adresse', saisie.client.adresse],
         ['Ville', saisie.client.ville], ['Téléphone', saisie.client.tel], ['E-mail', saisie.client.email],
       ].filter(([, v]) => v),
       details: articles.flatMap((a, i) => [
@@ -2284,7 +2315,8 @@ function repartirDeZero() {
     && !window.confirm('Cette vente n’a pas été facturée. La remplacer par une vente vierge ?')) return;
   saisie = saisieNeuve();
   dossierId = null;
-  for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-ville', ''],
+  for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-adresse', ''],
+    ['#dvf-cl-ville', ''],
     ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cl-wa', ''],
     ['#dvf-cherche', ''],
     ['#dvf-projet', ''], ['#dvf-due', ''], ['#dvf-heure', ''], ['#dvf-note-interne', ''],

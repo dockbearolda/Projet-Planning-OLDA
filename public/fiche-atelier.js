@@ -469,6 +469,29 @@ export function dessinerFicheAtelier(r, ctx) {
   if (ctx.ouvrirHistorique) {
     outils.append(bouton('fa-btn', 'Historique', () => ctx.ouvrirHistorique()));
   }
+  // LA FACTURE ÉMISE, ET L'AVOIR QUI LA CORRIGE (03/09/2026).
+  //
+  // ⚠ ELLE N'ÉTAIT ATTEIGNABLE DEPUIS AUCUN ÉCRAN. Le bouton « Facture » avait
+  // été posé dans une modale de papier qui ne s'ouvrait plus que depuis une
+  // autre, laquelle ne s'ouvrait plus que depuis elle : deux portes qui ne
+  // s'ouvraient que l'une l'autre, depuis que la rangée « Documents » de cette
+  // fiche a été retirée le 30/08. La facture se rouvre donc d'ici, là où vit
+  // déjà le dossier.
+  //
+  // ⚠ CE N'EST PAS UN RETOUR EN ARRIÈRE SUR LE 30/08. Ce que Charlie a fait
+  // retirer, ce sont les pastilles qui DOUBLAIENT la fiche — la fiche porte
+  // désormais « Ce qu'il y a à produire », donc les papiers de travail n'ont
+  // plus à s'ouvrir d'ici. Une facture émise n'est pas un papier de travail :
+  // c'est un document légal, immuable, que seul un AVOIR peut corriger. Rien
+  // dans la fiche ne le remplace, et il n'existait aucune autre porte.
+  //
+  // MÊME RÈGLE QUE LE DEVIS JUSTE EN DESSOUS : il ne paraît que sur un dossier
+  // qui porte VRAIMENT une facture (`fiche.factureNumero`, posé par le serveur
+  // à l'émission). Un bouton qui n'ouvre rien est un bouton qu'on apprend à ne
+  // plus lire.
+  if (fiche && fiche.factureNumero && ctx.ouvrirFacture) {
+    outils.append(bouton('fa-btn', `Facture ${fiche.factureNumero}`, () => ctx.ouvrirFacture()));
+  }
   // REPRENDRE LE DEVIS — la V2, la V3 (02/09/2026). Charlie : « ce devis pourra
   // être modifié directement depuis la ligne pour créer la v2, 3, 4… dans le cas
   // où le client souhaite une modification ».

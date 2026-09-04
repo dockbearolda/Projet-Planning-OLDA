@@ -3594,6 +3594,10 @@ function contexteFicheAtelier(r, marquage) {
         client: nomClientAffiche(r.billing_company, r.client_type) || '',
       }))
       .catch(reportError),
+    // ROUVRIR LA FACTURE — et, de là, établir un avoir. La fiche se ferme
+    // d'abord : deux boîtes empilées, c'est deux voiles et deux pièges de
+    // focus, et on revient au planning en fermant deux fois.
+    ouvrirFacture: () => { fermerFicheAtelier(); ouvrirFacture(r); },
     fermer: fermerFicheAtelier,
     patchLigne: (champ, valeur) => {
       patch(r, { [champ]: valeur }, () => { r[champ] = valeur; rafraichirLigne(r); });
@@ -3985,12 +3989,17 @@ async function ouvrirFacture(r) {
   factureOuverte = true;
   let mod;
   let doc;
+  // `data` VIT HORS DU `try` : le formulaire d'avoir en a besoin bien après
+  // (les lignes de la facture, ce qui reste à rendre, les avoirs déjà émis).
+  // Déclaré dedans, il était block-scoped — `peindreEtat` levait un
+  // ReferenceError et la modale ne s'ouvrait pas du tout.
+  let data;
   try {
     mod = await chargerFacture();
     const rep = await fetchBorne(`/api/requests/${r.id}/facture`);
     if (rep.status === 404) throw new Error('Aucune facture pour ce dossier');
     if (!rep.ok) throw new Error(`Erreur ${rep.status}`);
-    const data = await rep.json();
+    data = await rep.json();
     doc = mod.modeleFacture(data.document.saisie, data.document.entreprise);
   } catch (err) {
     factureOuverte = false;
@@ -4022,6 +4031,12 @@ async function ouvrirFacture(r) {
     b.addEventListener('click', onClick);
     return b;
   };
+
+  // CE QUI A DÉJÀ ÉTÉ RENDU, au-dessus des boutons. La facture archivée, elle,
+  // ne bouge pas : ce qu'on a remis au client reste ce qu'on a remis au client.
+  // C'est l'application qui sait qu'elle a été corrigée — pas le papier.
+  const etat = document.createElement('div');
+  etat.className = 'tk-modal__aide';
   const fermer = () => {
     fond.remove();
     document.removeEventListener('keydown', auClavier);
@@ -4031,26 +4046,46 @@ async function ouvrirFacture(r) {
   const auClavier = (e) => { if (e.key === 'Escape') fermer(); };
   document.addEventListener('keydown', auClavier);
 
+  const imprimerPapier = (t) => {
+    const cadre = document.createElement('iframe');
+    cadre.setAttribute('aria-hidden', 'true');
+    cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:0';
+    document.body.appendChild(cadre);
+    const d = cadre.contentDocument;
+    d.title = `${t.titre} ${t.numero || ''}`.trim();
+    const style = d.createElement('style');
+    style.textContent = `@page{size:A4 portrait;margin:0}body{margin:0;background:#fff}${mod.CSS_FACTURE}`;
+    d.head.appendChild(style);
+    d.body.appendChild(mod.dessinerFacture(t, d));
+    cadre.contentWindow.focus();
+    cadre.contentWindow.print();
+    setTimeout(() => cadre.remove(), 1000);
+  };
+
+  const peindreEtat = () => {
+    const avoirs = Array.isArray(data.avoirs) ? data.avoirs : [];
+    if (!avoirs.length) { etat.textContent = ''; return; }
+    const rendus = avoirs.map((a) => `${a.numero} (${euroFr(a.montantTtc)})`).join(', ');
+    etat.textContent = data.resteARendre <= 0.004
+      ? `Annulée en totalité par ${rendus}.`
+      : `Avoir déjà émis : ${rendus}. Reste à rendre : ${euroFr(data.resteARendre)}.`;
+  };
+  peindreEtat();
+
+  const boutonAvoir = bouton('Établir un avoir', () => {
+    formulaireAvoir(mod, data, { carte, feuille, actions, imprimerPapier, peindreEtat, boutonAvoir });
+  });
+  boutonAvoir.disabled = !(data.resteARendre > 0.004);
+
   actions.append(
     bouton('Fermer', fermer),
-    bouton('Imprimer', () => {
-      const cadre = document.createElement('iframe');
-      cadre.setAttribute('aria-hidden', 'true');
-      cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:0';
-      document.body.appendChild(cadre);
-      const d = cadre.contentDocument;
-      d.title = `${doc.titre} ${doc.numero || ''}`.trim();
-      const style = d.createElement('style');
-      style.textContent = `@page{size:A4 portrait;margin:0}body{margin:0;background:#fff}${mod.CSS_FACTURE}`;
-      d.head.appendChild(style);
-      d.body.appendChild(mod.dessinerFacture(doc, d));
-      cadre.contentWindow.focus();
-      cadre.contentWindow.print();
-      setTimeout(() => cadre.remove(), 1000);
-    }),
+    boutonAvoir,
+    // UNE SEULE ÉCRITURE DE L'IMPRESSION (`imprimerPapier`) : elle sert la
+    // facture et l'avoir, qui sortent du même cadre et du même CSS.
+    bouton('Imprimer', () => imprimerPapier(doc)),
   );
 
-  carte.append(feuille, actions);
+  carte.append(feuille, etat, actions);
   fond.append(carte);
   fond.addEventListener('click', (e) => { if (e.target === fond) fermer(); });
   document.body.append(fond);
@@ -4059,6 +4094,199 @@ async function ouvrirFacture(r) {
     const premier = actions.querySelector('button');
     if (premier) premier.focus();
   });
+}
+
+// Le même format d'euros que les papiers, sans charger `devis.js` pour deux
+// nombres : la modale n'a pas à connaître le moteur du devis.
+const euroFr = (n) => `${(Number(n) || 0).toFixed(2).replace('.', ',')} €`;
+
+// ===========================================================================
+// ÉTABLIR UN AVOIR (03/09/2026)
+// ===========================================================================
+// LE FORMULAIRE PREND LA PLACE DU PAPIER, dans la MÊME modale : ouvrir une
+// seconde boîte par-dessus la première ferait deux voiles et deux pièges de
+// focus, et le geste est court — un motif, des quantités, un bouton.
+//
+// LES QUANTITÉS PARTENT PLEINES : le cas courant est l'annulation totale, elle
+// doit coûter un clic. Un retour partiel se règle en baissant les lignes.
+//
+// ⚠ AUCUN PRIX NE SE RETAPE ICI. Les prix unitaires viennent de la facture
+// archivée et ne sont pas modifiables : un avoir qui rendrait un autre prix ne
+// corrigerait pas cette facture-là.
+function formulaireAvoir(mod, data, ctx) {
+  const { carte, feuille, actions, imprimerPapier, peindreEtat, boutonAvoir } = ctx;
+  const source = (data.document && data.document.saisie) || {};
+  const lignes = (Array.isArray(source.lignes) ? source.lignes : [])
+    .map((l) => ({ ...l, rendre: Number(l.quantite) || 0 }));
+  if (!lignes.length) return;
+
+  // LA CLÉ EST TIRÉE ICI, à l'ouverture du formulaire, PAS à l'envoi : c'est
+  // elle qui fait qu'une resoumission après une réponse avalée retombe sur
+  // l'avoir déjà écrit au lieu d'en émettre un second (voir POST /api/avoirs).
+  const cle = (window.crypto && window.crypto.randomUUID)
+    ? window.crypto.randomUUID()
+    : `av-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const taux = source.regime === 'tgca' ? Math.max(0, Number(source.tauxTgca) || 0) : 0;
+  const htFacture = Math.round(lignes.reduce((t, l) => t + (Number(l.quantite) || 0) * (Number(l.unitaireHt) || 0), 0) * 100) / 100;
+  const ajSource = (source.ajustement && typeof source.ajustement === 'object') ? source.ajustement : { unite: 'eur', valeur: 0 };
+  // MÊME ARITHMÉTIQUE QUE LE SERVEUR, au centime : l'écran ne décide de rien,
+  // il montre d'avance ce que le serveur va calculer. Les deux divergeraient
+  // que le total annoncé ne serait pas celui du papier.
+  const calculer = () => {
+    const ht = Math.round(lignes.reduce((t, l) => t + l.rendre * (Number(l.unitaireHt) || 0), 0) * 100) / 100;
+    const part = htFacture > 0 ? Math.min(1, ht / htFacture) : 0;
+    const unite = ajSource.unite === 'pct' ? 'pct' : 'eur';
+    const valeur = unite === 'pct' ? (Number(ajSource.valeur) || 0)
+      : Math.round((Number(ajSource.valeur) || 0) * part * 100) / 100;
+    const montant = Math.round((unite === 'pct' ? ht * (valeur / 100) : valeur) * 100) / 100;
+    const ajuste = Math.round((ht + montant) * 100) / 100;
+    const vise = Math.round(ajuste * (1 + taux) * 100) / 100;
+    let ttc = vise;
+    if (source.arrondi === 'euro') ttc = Math.floor(vise + 1e-9);
+    else if (source.arrondi === 'dix') ttc = Math.floor(vise * 10 + 1e-9) / 10;
+    return Math.round(ttc * 100) / 100;
+  };
+
+  const form = document.createElement('div');
+  form.className = 'av-form';
+  const titre = document.createElement('h2');
+  titre.className = 'av-form__titre';
+  titre.textContent = `Avoir sur la facture ${data.numero}`;
+  form.append(titre);
+
+  const motif = document.createElement('input');
+  motif.type = 'text';
+  motif.className = 'av-champ';
+  motif.placeholder = 'Motif — retour, erreur de saisie, geste commercial…';
+  motif.setAttribute('aria-label', 'Motif de l’avoir');
+  motif.maxLength = 240;
+  form.append(motif);
+
+  const total = document.createElement('div');
+  total.className = 'av-total';
+  const emettre = document.createElement('button');
+  emettre.type = 'button';
+  emettre.className = 'ask__btn ask__btn--primary';
+  emettre.textContent = 'Émettre l’avoir';
+
+  const rafraichir = () => {
+    const ttc = calculer();
+    const trop = ttc > data.resteARendre + 0.004;
+    total.textContent = trop
+      ? `${euroFr(ttc)} — au-delà des ${euroFr(data.resteARendre)} qui restent à rendre`
+      : `${euroFr(ttc)} à rendre`;
+    total.classList.toggle('is-trop', trop);
+    emettre.disabled = trop || ttc <= 0;
+  };
+
+  for (const l of lignes) {
+    const rang = document.createElement('div');
+    rang.className = 'av-ligne';
+    const nom = document.createElement('span');
+    nom.className = 'av-ligne__nom';
+    nom.textContent = l.designation;
+    const pu = document.createElement('span');
+    pu.className = 'av-ligne__pu';
+    pu.textContent = `${euroFr(l.unitaireHt)} HT`;
+    const qte = document.createElement('input');
+    qte.type = 'number';
+    qte.className = 'av-champ av-champ--qte';
+    qte.min = '0';
+    qte.max = String(Number(l.quantite) || 0);
+    qte.step = '1';
+    qte.value = String(l.rendre);
+    qte.setAttribute('aria-label', `Quantité à rendre — ${l.designation}`);
+    qte.addEventListener('input', () => {
+      const max = Number(l.quantite) || 0;
+      l.rendre = Math.max(0, Math.min(max, Math.round(Number(qte.value) || 0)));
+      rafraichir();
+    });
+    // LE CHAMP SE REMET D'ÉQUERRE À LA PERTE DU FOCUS, jamais à la frappe :
+    // corriger « 99 » en « 10 » sous les doigts fait sauter le curseur (voir
+    // renderneeds-reprend-le-champ). Mais le laisser afficher 99 à côté d'un
+    // total calculé sur 10 serait un chiffre faux sous les yeux — d'où
+    // `change`, qui ne se déclenche qu'une fois la main partie.
+    qte.addEventListener('change', () => {
+      if (String(l.rendre) !== qte.value) qte.value = String(l.rendre);
+    });
+    const sur = document.createElement('span');
+    sur.className = 'av-ligne__sur';
+    sur.textContent = `/ ${l.quantite}`;
+    rang.append(nom, pu, qte, sur);
+    form.append(rang);
+  }
+  form.append(total);
+  rafraichir();
+
+  // LE PAPIER EST MIS DE CÔTÉ, PAS DÉTRUIT : « Annuler » le remet tel quel,
+  // sans relire le serveur — c'est le même document, il n'a pas bougé.
+  const papier = [...feuille.childNodes];
+  feuille.replaceChildren(form);
+  const actionsAvant = [...actions.childNodes];
+  const annuler = document.createElement('button');
+  annuler.type = 'button';
+  annuler.className = 'ask__btn';
+  annuler.textContent = 'Annuler';
+  annuler.addEventListener('click', () => {
+    feuille.replaceChildren(...papier);
+    actions.replaceChildren(...actionsAvant);
+  });
+
+  emettre.addEventListener('click', async () => {
+    emettre.disabled = true;
+    emettre.textContent = 'Émission…';
+    try {
+      const rep = await fetchBorne('/api/avoirs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cle,
+          invoiceId: data.id,
+          motif: motif.value,
+          lignes: lignes.filter((l) => l.rendre > 0).map((l) => ({ ...l, quantite: l.rendre })),
+        }),
+      });
+      if (!rep.ok) {
+        const err = await rep.json().catch(() => ({}));
+        throw new Error(err.error || `Erreur ${rep.status}`);
+      }
+      const av = await rep.json();
+      // ON MONTRE L'AVOIR, ET ON L'IMPRIME : c'est un papier qu'on remet au
+      // client, comme la facture dont il sort.
+      const t = mod.modeleFacture(av.document.saisie, av.document.entreprise);
+      feuille.replaceChildren(mod.dessinerFacture(t, document));
+      data.avoirs = [...(data.avoirs || []), { numero: av.numero, montantTtc: av.montantTtc }];
+      data.resteARendre = Math.round((data.resteARendre - av.montantTtc) * 100) / 100;
+      peindreEtat();
+      boutonAvoir.disabled = !(data.resteARendre > 0.004);
+      const revenir = document.createElement('button');
+      revenir.type = 'button';
+      revenir.className = 'ask__btn';
+      revenir.textContent = 'Revenir à la facture';
+      revenir.addEventListener('click', () => {
+        feuille.replaceChildren(...papier);
+        actions.replaceChildren(...actionsAvant);
+      });
+      const reimprimer = document.createElement('button');
+      reimprimer.type = 'button';
+      reimprimer.className = 'ask__btn ask__btn--primary';
+      reimprimer.textContent = 'Imprimer l’avoir';
+      reimprimer.addEventListener('click', () => imprimerPapier(t));
+      actions.replaceChildren(revenir, reimprimer);
+      imprimerPapier(t);
+    } catch (err) {
+      // « Le vert se tait, l'échec parle » : un avoir qui n'est pas parti doit
+      // le DIRE, sinon on croit le client remboursé.
+      total.textContent = err.message || 'Émission impossible';
+      total.classList.add('is-trop');
+      emettre.disabled = false;
+      emettre.textContent = 'Émettre l’avoir';
+    }
+  });
+
+  actions.replaceChildren(annuler, emettre);
+  motif.focus();
 }
 
 // L'IDENTITÉ DE L'ATELIER — ce qui signe le bon de commande. Lue UNE fois par

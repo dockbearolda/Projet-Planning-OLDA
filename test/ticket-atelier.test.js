@@ -429,6 +429,30 @@ const DEMANDE = {
   assert.ok(!/cellTicket\(/.test(APP), 'plus de colonne « Documents » dans la ligne');
   assert.ok(!/ticket|bureau|imprimer/i.test(FICHE_ATELIER.split('const outils')[1].split('tete.append')[0]),
     'plus de bouton de papier dans l’en-tête de la fiche');
+
+  // ⚠ UNE EXCEPTION, ET UNE SEULE : LA FACTURE ÉMISE (03/09/2026).
+  //
+  // L'assertion ci-dessus n'est PAS affaiblie — ni le ticket, ni le bon de
+  // commande, ni l'impression ne reviennent dans l'en-tête de la fiche. Ce que
+  // Charlie a fait retirer le 30/08, ce sont les pastilles qui DOUBLAIENT la
+  // fiche : elle porte « Ce qu'il y a à produire », donc les papiers de
+  // travail n'ont plus à s'ouvrir d'ici.
+  //
+  // Une facture émise n'est pas un papier de travail. C'est un document légal,
+  // immuable, que seul un AVOIR peut corriger — et il n'existait AUCUNE autre
+  // porte : le bouton avait été posé dans une modale qui ne s'ouvrait plus que
+  // depuis une autre, laquelle ne s'ouvrait plus que depuis elle.
+  //
+  // IL RESTE CONDITIONNEL, comme « Reprendre le devis » juste en dessous : il
+  // ne paraît que sur un dossier qui porte vraiment une facture. C'est cette
+  // garde-là qui empêche la rangée de repousser.
+  const OUTILS = FICHE_ATELIER.split('const outils')[1].split('tete.append')[0];
+  assert.ok(/fiche\.factureNumero/.test(OUTILS),
+    'la facture doit s’ouvrir depuis la fiche — sans ça, aucun écran n’y mène');
+  assert.ok(/if \(fiche && fiche\.factureNumero && ctx\.ouvrirFacture\)/.test(OUTILS),
+    'le bouton « Facture » ne doit paraître que sur un dossier qui en porte une');
+  assert.ok(/ouvrirFacture: \(\) =>/.test(APP),
+    'l’écran hôte doit fournir `ouvrirFacture` au contexte de la fiche');
   assert.ok(!/'open-btn'/.test(APP), 'plus de bouton « ouvrir la fiche »');
   assert.ok(!/'pcard__open'/.test(APP), 'ni sur la carte');
   // LE RÉCAPITULATIF EN .TXT EST PARTI À SON TOUR (30/08). Il avait déménagé du
