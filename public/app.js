@@ -3452,6 +3452,7 @@ function chargerTaillesLogo() {
 // lire — la règle du « Reprendre le devis » et de la « Facture », déjà écrite
 // dans la fiche.
 let batProduits = null;
+let batFournisseur = {};
 let batProduitsEnVol = null;
 function chargerBatProduits() {
   if (batProduits) return Promise.resolve(batProduits);
@@ -3459,6 +3460,11 @@ function chargerBatProduits() {
     batProduitsEnVol = api('GET', '/api/settings/bat-produits')
       .then((t) => {
         batProduits = new Set(Array.isArray(t && t.cles) ? t.cles : []);
+        // ⚠ LA RÉFÉRENCE DU FOURNISSEUR N'EST PAS LA NÔTRE. Le comptoir range
+        // « K3025 » ; le catalogue de BAT Studio indexe sur « K3025IC ». Huit
+        // références sur quarante-neuf sont dans ce cas — chercher la référence
+        // nue marche sur NS300 et échoue sur K3025.
+        batFournisseur = (t && t.fournisseur && typeof t.fournisseur === 'object') ? t.fournisseur : {};
         return batProduits;
       })
       .catch(() => { batProduitsEnVol = null; return new Set(); });
@@ -8148,9 +8154,36 @@ function mountBat(pour) {
 // Déjà monté, on ne remonte pas : on demande à l'écran de basculer sur le BAT
 // de CETTE fiche. Fermer et remonter coûterait 5,4 Mo de bibliothèques et
 // fermerait le projet en cours d'édition.
+// CE QUE LA LIGNE DIT AU BAT POUR QU'IL S'OUVRE DÉJÀ REMPLI (04/09/2026).
+// Charlie : « le BAT doit déjà être pré-rempli avec les t-shirts, la bonne
+// couleur, etc., qu'on n'ait plus qu'à ajouter les logos ».
+//
+// On lui passe ce que la ligne SAIT, traduit dans SES termes : la référence du
+// FOURNISSEUR (celle sur laquelle son catalogue est indexé), la couleur, les
+// quantités par taille et les faces à marquer. Rien de plus — les logos sont
+// justement ce qu'il reste à poser.
+function prodPourBat(r) {
+  const prod = (r && r.fiche && r.fiche.prod) || null;
+  if (!prod) return null;
+  const ref = String(prod.ref || '').trim();
+  return {
+    // La table ne porte QUE les références où les deux noms diffèrent : partout
+    // ailleurs, la nôtre EST celle du fournisseur.
+    refFournisseur: batFournisseur[cleBatProduit(ref)] || ref,
+    couleur: String(prod.couleur || '').trim(),
+    tailles: Array.isArray(prod.tailles) ? prod.tailles : [],
+    faces: (Array.isArray(prod.logos) ? prod.logos : []).map((z) => z && z.face).filter(Boolean),
+  };
+}
+
 function ouvrirBatDeLaLigne(r) {
   if (!r || !r.id || !$bat) return;
-  const quoi = { requestId: r.id, client: r.billing_company || '', projet: r.description || '' };
+  const quoi = {
+    requestId: r.id,
+    client: r.billing_company || '',
+    projet: r.description || '',
+    prod: prodPourBat(r),
+  };
   // ⚠ LE MONTAGE D'ABORD, LE HASH ENSUITE. `mountBat` est aussi appelé par le
   // changement de vue : si le hash partait devant, l'écran se monterait SANS
   // fiche et poserait un BAT vierge qu'il faudrait remplacer une seconde plus

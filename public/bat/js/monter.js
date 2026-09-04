@@ -123,6 +123,10 @@ function poserFeuilles(base) {
  * @param {string}  [options.requestId]  la fiche du CRM sur laquelle on travaille
  * @param {string}  [options.client]     nom du client, si la fiche le porte
  * @param {string}  [options.projet]     intitulé du projet, si la fiche le porte
+ * @param {object}  [options.prod]       ce qu'il y a à produire, tel que la ligne
+ *                                       le porte : `{refFournisseur, couleur,
+ *                                       tailles: [{t, n}], faces: [nom…]}`. De
+ *                                       quoi ouvrir un BAT déjà rempli.
  * @param {boolean} [options.chrome]     `false` masque la barre d'onglets : l'hôte
  *                                       a déjà sa navigation. L'état de sauvegarde
  *                                       reste visible, en coin.
@@ -216,6 +220,9 @@ export async function monterBatStudio(conteneur, options = {}) {
     if (id) contexteOuverture.requestId = id;
     if (options.client) contexteOuverture.client = String(options.client);
     if (options.projet) contexteOuverture.projet = String(options.projet);
+    // CE QU'IL Y A A PRODUIRE : de quoi ouvrir un BAT DEJA REMPLI plutot qu'un
+    // vierge qu'il faudrait ressaisir sous les yeux du client.
+    if (options.prod) contexteOuverture.prod = options.prod;
   }
 
   // LE THÈME EST CELUI DU CRM, ET IL N'Y EN A QU'UN. `theme.js` est parti avec
@@ -254,6 +261,10 @@ export async function monterBatStudio(conteneur, options = {}) {
       contexteOuverture.requestId = id;
       if (quoi.client) contexteOuverture.client = String(quoi.client);
       if (quoi.projet) contexteOuverture.projet = String(quoi.projet);
+      // ⚠ ON REMPLACE, MEME PAR `null` : le contexte suit la ligne COURANTE.
+      // Garder celui d'avant remplirait le BAT d'un dossier avec les tailles
+      // d'un autre — et personne ne le verrait avant la production.
+      contexteOuverture.prod = quoi.prod || null;
       await app.go('bat');
       await ouvrirPourFiche(id);
       return true;

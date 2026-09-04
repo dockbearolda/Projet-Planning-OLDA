@@ -391,6 +391,23 @@ module.exports = {
   cleDeTaille,
   // Exposé pour les tests et pour le serveur : il faut les mêmes clés des deux
   // côtés, et elles ne se recopient pas.
+  // LA RÉFÉRENCE DU FOURNISSEUR, QUAND ELLE DIFFÈRE DE LA NÔTRE.
+  // Le comptoir range « K3025 » ; TopTex — et donc le catalogue de BAT Studio,
+  // qui indexe sur `refSupplier` — l'appelle « K3025IC ». Huit des
+  // quarante-neuf références sont dans ce cas (tous les K30xx). Chercher la
+  // référence NUE marche donc sur NS300 et échoue sur K3025 : le BAT s'ouvre
+  // vide, et personne ne comprend pourquoi ça marche une fois sur deux.
+  //
+  // La table sort du moteur, jamais d'une liste recopiée : c'est le même
+  // fichier que celui servi au navigateur.
+  refsFournisseur: () => {
+    const out = {};
+    for (const r of TE().DB.refs || []) {
+      const ref = String(r.ref || '').trim();
+      if (ref) out[ref] = String(r.toptex || ref).trim() || ref;
+    }
+    return out;
+  },
   cles: () => [...TE().SIZE_KEYS],
   libelles: () => ({ ...TE().SIZE_LABELS }),
 };

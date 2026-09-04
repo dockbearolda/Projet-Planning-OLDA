@@ -23,6 +23,9 @@ const chiffrage = require('./chiffrage');
 // BAT STUDIO — l'onglet « BAT » de la barre. Tout son serveur tient là-dedans ;
 // son front est servi tel quel depuis `public/bat/`. Voir l'entête de bat.js.
 const { monterBat } = require('./bat');
+// Le magasin de BAT Studio : la purge d'un dossier soldé y efface son projet et
+// les logos que plus personne ne réclame (voir `purgerBatDuDossier`).
+const { batLire, batEcrire, batSupprimer } = require('./db');
 const {
   pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS, ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
@@ -1261,7 +1264,17 @@ app.get('/api/settings/bat-produits', asyncH(async (req, res) => {
       if (c) cles.add(c);
     }
   }
-  res.json({ familles, cles: [...cles] });
+  // ⚠ ET LA RÉFÉRENCE DU FOURNISSEUR, qui n'est pas la nôtre. Le comptoir range
+  // « K3025 » ; le catalogue de BAT Studio indexe sur `refSupplier`, soit
+  // « K3025IC ». Huit références sur quarante-neuf sont dans ce cas. Sans cette
+  // table, le pré-remplissage du BAT marcherait sur NS300 et échouerait sur
+  // K3025 — une fois sur deux, sans un message nulle part.
+  const brut = chiffrage.refsFournisseur();
+  const fournisseur = {};
+  for (const [ref, sup] of Object.entries(brut)) {
+    if (cleBat(ref) !== cleBat(sup)) fournisseur[cleBat(ref)] = sup;
+  }
+  res.json({ familles, cles: [...cles], fournisseur });
 }));
 
 app.put('/api/settings/textile', exige('reglages'), asyncH(async (req, res) => {
@@ -2871,6 +2884,27 @@ app.patch('/api/requests/:id', asyncH(async (req, res) => {
   const etapes = [...new Set([avant[0].stage, rows[0].stage])];
   broadcast({ kind: 'update', stages: etapes });
 
+  // LE BAT D'UN DOSSIER SOLDÉ N'A PLUS RIEN À DIRE (04/09/2026). Voir
+  // `purgerBatDuDossier` : le déclencheur est l'ENTRÉE dans « Paiement &
+  // clôture », et le PDF déposé sur la ligne n'est jamais touché.
+  //
+  // ⚠ APRÈS LE `broadcast`, ET SANS `await`. La purge est un CONFORT : un
+  // magasin qui tousse ne doit pas empêcher de solder une commande. Elle ne
+  // peut donc ni retarder la réponse, ni la faire échouer.
+  //
+  // ⚠ ET SEULEMENT SUR LA TRANSITION. Un dossier qu'on corrige alors qu'il est
+  // DÉJÀ à `paiement` ne relance pas un balayage complet du magasin à chaque
+  // frappe — on ne purge qu'au passage de la porte.
+  if (rows[0].stage === 'paiement' && avant[0].stage !== 'paiement') {
+    purgerBatDuDossier(req.params.id)
+      .then((n) => {
+        if (n.projets) {
+          console.log(`BAT purgé (dossier soldé) : ${n.projets} projet(s), ${n.logos} logo(s) libéré(s).`);
+        }
+      })
+      .catch((err) => console.error('purge du BAT :', err.message));
+  }
+
   // ALERTE MARGE FAIBLE (§13). « Si un commercial descend sous la marge
   // minimum : afficher une alerte. La Direction peut néanmoins forcer le prix. »
   //
@@ -3528,6 +3562,83 @@ app.put('/api/requests/:id/pdf/:kind', capacitePdf,
     });
     res.status(statut).json(corps);
   }));
+
+// ---------------------------------------------------------------------------
+// LE BAT D'UN DOSSIER SOLDE N'A PLUS RIEN A DIRE
+// ---------------------------------------------------------------------------
+// Charlie, 04/09/2026 : « on doit pouvoir modifier le BAT tant qu'on le
+// souhaite, mais des que le dossier est dans paiement et cloture, le BAT est
+// supprime de la ligne, inutile de le conserver pour rien ».
+//
+// LE DECLENCHEUR EST L'ENTREE DANS LA FAMILLE, ni l'export, ni l'archivage.
+//   · pas l'export : un BAT existe pour etre CORRIGE — « BAT – Modification
+//     demandee » est une sous-etape du pipeline, et effacer a l'export
+//     obligerait a repartir d'une feuille blanche a chaque aller-retour client.
+//   · pas l'archivage : a `paiement`, la commande est produite, remise et
+//     payee. Le dossier peut ensuite dormir des mois avant qu'on y touche, et
+//     attendre coute de la place pour rien.
+//
+// LE PDF N'EST JAMAIS TOUCHE. C'est la trace, et c'est ce que le client a
+// signe : il reste sur la ligne, avec ses versions.
+//
+// ⚠ CE QUI PESE N'EST PAS LE FICHIER DE TRAVAIL. Mesure sur le volume en ligne
+// le 04/09 : 85 projets = 1,1 Mo, mais leurs logos 170,9 Mo. Effacer le seul
+// JSON rendrait treize kilo-octets et donnerait le sentiment d'avoir nettoye.
+// On retire donc aussi les logos que PLUS AUCUN projet vivant ne reclame — les
+// logos sont dedupliques par empreinte, un meme fichier peut servir a dix
+// dossiers, et c'est pour ca qu'on compte avant d'effacer.
+const CHEMIN_INDEX = 'projects-index.json';
+
+async function batLireJson(rel) {
+  const f = await batLire(rel);
+  if (!f) return null;
+  try { return JSON.parse(f.octets.toString('utf8')); } catch (_) { return null; }
+}
+
+// Les empreintes de logos qu'un projet pose, toutes faces confondues.
+function logosDuProjet(projet) {
+  const out = new Set();
+  for (const a of (projet && projet.articles) || []) {
+    for (const face of Object.values((a && a.faces) || {})) {
+      for (const l of (face && face.logos) || []) {
+        if (l && l.hash) out.add(`${l.hash}.${l.type || 'pdf'}`);
+      }
+    }
+  }
+  return out;
+}
+
+async function purgerBatDuDossier(requestId) {
+  const index = await batLireJson(CHEMIN_INDEX);
+  if (!Array.isArray(index)) return { projets: 0, logos: 0 };
+  const aJeter = index.filter((e) => e && e.crmRequestId === requestId).map((e) => e.id);
+  if (!aJeter.length) return { projets: 0, logos: 0 };
+
+  // Ce que les projets condamnes posaient, et ce que les SURVIVANTS reclament
+  // encore. On ne lit les fichiers qu'a ce moment-la : c'est le seul endroit ou
+  // le compte doit etre juste, et ca ne se produit qu'a la cloture d'un dossier.
+  const condamnes = new Set();
+  for (const id of aJeter) {
+    for (const l of logosDuProjet(await batLireJson(`projects/${id}.json`))) condamnes.add(l);
+  }
+  const gardes = new Set();
+  for (const e of index) {
+    if (!e || aJeter.includes(e.id)) continue;
+    for (const l of logosDuProjet(await batLireJson(`projects/${e.id}.json`))) gardes.add(l);
+  }
+
+  for (const id of aJeter) await batSupprimer(`projects/${id}.json`);
+  await batEcrire(CHEMIN_INDEX, Buffer.from(
+    JSON.stringify(index.filter((e) => !aJeter.includes(e.id))), 'utf8',
+  ));
+
+  let logos = 0;
+  for (const l of condamnes) {
+    if (gardes.has(l)) continue;
+    try { await batSupprimer(`logos/${l}`); logos += 1; } catch (_) { /* deja parti */ }
+  }
+  return { projets: aJeter.length, logos };
+}
 
 // BAT STUDIO, MONTÉ ICI ET PAS AILLEURS : juste derrière `deposerPdf`, qui est
 // la seule chose que le CRM lui prête. Tout ce qui est sous `/bat/api` lui
