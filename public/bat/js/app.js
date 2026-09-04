@@ -5,7 +5,7 @@ import { store, importOldaCatalogue } from './store.js';
 import { onSaveState, resumePending, onConflit, resoudreConflit } from './persist.js';
 import { toast, confirmModal, el } from './ui.js';
 import { attacherContexte, contexteOuverture } from './crm.js';
-import { renderProjects, startNewProject, ouvrirPourFiche } from './projects.js';
+import { startNewProject, ouvrirPourFiche } from './projects.js';
 import { loadTailles } from './tailles.js';
 import { ICON_SETTINGS, ICON_GARMENT } from './util.js';
 import { chemin } from './base.js';
@@ -28,7 +28,7 @@ function showLoading(host) {
 }
 
 export const app = {
-  screen: 'projects',
+  screen: 'bat',
   project: null,       // projet ouvert
   batPage: null,       // instance BatPage (l'écran-PDF)
 
@@ -41,7 +41,10 @@ export const app = {
     // paramètre, déposera quand même au bon endroit.
     if (attacherContexte(p)) store.saveProject(p);
     this.project = p;
-    document.getElementById('nav-bat').disabled = false;
+    // `#nav-bat` NE SE DÉSACTIVE PLUS. Il l'était tant qu'aucun projet n'était
+    // ouvert — on venait alors de la liste, et « Feuille » n'aurait mené nulle
+    // part. La liste n'existe plus : l'application s'ouvre SUR la feuille, il y
+    // a donc toujours un projet, et un onglet grisé ne dirait plus rien.
     this.updateTopbar();
     await this.go('bat');
   },
@@ -91,7 +94,7 @@ export const app = {
     this.project = null;
     this.batPage?.destroy();
     this.batPage = null;
-    document.getElementById('nav-bat').disabled = true;
+
     this.updateTopbar();
   },
 
@@ -109,19 +112,11 @@ export const app = {
       s.classList.toggle('active', s.id === 'screen-' + screen);
     }
     const host = document.getElementById('screen-' + screen);
-    if (screen === 'projects') await renderProjects(host);
     if (screen === 'produits') {
       const done = showLoading(host);
       try {
         const { renderProduits } = await import('./produits.js');
         await renderProduits(host);
-      } finally { done(); }
-    }
-    if (screen === 'reglages') {
-      const done = showLoading(host);
-      try {
-        const { renderReglages } = await import('./reglages.js');
-        await renderReglages(host);
       } finally { done(); }
     }
     if (screen === 'bat' && this.project) {
@@ -143,15 +138,15 @@ export const app = {
 window.app = app;     // debug + mode captures
 window.store = store; // idem
 
-// Barre supérieure : les deux onglets qui portent une icône (jamais d'emoji).
+// Barre supérieure : l'onglet qui porte une icône (jamais d'emoji).
+// IL N'Y EN A PLUS QU'UN. « Réglages » était habillé ici lui aussi ; l'onglet
+// est parti le 04/09, et cette fonction cherchait toujours son bouton — elle
+// tombait donc sur `null` et le montage s'arrêtait là, feuille vide et sans
+// projet ouvert. Un sélecteur qui ne trouve rien ne dit rien : il faut le
+// retirer avec ce qu'il habillait.
 function fillTopbar() {
-  const reglages = document.querySelector('.nav-reglages');
-  const label = document.createElement('span');
-  label.textContent = 'Réglages';
-  reglages.replaceChildren(el(ICON_SETTINGS), label);
-  reglages.setAttribute('aria-label', 'Réglages');
-
   const produits = document.querySelector('.nav-produits');
+  if (!produits) return;
   const labelP = document.createElement('span');
   labelP.textContent = 'Produits';
   produits.replaceChildren(el(ICON_GARMENT), labelP);
@@ -380,6 +375,19 @@ export async function demarrer() {
     }
   }
 
+  // « NOUVEAU » : une feuille vierge, et on y va. `startNewProject` reprend le
+  // BAT vierge s'il en existe un — cliquer deux fois n'empile pas deux
+  // brouillons. Le bouton n'existe que monté dans le CRM (cf. monter.js).
+  const neuf = document.getElementById('bat-neuf');
+  if (neuf) {
+    neuf.addEventListener('click', async () => {
+      neuf.disabled = true;
+      try { await startNewProject(); await app.go('bat'); }
+      catch (e) { console.error(e); toast('Impossible d\'ouvrir un BAT neuf : ' + (e.message || e), { error: true }); }
+      finally { neuf.disabled = false; }
+    });
+  }
+
   document.querySelectorAll('.nav-btn').forEach(b => {
     b.addEventListener('click', () => app.go(b.dataset.screen));
   });
@@ -400,8 +408,10 @@ export async function demarrer() {
   if (impose && impose !== 'bat') { await app.go(impose); return; }
 
   // Sans catalogue produit, il n'y a pas de vêtement à poser : on retombe sur
-  // l'écran Projets, qui est justement celui qui explique comment l'importer.
-  if (!store.catalogue.products.length) { await app.go('projects'); return; }
+  // PRODUITS, qui est l'écran par lequel on en ajoute une référence. C'était
+  // « Projets » jusqu'au 04/09 ; cet écran-là n'existe plus, et Produits dit la
+  // même chose de plus près — c'est lui qui porte l'import.
+  if (!store.catalogue.products.length) { await app.go('produits'); return; }
 
   // L'APPLICATION S'OUVRE SUR LA FEUILLE, pas sur la liste : on vient y faire un
   // BAT, pas consulter un catalogue de projets.
@@ -414,7 +424,10 @@ export async function demarrer() {
     else await startNewProject();
   } catch (e) {
     console.error('Ouverture du BAT impossible :', e);
-    await app.go('projects');
+    // Le repli ne peut plus être « la liste » : il n'y en a plus. On reste sur
+    // la feuille, vide — l'erreur est déjà dite par le toast, et un écran qui
+    // change tout seul sous les yeux en dit une seconde.
+    await app.go('bat');
   }
 }
 

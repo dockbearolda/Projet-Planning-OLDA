@@ -112,6 +112,51 @@ assert.ok(!/safe-area-inset/.test(sansCommentaires(APPCSS)), 'les safe-areas son
 assert.ok(!/pointer:\s*coarse/.test(sansCommentaires(lire('public/bat/css/feuille/feuille.css'))),
   'le bloc tactile de la feuille est retiré');
 
+// L'ÉCRAN NE DEMANDE QUE SIX CHOSES (04/09/2026).
+// Charlie, mot pour mot : « si je clique sur BAT je veux que ça me demande nom,
+// projet, référence, couleur, les faces, et les quantités, rien d'autre. »
+// Deux écrans, pas quatre : la FEUILLE, et PRODUITS pour ajouter une référence
+// qu'on n'a pas. Sont partis la liste des projets et les réglages du BAT.
+{
+  const MONTER_NU = MONTER.replace(/\/\/[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const ecrans = [...MONTER_NU.matchAll(/data-screen="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepStrictEqual(ecrans, ['bat', 'produits'],
+    'deux onglets, dans cet ordre : la feuille, puis les produits');
+  const sections = [...MONTER_NU.matchAll(/id="screen-([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepStrictEqual(sections, ['bat', 'produits'],
+    '…et deux sections, pas une de plus : une section sans onglet est un écran inatteignable');
+  // Le bouton est construit en JS, pas dans une chaine de balisage : on cherche
+  // son identifiant, pas un attribut HTML.
+  assert.ok(/'bat-neuf'/.test(MONTER) && /'Nouveau'/.test(MONTER),
+    '« Nouveau » est dans l\'en-tête : sans lui l\'écran serait à un coup, le BAT sorti '
+    + 'et l\'onglet rouvrant le même, rempli');
+
+  // LES SIX CHAMPS, ET DANS CET ORDRE. Client et Projet sont posés par
+  // `renderFiche`, les trois suivants par l'ossature de la feuille, et les
+  // quantités ferment la rangée.
+  const PAGE = lire('public/bat/js/batpage.js');
+  for (const champ of ['Client', 'Projet', 'Vêtement', 'Couleur', 'Faces', 'Quantités']) {
+    assert.ok(PAGE.includes(champ), `la feuille demande « ${champ} »`);
+  }
+  assert.ok(!/id="bat-history"/.test(PAGE),
+    'l\'historique est parti : le PDF est la seule action terminale');
+  assert.ok(/id="bat-export"/.test(PAGE), '…mais l\'export du PDF reste');
+
+  // LE CODE DES DEUX ÉCRANS RETIRÉS EST PARTI AVEC EUX. Un écran qu'on ne peut
+  // plus atteindre dont le code reste, c'est le code qu'on rallume par erreur
+  // six mois plus tard.
+  const PROJETS = lire('public/bat/js/projects.js');
+  const REGLAGES = lire('public/bat/js/reglages.js');
+  assert.ok(!/export async function renderProjects/.test(PROJETS), 'renderProjects est retirée');
+  assert.ok(!/export async function renderReglages/.test(REGLAGES), 'renderReglages est retirée');
+  assert.ok(/export async function startNewProject/.test(PROJETS),
+    '…mais ce qui OUVRE un BAT reste : « Nouveau » en dépend');
+  assert.ok(/export async function ouvrirPourFiche/.test(PROJETS),
+    '…et l\'ouverture depuis une fiche du CRM aussi');
+  assert.ok(/export async function calibrationModal/.test(REGLAGES),
+    '…et la calibration, que l\'écran Produits appelle');
+}
+
 // L'ONGLET EST DANS LA BARRE, ENTRE LES ÉCRANS QUI PRODUISENT UN DOCUMENT.
 const INDEX = lire('public/index.html');
 const nav = INDEX.slice(INDEX.indexOf('class="nav-switch"'), INDEX.indexOf('</nav>'));
