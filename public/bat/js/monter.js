@@ -6,15 +6,15 @@
 //   import { monterBatStudio } from '/bat/js/monter.js';
 //   await monterBatStudio(document.getElementById('zone-bat'), { requestId: 'req-42' });
 //
-// LE MÊME CODE, MONTÉ À TROIS ENDROITS. BAT Studio n'est pas une application à
-// quatre écrans : c'est UN écran de travail et trois pages de référence, et
-// dans un CRM ces trois-là ont déjà leur place. D'où l'option `ecran` :
+// DEUX ÉCRANS, ET PLUS QUATRE (04/09/2026). Charlie : « je veux que ça me
+// demande nom, projet, référence, couleur, les faces, et les quantités, rien
+// d'autre ». La FEUILLE est l'application ; PRODUITS reste, parce que c'est par
+// lui qu'on ajoute une référence qu'on n'a pas encore.
 //
-//   fiche demande      → { requestId: 'req-42', chrome: false }
-//   réglages · produits→ { ecran: 'produits',   chrome: false }
-//   réglages · BAT     → { ecran: 'reglages',   chrome: false }
-//
-// Trois entrées, un seul code, zéro duplication.
+// Sont partis : la liste des projets (son bouton « + Nouveau projet » est
+// devenu le « Nouveau » de l'en-tête) et les réglages (l'identité qui signe le
+// PDF est déjà un réglage du CRM). Les BAT déjà faits restent en base et sur
+// leurs fiches — l'écran ne les liste simplement plus.
 //
 // Le conteneur reçoit la classe `.bat-app` : c'est elle qui porte les jetons et
 // sous laquelle TOUT l'habillage est enfermé (cf. l'entête de app.css). Rien ne
@@ -50,19 +50,15 @@
 // depuis quatre fichiers. La rangée change de forme, pas de prises.
 export const ONGLETS = `
   <nav id="mainnav" aria-label="Écrans du bon à tirer">
-    <button data-screen="projects" class="nav-btn active" type="button">Projets</button>
-    <button data-screen="bat" class="nav-btn" id="nav-bat" type="button" title="Ouvrez d'abord un projet" disabled>Feuille</button>
+    <button data-screen="bat" class="nav-btn active" id="nav-bat" type="button">Feuille</button>
     <button data-screen="produits" class="nav-btn nav-produits" type="button">Produits</button>
-    <button data-screen="reglages" class="nav-btn nav-reglages" type="button"></button>
   </nav>
 `;
 
 export const OSSATURE = `
   <main id="screens">
-    <section id="screen-projects" class="screen active"></section>
-    <section id="screen-bat" class="screen"></section>
+    <section id="screen-bat" class="screen active"></section>
     <section id="screen-produits" class="screen"></section>
-    <section id="screen-reglages" class="screen"></section>
   </main>
 `;
 
@@ -90,7 +86,7 @@ const MODULES = [
 
 // Les quatre écrans, tels que `app.go()` les nomme et tels que l'ossature les
 // pose (`#screen-<id>`). Écrit ici parce que c'est ici que l'hôte les nomme.
-const ECRANS = new Set(['bat', 'projects', 'produits', 'reglages']);
+const ECRANS = new Set(['bat', 'produits']);
 
 function precharger(base) {
   for (const rel of MODULES) {
@@ -128,7 +124,7 @@ function poserFeuilles(base) {
  * @param {boolean} [options.chrome]     `false` masque la barre d'onglets : l'hôte
  *                                       a déjà sa navigation. L'état de sauvegarde
  *                                       reste visible, en coin.
- * @param {'bat'|'projects'|'produits'|'reglages'} [options.ecran]
+ * @param {'bat'|'produits'} [options.ecran]
  *                                       l'écran sur lequel ouvrir. Défaut : `bat`.
  *                                       C'est ce qui permet de monter LE MÊME code
  *                                       à trois endroits du CRM — la fiche, et deux
@@ -181,10 +177,22 @@ export async function monterBatStudio(conteneur, options = {}) {
     const projet = document.createElement('div');
     projet.id = 'topbar-project';
     projet.className = 'topbar-project';
+    // « NOUVEAU » EST LA SEULE COMMANDE DE CET EN-TÊTE, et elle y est parce que
+    // la liste des projets n'existe plus : c'était elle qui portait « + Nouveau
+    // projet ». Sans ce bouton, l'écran serait à un coup — le BAT sorti, revenir
+    // sur l'onglet rouvrirait le même, rempli.
+    // Elle ne DÉTRUIT rien : `startNewProject` reprend le BAT vierge s'il en
+    // existe un, et n'en crée un qu'à défaut. Cliquer deux fois de suite
+    // n'empile donc pas deux brouillons.
+    const neuf = document.createElement('button');
+    neuf.type = 'button';
+    neuf.id = 'bat-neuf';
+    neuf.className = 'btn primaire';
+    neuf.textContent = 'Nouveau';
     conteneur.prepend(ecranTete({
       titre: 'Bon à tirer',
       gauche: [onglets.firstElementChild],
-      droite: [projet, etat],
+      droite: [projet, etat, neuf],
     }));
   } else {
     // Sans chrome, l'hôte a déjà sa navigation — mais l'état de sauvegarde reste

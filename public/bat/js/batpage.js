@@ -445,7 +445,6 @@ export class BatPage {
                soit le nombre d'articles ou de tailles. -->
           <div class="bat-pied">
             <span class="hint" id="bat-status"></span>
-            <button class="btn secondaire" id="bat-history">Historique</button>
             <button class="btn primaire" id="bat-export">Exporter le PDF</button>
           </div>
         </div>
