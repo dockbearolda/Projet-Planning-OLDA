@@ -38,6 +38,7 @@ const {
   getClientSecteurs, addClientSecteur, removeClientSecteur,
   SUB_STAGES, WHATSAPP_MESSAGE_MAX, getWhatsappMessage, setWhatsappMessage,
   getReglagesTextile, setReglagesTextile,
+  getFamillesBat,
   getEntreprise, setEntreprise,
   getMentionsRegime, setMentionsRegime,
   getTaillesLogo, majTailleLogo, compterTaillesLogo,
@@ -1224,6 +1225,43 @@ app.put('/api/settings/whatsapp', exige('reglages'), asyncH(async (req, res) => 
 // GET → réglages · PUT { … } → fusionne avec l'existant, diffusé en SSE.
 app.get('/api/settings/textile', asyncH(async (req, res) => {
   res.json(await getReglagesTextile());
+}));
+
+// CE QUI PERMET AU PLANNING DE SAVOIR SI UNE LIGNE MÉRITE UN BAT, sans lui
+// faire porter les 220 produits du catalogue.
+//
+// C'EST LA SEULE PORTE, ET ELLE EST EN LECTURE. La liste des familles est un
+// réglage (`app_meta.familles_bat`, voir `getFamillesBat` dans db.js) : elle se
+// change sans déploiement. Elle n'a PAS d'écran ni de route d'écriture, et ce
+// n'est pas un oubli — une liste qui bouge deux fois par an ne justifie pas un
+// panneau de plus dans les Réglages tant que personne n'a eu besoin de la
+// changer. Le jour où ça arrive, la fonction d'écriture s'écrit en trois
+// lignes ; d'ici là, une route que personne n'appelle est une porte de plus à
+// tenir.
+//
+// La ligne ne connaît pas sa famille : elle porte une RÉFÉRENCE
+// (`fiche.prod.ref`) et une DÉSIGNATION (`product`). Le rapprochement se fait
+// donc sur ces deux clés, réduites sans casse ni accent — la règle de
+// rapprochement de noms du reste de l'application. Les DEUX, parce qu'une
+// vendeuse peut taper une désignation sans choisir au catalogue : sans elle,
+// un t-shirt saisi à la main n'aurait pas de bouton.
+//
+// Mesuré le 04/09 : 86 produits sur 220, soit moins de 4 Ko sur le fil, lus une
+// fois par poste. Envoyer le catalogue entier en pèserait cinquante.
+const cleBat = (v) => String(v == null ? '' : v).trim().toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+app.get('/api/settings/bat-produits', asyncH(async (req, res) => {
+  const familles = await getFamillesBat();
+  const voulues = new Set(familles.map(cleBat));
+  const cles = new Set();
+  for (const p of await getCatalogueProduits()) {
+    if (!voulues.has(cleBat(p.famille))) continue;
+    for (const k of [p.reference, p.designation, p.label]) {
+      const c = cleBat(k);
+      if (c) cles.add(c);
+    }
+  }
+  res.json({ familles, cles: [...cles] });
 }));
 
 app.put('/api/settings/textile', exige('reglages'), asyncH(async (req, res) => {

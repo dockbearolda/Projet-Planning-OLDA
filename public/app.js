@@ -3436,6 +3436,52 @@ function chargerTaillesLogo() {
   return taillesLogoEnVol;
 }
 
+// QUELLES LIGNES MÉRITENT UN BON À TIRER (04/09/2026).
+// Charlie : « les BAT ne sont utiles que pour les textiles : casquette,
+// t-shirt, sweat, pochette, sac, etc. Le reste, on fait encore les BAT sur
+// Illustrator. »
+//
+// LA LIGNE NE CONNAÎT PAS SA FAMILLE — elle porte une RÉFÉRENCE et une
+// DÉSIGNATION. Le serveur envoie donc les clés des produits concernés
+// (`/api/settings/bat-produits`, moins de 4 Ko), et on rapproche sur les deux :
+// une vendeuse peut taper une désignation sans choisir au catalogue, et sans
+// cette seconde clé un t-shirt saisi à la main n'aurait pas de bouton.
+//
+// INJOIGNABLE, ON NE PROPOSE RIEN. Un bouton « BAT » posé au hasard sur une
+// tasse est pire que pas de bouton : c'est un bouton qu'on apprend à ne plus
+// lire — la règle du « Reprendre le devis » et de la « Facture », déjà écrite
+// dans la fiche.
+let batProduits = null;
+let batProduitsEnVol = null;
+function chargerBatProduits() {
+  if (batProduits) return Promise.resolve(batProduits);
+  if (!batProduitsEnVol) {
+    batProduitsEnVol = api('GET', '/api/settings/bat-produits')
+      .then((t) => {
+        batProduits = new Set(Array.isArray(t && t.cles) ? t.cles : []);
+        return batProduits;
+      })
+      .catch(() => { batProduitsEnVol = null; return new Set(); });
+  }
+  return batProduitsEnVol;
+}
+
+// La même réduction que le serveur : sans casse ni accent, et SANS retirer le
+// pluriel — « Sacs » est une famille, « Sac coton » un produit, et les deux
+// clés viennent déjà réduites de la même façon des deux côtés.
+const cleBatProduit = (v) => String(v == null ? '' : v).trim().toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+function meriteUnBat(r) {
+  if (!batProduits || !batProduits.size) return false;
+  const prod = (r && r.fiche && r.fiche.prod) || null;
+  for (const k of [prod && prod.ref, r && r.product]) {
+    const c = cleBatProduit(k);
+    if (c && batProduits.has(c)) return true;
+  }
+  return false;
+}
+
 // Le tableau et le catalogue ne se sont pas mis d'accord sur les pluriels ni sur
 // les accents : on compare sur une forme réduite, jamais pour réécrire. C'est la
 // règle `txLogoCle` du comptoir, à l'identique — deux écrans qui rapprochent les
@@ -3627,6 +3673,15 @@ function contexteFicheAtelier(r, marquage) {
       };
       quandPret();
     },
+    // LE BON À TIRER DE CETTE LIGNE (04/09/2026). Charlie : « à l'intérieur de
+    // chaque ligne je dois pouvoir rapidement créer un BAT ».
+    //
+    // ⚠ ON NE FERME PAS LA FICHE comme le fait « Reprendre le devis ». Le BAT
+    // s'ouvre sur un AUTRE onglet : la fiche disparaît de toute façon avec le
+    // planning, et la refermer en plus ferait perdre sa place au retour.
+    // Il ne paraît que sur une ligne textile — voir `meriteUnBat`.
+    peutBat: meriteUnBat(r),
+    ouvrirBat: () => ouvrirBatDeLaLigne(r),
     ouvrirClient: (ligne) => {
       const cible = ligne || r;
       clientVise = cible.billing_company || cible.contact_referent || '';
@@ -3650,11 +3705,15 @@ function openLigneDetail(id) {
   // LE PRIX DE CHAQUE EMPLACEMENT part avec elles. Neuf recalculs du moteur : ils
   // n'ont aucune raison de voyager sur chaque ligne de la grille, à chaque
   // rafraîchissement — ils ne servent qu'ici, et seulement quand on ouvre.
+  // LA LISTE DES PRODUITS QUI MÉRITENT UN BAT part avec elles, et pour la même
+  // raison : elle ne sert qu'ici, une fois par session, et sans elle le bouton
+  // « BAT » manquerait sur la première fiche ouverte.
   Promise.all([
     chargerFicheComplete(id).catch(() => {}),
     chargerTaillesLogo(),
+    chargerBatProduits(),
     api('GET', `/api/requests/${id}/marquage`).catch(() => null),
-  ]).then(([, , marquage]) => {
+  ]).then(([, , , marquage]) => {
     if (ficheAtelierId !== String(id)) return;
     const fraiche = rows.find((x) => String(x.id) === String(id)) || ligne;
     completerFiche(fraiche);
@@ -8063,12 +8122,50 @@ function mountTaillesLogos() {
 // mais il appelle `closeProject()` : passer voir le planning trente secondes
 // fermerait le BAT en cours d'édition. Le conteneur est simplement caché, comme
 // les huit autres écrans.
+//
+// ON GARDE CE QU'IL REND (`batMonte`), et c'est ce qui manquait : la chaîne
+// « une fiche, un BAT » était écrite et testée depuis le 04/09 — mais personne
+// n'appelait `monterBatStudio` avec une fiche, donc `ouvrirPourFiche` ne
+// s'exécutait jamais et TOUT BAT composé ici était orphelin. Au moment de le
+// déposer, l'écran répondait « Aucune fiche CRM associée à ce projet ».
 let batLoading = null;
-function mountBat() {
-  if (!$bat || batLoading) return;
-  batLoading = Promise.all([poserFeuille('bat.css'), import('./bat/js/monter.js')])
-    .then(([, m]) => m.monterBatStudio($bat, { chrome: true }))
-    .catch((err) => { batLoading = null; reportError(err); });
+let batMonte = null;
+function mountBat(pour) {
+  if (!$bat) return null;
+  if (!batLoading) {
+    batLoading = Promise.all([poserFeuille('bat.css'), import('./bat/js/monter.js')])
+      // La fiche est annoncée AU MONTAGE quand on en a une : `demarrer()` la lit
+      // pour ouvrir directement le bon BAT, au lieu d'en poser un vierge qu'il
+      // faudrait remplacer une seconde plus tard.
+      .then(([, m]) => m.monterBatStudio($bat, { chrome: true, ...(pour || {}) }))
+      .then((mod) => { batMonte = mod; return mod; })
+      .catch((err) => { batLoading = null; reportError(err); });
+  }
+  return batLoading;
+}
+
+// OUVRIR LE BAT DE CETTE LIGNE — le geste que Charlie demande depuis la fiche.
+// Déjà monté, on ne remonte pas : on demande à l'écran de basculer sur le BAT
+// de CETTE fiche. Fermer et remonter coûterait 5,4 Mo de bibliothèques et
+// fermerait le projet en cours d'édition.
+function ouvrirBatDeLaLigne(r) {
+  if (!r || !r.id || !$bat) return;
+  const quoi = { requestId: r.id, client: r.billing_company || '', projet: r.description || '' };
+  // ⚠ LE MONTAGE D'ABORD, LE HASH ENSUITE. `mountBat` est aussi appelé par le
+  // changement de vue : si le hash partait devant, l'écran se monterait SANS
+  // fiche et poserait un BAT vierge qu'il faudrait remplacer une seconde plus
+  // tard — le défaut que `ouvrirPourFiche` existe pour éviter.
+  const dejaMonte = !!batLoading;
+  const attente = mountBat(quoi);
+  // Une clé de `VIEWS`, jamais une chaîne écrite à la main : c'est ce qui a
+  // laissé passer une barre morte le 31/08 (« vue et hash doivent rester
+  // alignés »).
+  location.hash = '#bat';
+  // Premier montage : `demarrer()` a déjà lu la fiche, il n'y a rien à demander.
+  if (!dejaMonte) return;
+  Promise.resolve(attente)
+    .then((mod) => (mod && mod.ouvrirPourFiche ? mod.ouvrirPourFiche(r.id, quoi) : null))
+    .catch(reportError);
 }
 
 // LE DEVIS CHIFFRE — meme montage paresseux. Il tire TROIS feuilles et deux

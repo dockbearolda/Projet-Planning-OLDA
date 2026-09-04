@@ -489,6 +489,21 @@ export function dessinerFicheAtelier(r, ctx) {
   // qui porte VRAIMENT une facture (`fiche.factureNumero`, posé par le serveur
   // à l'émission). Un bouton qui n'ouvre rien est un bouton qu'on apprend à ne
   // plus lire.
+  // LE BON À TIRER DE CETTE LIGNE (04/09/2026). Charlie : « à l'intérieur de
+  // chaque ligne je dois pouvoir rapidement créer un BAT ».
+  //
+  // MÊME RÈGLE QUE LA FACTURE ET LE DEVIS EN DESSOUS : il ne paraît que là où
+  // il mène quelque part — sur une ligne textile (`ctx.peutBat`). Sur une tasse
+  // ou un article de rayon, l'atelier fait toujours son BAT sur Illustrator, et
+  // un bouton qui n'ouvre rien est un bouton qu'on apprend à ne plus lire.
+  //
+  // IL DIT « OUVRIR » ET PAS « CRÉER », parce qu'il fait les deux : une fiche
+  // qui a déjà son BAT le rouvre, une fiche qui n'en a pas en ouvre un
+  // pré-rempli. C'est la même porte, et l'écran d'en face sait laquelle des
+  // deux il pousse.
+  if (ctx.peutBat && ctx.ouvrirBat) {
+    outils.append(bouton('fa-btn', 'BAT', () => ctx.ouvrirBat()));
+  }
   if (fiche && fiche.factureNumero && ctx.ouvrirFacture) {
     outils.append(bouton('fa-btn', `Facture ${fiche.factureNumero}`, () => ctx.ouvrirFacture()));
   }

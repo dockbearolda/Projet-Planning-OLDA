@@ -230,8 +230,34 @@ export async function monterBatStudio(conteneur, options = {}) {
   const { demarrer, app } = await import('./app.js');
   await demarrer();
 
+  // OUVRIR LE BAT D'UNE AUTRE FICHE SANS REMONTER L'ECRAN (04/09/2026).
+  // Le CRM garde son onglet monte : passer d'une ligne a une autre ne doit ni
+  // recharger 5,4 Mo de bibliotheques, ni fermer le projet en cours d'edition.
+  // `ouvrirPourFiche` sait deja retrouver LE BAT d'une fiche ou en creer un ;
+  // ce qui manquait, c'etait une prise pour l'appeler de l'exterieur.
+  const { ouvrirPourFiche } = await import('./projects.js');
+  const { contexteOuverture, nettoyerId: propre } = await import('./crm.js');
+
   return {
     app,
+    /**
+     * Bascule l'ecran sur le BAT de CETTE fiche du CRM.
+     * @param {string} requestId
+     * @param {{client?: string, projet?: string}} [quoi] ce que la ligne sait
+     *        du client et du projet, pour un BAT qui naitrait ici.
+     */
+    async ouvrirPourFiche(requestId, quoi = {}) {
+      const id = propre(requestId);
+      if (!id) return false;
+      // Le contexte suit la fiche COURANTE : c'est lui que `attacherContexte`
+      // lit quand un projet vierge se voit coller sa fiche.
+      contexteOuverture.requestId = id;
+      if (quoi.client) contexteOuverture.client = String(quoi.client);
+      if (quoi.projet) contexteOuverture.projet = String(quoi.projet);
+      await app.go('bat');
+      await ouvrirPourFiche(id);
+      return true;
+    },
     // Démonter rend la page à l'hôte : l'éditeur relâche ses écouteurs de
     // fenêtre et ses images, et le conteneur redevient un div ordinaire.
     demonter() {
