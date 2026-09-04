@@ -276,6 +276,15 @@
     font-family: var(--mono); font-size: .78rem; font-weight: 600; letter-spacing: .06em;
     color: var(--accent); padding-top: .18rem;
   }
+  .lot--fait .rang { color: var(--ok); }
+  .lot h3 { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  .etiq {
+    font-family: var(--mono); font-size: .66rem; font-weight: 500; letter-spacing: .1em;
+    text-transform: uppercase; padding: .1rem .42rem; border-radius: 3px;
+    border: 1px solid currentColor;
+  }
+  .etiq--fait   { color: var(--ok);   background: var(--ok-w); }
+  .etiq--reste  { color: var(--warn); background: var(--warn-w); }
   .lot .rang::after { content: ""; display: block; width: 1px; height: calc(100% - .4rem); margin: .55rem 0 0 .55rem; background: var(--rule); }
   .lot h3 { margin-bottom: .35rem; }
   .lot p { font-size: .935rem; color: var(--ink-2); }
@@ -335,12 +344,12 @@
     <div class="reperage" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     <p class="surtitre">Planning OLDA · Cahier du 4 septembre 2026</p>
     <h1>Trois documents par ligne</h1>
-    <p class="chapo">Chaque ligne du planning porte son bon à tirer, son devis et sa facture — et le BAT arrive pré-rempli avec les t-shirts que Mélina vient de saisir. Voici ce qui existe déjà, ce qui manque vraiment, et dans quel ordre le construire.</p>
+    <p class="chapo">Chaque ligne du planning porte son bon à tirer, son devis et sa facture — et le BAT arrive pré-rempli avec les t-shirts que Mélina vient de saisir. Le cahier de construction, et où en est le chantier.</p>
     <ul class="etat">
-      <li class="t-ok"><b>3</b> défauts corrigés</li>
-      <li class="t-ok"><b>151</b> tests verts</li>
-      <li class="t-warn"><b>5</b> lots à construire</li>
-      <li><b>Rien</b> n'est codé de la fonctionnalité</li>
+      <li class="t-ok"><b>4 lots sur 5</b> construits et vérifiés</li>
+      <li class="t-ok"><b>155</b> tests verts</li>
+      <li class="t-ok"><b>4</b> défauts corrigés</li>
+      <li class="t-warn">Reste le <b>lot 3</b> — le PDF déposé</li>
       <li><b>Rien</b> n'est parti sur Railway</li>
     </ul>
   </header>
@@ -580,23 +589,23 @@
       <section id="lots">
         <p class="eyebrow">07 · La construction</p>
         <h2>Les cinq lots, dans l'ordre</h2>
-        <p class="mesure">L'ordre n'est pas négociable : chaque lot a besoin du précédent. Le premier est aussi celui qui rend le plus vite — il remplit la fiche atelier et le ticket, que le BAT soit construit ou non.</p>
+        <p class="mesure">L'ordre n'est pas négociable : chaque lot a besoin du précédent. <strong>Quatre sont livrés</strong>, chacun vérifié dans le vrai navigateur, de la saisie au comptoir jusqu'à la feuille du BAT. Reste le lot&nbsp;3 — le seul qui demande d'écrire un second rendu du papier.</p>
 
         <div class="lots" style="margin-top:1.5rem">
 
-          <article class="lot">
+          <article class="lot lot--fait">
             <div class="rang">LOT 1</div>
             <div>
-              <h3>La ligne porte enfin ce que Mélina a saisi</h3>
+              <h3>La ligne porte enfin ce que Mélina a saisi <span class="etiq etiq--fait">Livré</span></h3>
               <p>Les deux écrans flash envoient les <b>tailles</b> et les <b>faces</b> avec le reste. Aucun écran nouveau, aucune migration. C'est le socle : sans lui, rien ne peut se pré-remplir. Bénéfice immédiat et indépendant du BAT — la fiche atelier et le ticket cessent d'être vides sur les dossiers du comptoir.</p>
               <p class="teste"><b>Ce qui se teste</b> Une vente à 3 articles, tailles et faces remplies → les 3 lignes les portent, et le ticket atelier les imprime.</p>
             </div>
           </article>
 
-          <article class="lot">
+          <article class="lot lot--fait">
             <div class="rang">LOT 2</div>
             <div>
-              <h3>Une seule fabrique de lignes — le devis découpe</h3>
+              <h3>Une seule fabrique de lignes — le devis découpe <span class="etiq etiq--fait">Livré</span></h3>
               <p>La partie qui transforme des articles en lignes de planning est <b>extraite une fois</b>, et les deux écrans l'appellent. « 1 article = 1 ligne » devient vrai par construction, pas par deux implémentations qui se ressemblent. La reprise d'un devis repart du numéro : un article retiré en V2 archive sa ligne, un article ajouté en crée une. <b>On ne découpe pas le passé.</b></p>
               <p class="teste"><b>Ce qui se teste</b> Un devis à 3 articles → 3 lignes, somme exacte du TTC. Une V2 qui retire un article → 2 lignes vivantes, 1 archivée, 0 doublon. Deux postes qui enregistrent en même temps → 3 lignes, pas 6.</p>
             </div>
@@ -605,25 +614,25 @@
           <article class="lot">
             <div class="rang">LOT 3</div>
             <div>
-              <h3>Le PDF se dépose tout seul</h3>
+              <h3>Le PDF se dépose tout seul <span class="etiq etiq--reste">À construire</span></h3>
               <p><b>Le lot le plus cher, et il faut le dire.</b> Les écrans impriment ; ils ne fabriquent aucun octet de PDF. La solution retenue : un <b>troisième rendu du même modèle</b> — le devis existe déjà comme objet pur, mis en HTML pour l'écran ; on ajoute une mise en PDF. La grammaire du papier ne se réécrit nulle part. L'outil est déjà là, hébergé chez nous, et c'est celui du BAT. La facture d'abord : elle est plus simple, et c'est elle qui part chez un comptable.</p>
               <p class="teste"><b>Ce qui se teste</b> Émettre une facture → la pastille de chaque ligne est remplie, le PDF s'ouvre, et son total est celui du papier imprimé. Un test compare les deux rendus sur le même modèle, pour qu'ils ne divergent jamais.</p>
             </div>
           </article>
 
-          <article class="lot">
+          <article class="lot lot--fait">
             <div class="rang">LOT 4</div>
             <div>
-              <h3>La ligne ouvre son BAT</h3>
+              <h3>La ligne ouvre son BAT <span class="etiq etiq--fait">Livré</span></h3>
               <p>Le bouton apparaît sur les lignes textile, et il ouvre <b>le</b> BAT de cette ligne — pas un nouveau. Toute la mécanique existe déjà et attend son allumage ; ce lot est le plus court des cinq.</p>
               <p class="teste"><b>Ce qui se teste</b> Deux passages sur la même ligne ouvrent le même projet — c'est précisément le défaut que le code existant a été écrit pour éviter. Une ligne de tasses n'a pas de bouton.</p>
             </div>
           </article>
 
-          <article class="lot">
+          <article class="lot lot--fait">
             <div class="rang">LOT 5</div>
             <div>
-              <h3>Le pré-remplissage, et la fin de vie</h3>
+              <h3>Le pré-remplissage, et la fin de vie <span class="etiq etiq--fait">Livré</span></h3>
               <p>La jointure du §04, la création automatique sur une ligne textile, et la purge à l'entrée en « Paiement &amp; clôture ». La purge est un confort : un magasin qui tousse ne doit jamais empêcher de solder une commande.</p>
               <p class="teste"><b>Ce qui se teste</b> 30 t-shirts K3025 Light Olive Green, 12 M / 18 L, Cœur + Dos → le BAT s'ouvre sur le bon produit, la bonne couleur, les bonnes quantités, deux zones nommées, aucun logo. Un dossier soldé ne laisse plus ni projet ni images orphelines, et garde son PDF.</p>
             </div>
