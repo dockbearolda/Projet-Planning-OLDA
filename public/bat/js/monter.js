@@ -84,8 +84,10 @@ const MODULES = [
   'js/producttype.js', 'js/mockup.js', 'js/mockuppixels.js', 'js/batlayout.js',
 ];
 
-// Les quatre écrans, tels que `app.go()` les nomme et tels que l'ossature les
-// pose (`#screen-<id>`). Écrit ici parce que c'est ici que l'hôte les nomme.
+// Les écrans, tels que `app.go()` les nomme et tels que l'ossature les pose
+// (`#screen-<id>`). Écrit ici parce que c'est ici que l'hôte les nomme — et
+// cette liste EST le contrat : elle en portait quatre jusqu'à la PR #209, elle
+// en porte deux, et `options.ecran` refuse tout nom qui n'y figure pas.
 const ECRANS = new Set(['bat', 'produits']);
 
 function precharger(base) {
@@ -127,8 +129,9 @@ function poserFeuilles(base) {
  * @param {'bat'|'produits'} [options.ecran]
  *                                       l'écran sur lequel ouvrir. Défaut : `bat`.
  *                                       C'est ce qui permet de monter LE MÊME code
- *                                       à trois endroits du CRM — la fiche, et deux
- *                                       pages de réglages — sans le dupliquer.
+ *                                       à plusieurs endroits du CRM — la feuille sur
+ *                                       une fiche, le catalogue ailleurs — sans le
+ *                                       dupliquer. La liste fait foi : `ECRANS`.
  * @param {string}  [options.base]       racine des ressources (défaut : ce module)
  * @returns {Promise<{app: object, demonter: () => void}>}
  */

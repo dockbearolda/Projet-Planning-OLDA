@@ -8050,12 +8050,14 @@ function mountTaillesLogos() {
 // serveur tant que personne n'a cliqué sur l'onglet — l'ouverture d'un poste
 // pèse 109 Ko, et ce chiffre est un budget, pas un constat.
 //
-// `chrome: true` : on GARDE sa rangée d'onglets (Projets · Bon À Tirer ·
-// Produits · Réglages). L'option existe pour le cas où le CRM monterait chaque
-// écran à sa place — un dans la fiche, deux dans les Réglages — et c'est ce que
-// recommande son INTEGRATION.md. Mais Charlie a demandé UN onglet dans la
-// barre : dans un seul écran, sans cette rangée, trois de ses quatre écrans
-// seraient inatteignables.
+// `chrome: true` : on GARDE sa rangée d'onglets (Feuille · Produits). Ils
+// n'étaient QUATRE que jusqu'à la PR #209 — la liste des projets et les
+// réglages ont quitté l'écran, l'identité qui signe le PDF étant déjà un
+// réglage du CRM. L'option `chrome: false` existe pour le cas où le CRM
+// monterait chaque écran à sa place, et c'est ce que recommande son
+// INTEGRATION.md. Mais Charlie a demandé UN onglet dans la barre : dans un
+// seul écran, sans cette rangée, « Produits » serait inatteignable — et c'est
+// par lui qu'on ajoute une référence qu'on n'a pas encore.
 //
 // ON NE DÉMONTE PAS EN QUITTANT L'ONGLET. `demonter()` existe et fonctionne,
 // mais il appelle `closeProject()` : passer voir le planning trente secondes
