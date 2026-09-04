@@ -225,10 +225,16 @@ delete process.env.APP_PASSWORD;
     'un devis à UN article pose sa production sur la ligne — la fiche atelier n’est plus vide');
   assert.strictEqual(lDevis.fiche.prod.ref, 'NS300');
 
-  // --- UN DEVIS À PLUSIEURS ARTICLES N'EN POSE AUCUNE ----------------------
-  // Tant qu'un devis à trois articles n'ouvre qu'UNE ligne, y écrire le premier
-  // article ferait passer la ligne entière pour lui. Une production à moitié
-  // décrite est une production FAUSSE : mieux vaut aucune.
+  // --- UN DEVIS À PLUSIEURS ARTICLES : UNE LIGNE PAR ARTICLE --------------
+  // Depuis le lot 2, un devis découpe comme une vente : chaque article a SA
+  // ligne, donc SA production. La réserve du lot 1 (« à plusieurs sur une seule
+  // ligne, on n'écrit rien ») n'a plus d'objet — il n'y a plus de ligne qui
+  // porterait trois articles.
+  const troisProd = [
+    prodDeLigne({ reference: 'NS300', couleur: 'Ocean Blue', parTaille: { S: 30 }, faces: 'Poitrine' }),
+    prodDeLigne({ reference: 'KP035', couleur: 'Navy', taillesLibres: [{ nom: 'Unique', qte: 10 }], faces: 'Avant' }),
+    prodDeLigne({ reference: 'SAC01', couleur: 'Naturel', taillesLibres: [{ nom: 'Unique', qte: 10 }], faces: 'Recto' }),
+  ];
   const devis3 = await call('POST', '/api/devis', {
     client: { nom: 'HOTEL TROIS ARTICLES' }, jour: '2026-09-04', ttc: 900,
     lignes: [
@@ -236,12 +242,18 @@ delete process.env.APP_PASSWORD;
       { designation: 'Casquettes', quantite: 10, unitaireHt: 15, totalHt: 150 },
       { designation: 'Sacs', quantite: 10, unitaireHt: 15, totalHt: 150 },
     ],
-    prod: [unSeul, unSeul, unSeul],
+    prod: troisProd,
   });
   assert.strictEqual(devis3.status, 201);
-  const lDevis3 = await ligneDe(devis3.body.id);
-  assert.ok(!('prod' in lDevis3.fiche),
-    'à plusieurs articles sur une ligne, la clé n’est pas écrite du tout — pas même à null');
+  assert.strictEqual(devis3.body.lot.total, 3, 'trois articles font trois lignes');
+
+  const trois = await Promise.all(devis3.body.lot.ids.map(ligneDe));
+  assert.deepStrictEqual(trois.map((r) => r.product), ['T-shirts', 'Casquettes', 'Sacs'],
+    'chaque ligne porte SA désignation, pas « T-shirts + 2 autres »');
+  assert.deepStrictEqual(trois.map((r) => r.fiche.prod.ref), ['NS300', 'KP035', 'SAC01'],
+    'et SA production — trois références, trois séries de tailles');
+  assert.deepStrictEqual(trois.map((r) => r.fiche.devisArticle), [0, 1, 2],
+    'le rang dit quelle ligne du devis cette ligne du planning représente');
 
   console.log('✓ ce que la vendeuse tape arrive : tailles, bulles et faces jusqu’au dossier, sans toucher au prix');
   process.exit(0);

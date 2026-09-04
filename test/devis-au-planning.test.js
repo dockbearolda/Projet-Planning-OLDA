@@ -76,18 +76,34 @@ delete process.env.APP_PASSWORD;
   assert.match(r.body.numero, /^DEV-26\.09\.01-\d{3}$/, `numéro inattendu : ${r.body.numero}`);
   const numero = r.body.numero;
 
-  r = await call('GET', `/api/requests/${id}`);
-  const ligne = r.body;
+  // ⚠ UN ARTICLE = UNE LIGNE, DEPUIS LE 04/09 (Charlie). Ce devis à deux
+  // articles ouvrait UNE ligne « T-shirt Unisexe Bio + 1 autre » ; il en ouvre
+  // deux, comme la même vente au comptoir. Une étape appartient à la LIGNE :
+  // tant que le devis tenait sur une seule, il était tout entier en attente ou
+  // tout entier en production, jamais les deux.
+  assert.strictEqual(r.body.lot.total, 2, 'deux articles font deux lignes');
+  const idsDevis = r.body.lot.ids;
+  const groupe = await Promise.all(idsDevis.map(async (x) => (await call('GET', `/api/requests/${x}`)).body));
+  const ligne = groupe[0];
   assert.strictEqual(ligne.order_kind, 'demande',
     'la nature reste « demande » : le client n’a rien signé');
-  assert.strictEqual(Number(ligne.project_value), 502,
-    'l’étape dit qu’on a chiffré — une colonne Prix vide la contredirait');
+  // LA SOMME DES LIGNES VAUT EXACTEMENT LE DEVIS. Sinon la colonne Prix du
+  // planning ment, et toute somme faite dessus ment avec elle. L'écart
+  // d'arrondi se pose sur la première ligne (partsDuTicket, comme au comptoir).
+  const somme = groupe.reduce((t, l) => t + Number(l.project_value), 0);
+  assert.strictEqual(Math.round(somme * 100) / 100, 502,
+    'la somme des lignes vaut le montant du devis, au centime');
+  assert.ok(Number(ligne.project_value) > Number(groupe[1].project_value),
+    'et chaque ligne porte SA part, au prorata de son HT');
   assert.strictEqual(ligne.billing_company, 'Aloha Beach');
-  assert.strictEqual(ligne.quantity, 60, 'la quantité est celle de toutes les lignes');
-  // CE QU'ON PRODUIT, EN UN MOT : la colonne « Article » du planning fait deux
-  // cents pixels — y déverser quatre désignations n'y rend rien lisible, et le
-  // détail complet est de toute façon dans la fiche.
-  assert.strictEqual(ligne.product, 'T-shirt Unisexe Bio + 1 autre');
+  // CHAQUE LIGNE PORTE SA DÉSIGNATION ET SA QUANTITÉ — plus « + 1 autre »,
+  // qui ne disait à personne ce qu'IL avait à faire.
+  assert.deepStrictEqual(groupe.map((l) => l.product), ['T-shirt Unisexe Bio', 'Transport Chronopost']);
+  assert.deepStrictEqual(groupe.map((l) => l.quantity), [30, 30]);
+  assert.deepStrictEqual(groupe.map((l) => l.fiche.devisArticle), [0, 1],
+    'le rang dit quelle ligne du devis chaque ligne du planning représente');
+  assert.deepStrictEqual(groupe.map((l) => l.fiche.lot.total), [2, 2],
+    'et le lot les relie, comme un ticket du comptoir');
   assert.strictEqual(ligne.description, 'STAFF');
   // UNE DATE SOUHAITÉE N'EST PAS UNE PROMESSE : sans elle, pas d'échéance —
   // sinon le dossier paraît en retard dès le lendemain alors que personne n'a
@@ -175,8 +191,9 @@ delete process.env.APP_PASSWORD;
   assert.strictEqual(r.status, 200);
 
   r = await call('GET', `/api/requests/${id}`);
-  assert.strictEqual(Number(r.body.project_value), 502,
-    'le montant du devis ne bouge pas quand un tarif de catalogue change');
+  const partAvant = Number(r.body.project_value);
+  assert.strictEqual(partAvant, 445.88,
+    'le montant de la ligne ne bouge pas quand un tarif de catalogue change');
   assert.deepStrictEqual(r.body.fiche.devis.lignes, archive.lignes,
     'et son détail non plus : le devis est figé dans sa fiche');
 
@@ -185,7 +202,7 @@ delete process.env.APP_PASSWORD;
   await call('PUT', '/api/tarifs-tasse',
     r.body.map((t) => (t.categorie === 'produit' ? { ...t, prixVenteTtc: 77 } : t)));
   r = await call('GET', `/api/requests/${id}`);
-  assert.strictEqual(Number(r.body.project_value), 502,
+  assert.strictEqual(Number(r.body.project_value), partAvant,
     'ni un tarif tasse : ce qui est chiffré est chiffré');
 
   // -------------------------------------------------------------------------
@@ -210,12 +227,25 @@ delete process.env.APP_PASSWORD;
     let v = await call('POST', '/api/devis', V2);
     assert.strictEqual(v.status, 200, JSON.stringify(v.body));
     assert.strictEqual(v.body.reprise, true, 'le serveur dit qu’il a repris, pas créé');
+    // LE MÊME DOSSIER, MÊME RENOMMÉ. « T-shirt Unisexe Bio » devient « T-shirt
+    // STAFF » : aucune désignation ne correspond, mais c'est le même travail
+    // sous un autre nom. L'appariement retombe donc sur le RANG plutôt que
+    // d'archiver la ligne et sa production pour un changement de libellé.
     assert.strictEqual(v.body.id, id, 'et c’est le MÊME dossier');
     assert.strictEqual(v.body.version, 2);
     assert.match(v.body.numero, /-V2$/, 'le numéro garde sa racine et gagne son rang');
 
     const apres = (await call('GET', '/api/requests')).body.length;
-    assert.strictEqual(apres, avant, 'une reprise n’ouvre AUCUN dossier de plus');
+    // UNE REPRISE N'OUVRE AUCUN DOSSIER DE PLUS — c'est la règle, et elle tient.
+    // Elle peut en RETIRER : la V2 n'a plus qu'un article, la ligne du transport
+    // sort donc du planning. Elle est ARCHIVÉE, pas supprimée : le client a eu
+    // une feuille avec ce transport dessus.
+    assert.strictEqual(v.body.archivees, 1, 'l’article que la V2 abandonne quitte le planning');
+    assert.strictEqual(apres, avant - 1, 'une reprise n’ouvre aucun dossier, et retire ce qu’on a retiré');
+    const corbeille = (await call('GET', '/api/requests/corbeille')).body;
+    assert.ok((Array.isArray(corbeille) ? corbeille : corbeille.lignes || [])
+      .some((l) => l.product === 'Transport Chronopost'),
+    'archivé, jamais supprimé : la ligne garde son journal et ses PDF');
 
     const f = (await call('GET', `/api/requests/${id}`)).body;
     assert.strictEqual(f.fiche.version, 2);

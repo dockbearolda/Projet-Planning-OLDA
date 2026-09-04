@@ -2407,9 +2407,19 @@ async function enregistrer() {
     // La reprise est FAITE : un second clic ne doit pas fabriquer une V3 de la
     // même modification.
     repriseDe = null;
+    // COMBIEN DE LIGNES CE DEVIS A OUVERTES, ET L'ÉCRAN LE DIT. Depuis le
+    // 04/09 un article fait une ligne : sans ce compte, on croit avoir
+    // enregistré un devis et on en trouve trois au planning. Et une reprise
+    // qui RETIRE un article le dit aussi — une ligne qui quitte le planning
+    // sans un mot, c'est un travail qu'on cherche le lendemain.
+    const combien = r && r.lot && r.lot.total > 1 ? ` — ${r.lot.total} lignes` : '';
+    const sorties = r && r.archivees
+      ? ` (${r.archivees} article${r.archivees > 1 ? 's' : ''} retiré${r.archivees > 1 ? 's' : ''})` : '';
     dire(r && r.reprise
-      ? `Version ${r.version} enregistrée sur le dossier`
-      : (r && r.dejaEnregistre ? 'Ce devis était déjà au planning' : 'Devis enregistré — dans « À trier »'),
+      ? `Version ${r.version} enregistrée sur le dossier${combien}${sorties}`
+      : (r && r.dejaEnregistre
+        ? 'Ce devis était déjà au planning'
+        : `Devis enregistré — dans « À trier »${combien}`),
     'is-ok');
     peindre();
   } catch (err) {

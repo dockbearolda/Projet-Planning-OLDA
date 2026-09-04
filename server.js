@@ -4792,12 +4792,66 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     ? borner(`${lignes[0].designation} + ${lignes.length - 1} autre${lignes.length > 2 ? 's' : ''}`, 200)
     : lignes[0].designation;
 
-  // Traduit AVANT la fiche, pour que la clé puisse ne pas exister du tout (voir
-  // le commentaire de `prod` plus bas). Une reprise V2/V3 le reprend par le
-  // `...fiche` de `neuve` : elle porte donc le `prod` de SA version, pas celui
-  // de la précédente — un devis qui passe d'un article à trois cesse d'en avoir
-  // un, et c'est juste.
-  const prodDevis = prodDuComptoir(Array.isArray(b.prod) ? b.prod[0] : null);
+  // ===========================================================================
+  // UN ARTICLE, UNE LIGNE — comme la vente directe (04/09/2026)
+  // ===========================================================================
+  // Charlie, 04/09 : « 1 article = 1 ligne partout ». Un devis à trois articles
+  // n'ouvrait qu'UNE ligne au planning, quand la même vente au comptoir en
+  // ouvrait trois. Deux formes pour les mêmes faits — et surtout : une étape
+  // appartient à la LIGNE. Tant que le devis tient sur une ligne, il est tout
+  // entier en attente ou tout entier en production, jamais les deux.
+  //
+  // LE DÉCOUPAGE EST CELUI DU COMPTOIR, PAS UN SECOND. `partsDuTicket` fait la
+  // seule chose qui compte ici : la somme des lignes vaut EXACTEMENT le montant
+  // du devis, sinon la colonne Prix du planning ment et toute somme faite
+  // dessus ment avec elle. L'écart d'arrondi se pose sur la première ligne.
+  //
+  // LA PART D'UN ARTICLE EST AU PRORATA DE SON HT, et pas de sa quantité : un
+  // devis porte un ajustement global et un arrondi commercial qui ne se
+  // répartissent pas à la pièce. Une somme de HT nulle (toutes les lignes « à
+  // chiffrer ») ne se répartit pas du tout — le montant reste sur la première,
+  // et `partsDuTicket` refusera de découper si ça ne tombe pas juste.
+  const prodBrut = Array.isArray(b.prod) ? b.prod : [];
+  const sommeHt = lignes.reduce((t, l) => t + l.totalHt, 0);
+  const articles = lignes.map((l, i) => ({
+    label: l.designation,
+    qte: l.quantite > 0 ? l.quantite : null,
+    montant: sommeHt > 0
+      ? Math.round(((prix.valeur * l.totalHt) / sommeHt) * 100) / 100
+      : (i === 0 ? prix.valeur : 0),
+    prod: prodDuComptoir(prodBrut[i]),
+  }));
+  // `null` = on ne sait pas découper proprement. Une ligne juste vaut mieux que
+  // quatre fausses — c'est la règle du comptoir, à l'identique.
+  const parts = articles.length > 1 ? partsDuTicket(articles, prix.valeur) : null;
+  const lot = articles.length > 1 && parts ? articles : [];
+  const nbLignes = lot.length || 1;
+
+  // LE GROUPE — CE QUI RELIE LES N LIGNES, ET LEURS VERSIONS.
+  // Le NUMÉRO ne peut pas servir : il gagne un « -V2 » à chaque reprise (voir
+  // plus haut), donc il change là où le lien doit tenir. Le groupe est la
+  // RACINE du numéro, posée à la V1 et recopiée telle quelle ensuite. Lisible
+  // en base, et déductible d'un dossier d'avant : sa racine est la même.
+  const groupe = String(numero).replace(/-V\d+$/, '');
+
+  // Ce que CHAQUE ligne du devis porte en propre.
+  const lignesDuDevis = nbLignes > 1
+    ? lot.map((a, i) => ({
+      produit: a.label,
+      quantite: a.qte,
+      valeur: parts[i],
+      prod: a.prod,
+      rang: i,
+    }))
+    : [{
+      produit,
+      quantite,
+      valeur: prix.valeur,
+      // Un devis d'un seul article n'a pas de lot, mais il a bien un article :
+      // sa ligne mérite la même lecture que les trois d'un devis groupé.
+      prod: articles.length === 1 ? articles[0].prod : null,
+      rang: 0,
+    }];
 
   const fiche = {
     kind: 'devis-v1',
@@ -4814,24 +4868,10 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     dueHeure: /^\d{2}:\d{2}$/.test(String(b.dueHeure || '')) ? b.dueHeure : null,
     maquette: b.maquette === true,
     noteInterne: borner(b.noteInterne, 600),
-    // CE QU'IL Y A À PRODUIRE (04/09/2026). Un dossier né d'un devis n'en
-    // portait RIEN : la fiche atelier s'ouvrait vide, le ticket sortait sans
-    // les tailles, et le BAT n'avait rien à se mettre. Le détail vivait dans
-    // `devis.lignes[]`, en texte, sous une forme qu'aucun de ces trois écrans
-    // ne lit — ils lisent tous `fiche.prod`, et lui seul.
-    //
-    // ⚠ SEULEMENT SUR UN DEVIS À UN SEUL ARTICLE, et c'est la même règle que
-    // la route du comptoir applique déjà à un panier d'un article : à
-    // plusieurs, le dossier n'ouvre pour l'instant qu'UNE ligne au planning, et
-    // y écrire le premier article ferait passer la ligne entière pour lui.
-    // Deux articles sur une ligne, ce n'est pas une production à moitié
-    // décrite, c'est une production FAUSSE. Le découpage en une ligne par
-    // article lève cette réserve — l'écran envoie déjà les N.
-    //
-    // `prodDuComptoir` rend `null` sur un article qui ne porte aucun fait : on
-    // n'écrit alors PAS la clé, plutôt qu'un `prod: null` que chaque poste
-    // recevrait à chaque rafraîchissement pour ne rien dire.
-    ...(lignes.length === 1 && prodDevis ? { prod: prodDevis } : {}),
+    // LE GROUPE : ce qui relie les N lignes de ce devis, et ses versions. Le
+    // numéro, lui, gagne un « -V2 » à chaque reprise et ne peut donc pas servir
+    // de lien. Voir le commentaire de `groupe` plus haut.
+    devisGroupe: groupe,
     // LE DEVIS TEL QU'IL A ÉTÉ IMPRIMÉ. C'est l'archive : elle ne se retouche
     // pas, et c'est elle qu'on ressort quand le client revient avec sa feuille.
     devis: {
@@ -4875,15 +4915,97 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
     ].filter(([, v]) => v).map(([k, v]) => ({ k, v })),
   };
 
-  // UNE REPRISE ÉCRIT SUR LE DOSSIER, ELLE N'EN OUVRE PAS UN SECOND.
+  // ===========================================================================
+  // ÉCRIRE LE DEVIS AU PLANNING — N lignes, en une transaction
+  // ===========================================================================
+  // TOUT OU RIEN. Trois `INSERT` autonomes, c'est un devis qui peut rester à
+  // moitié en base si le réseau tombe entre le deuxième et le troisième : on
+  // verrait un échec, on réessaierait, et les articles manquants n'entreraient
+  // jamais. C'est la même règle que le comptoir, et pour la même raison.
+  const ecrireLignes = async (cx, position, ficheCommune, projetId) => {
+    const ids = [];
+    for (let i = 0; i < lignesDuDevis.length; i += 1) {
+      const l = lignesDuDevis[i];
+      const ficheLigne = ficheDeLigne(ficheCommune, l);
+      const { rows: r } = await cx.query(
+        `INSERT INTO requests
+           (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
+            contact_referent, contact_phone, contact_email, quantity, product, description,
+            deadline, position, fiche, project_value, project_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         RETURNING id`,
+        [
+          famille, sousEtape, 'demande', responsable, 1, clientType, nomDossier,
+          borner(cl.contact, 120), borner(cl.tel, 40), borner(cl.email, 160),
+          l.quantite, l.produit, borner(b.projet, DESCRIPTION_MAX),
+          // UNE DATE SOUHAITÉE N'EST PAS UNE PROMESSE. Sans elle le dossier n'a
+          // pas d'échéance : la dater du jour le ferait paraître en retard dès
+          // demain alors que personne n'a rien promis au client.
+          isDay(b.dueDate) ? b.dueDate : null,
+          // Les rangs se suivent : les lignes d'un même devis restent CONTIGUËS
+          // dans « À trier ». L'écart de 1000 entre deux dossiers laisse la
+          // place aux déplacements à la main.
+          Number(position) + i, JSON.stringify(ficheLigne), l.valeur, projetId,
+        ],
+      );
+      ids.push(r[0].id);
+    }
+    return ids;
+  };
+
+  // CE QUE CHAQUE LIGNE PORTE EN PROPRE, par-dessus la fiche commune.
+  function ficheDeLigne(ficheCommune, l) {
+    return {
+      ...ficheCommune,
+      // LE RANG DE L'ARTICLE dans le devis. C'est lui qui dit quelle ligne de
+      // `devis.lignes[]` cette ligne du planning représente — sans quoi une
+      // fiche de trois articles ne saurait pas laquelle elle décrit.
+      devisArticle: l.rang,
+      ...(nbLignes > 1 ? { lot: { ref: numero, rang: l.rang + 1, total: nbLignes } } : {}),
+      // `prodDuComptoir` rend `null` sur un article qui ne porte aucun fait : on
+      // n'écrit alors PAS la clé, plutôt qu'un `prod: null` que chaque poste
+      // recevrait à chaque rafraîchissement pour ne rien dire.
+      ...(l.prod ? { prod: l.prod } : {}),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // UNE REPRISE RÉÉCRIT LE GROUPE, ELLE N'OUVRE PAS UN SECOND DOSSIER
+  // ---------------------------------------------------------------------------
+  // Un devis n'est plus UNE ligne : c'est un GROUPE de lignes qui portent le
+  // même `fiche.devisGroupe`. Une V2 n'a donc pas à écrire sur « le » dossier,
+  // elle a à faire coïncider le groupe avec la nouvelle version.
+  //
+  // L'APPARIEMENT SE FAIT PAR LA DÉSIGNATION, pas par le rang. Retirer
+  // l'article du milieu décalerait tout : la ligne des casquettes se mettrait à
+  // décrire les sacs, en gardant son étape, son BAT et ses pièces jointes. Une
+  // ligne qui change d'article sans changer d'identité, c'est le genre d'erreur
+  // qu'on ne découvre qu'à la production.
+  //
+  // CE QUI SORT DE LA V2 EST ARCHIVÉ, JAMAIS SUPPRIMÉ. Le client a eu une
+  // feuille avec cet article dessus ; six mois plus tard il faut pouvoir dire
+  // ce qu'on lui avait chiffré.
   if (repriseId) {
-    const { rows: anc } = await pool.query('SELECT fiche FROM requests WHERE id = $1', [repriseId]);
-    const ficheAnc = anc.length && anc[0].fiche && typeof anc[0].fiche === 'object' ? anc[0].fiche : {};
+    const { rows: anciennes } = await pool.query(
+      `SELECT id, product, fiche FROM requests
+        WHERE fiche->>'devisGroupe' = $1 AND ${VIVANTES_NU}
+        ORDER BY position`,
+      [groupe],
+    );
+    // REPLI POUR LES DEVIS D'AVANT LE GROUPE : ils n'ont pas de
+    // `devisGroupe`, et ils tiennent de toute façon sur une seule ligne.
+    // On reprend celle-là, et elle gagne le groupe au passage.
+    const groupeAnc = anciennes.length
+      ? anciennes
+      : (await pool.query(`SELECT id, product, fiche FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [repriseId])).rows;
+    if (!groupeAnc.length) return res.status(404).json({ error: 'dossier introuvable' });
+
+    const ficheAnc = groupeAnc[0].fiche && typeof groupeAnc[0].fiche === 'object' ? groupeAnc[0].fiche : {};
     const version = Math.max(1, Math.round(Number(ficheAnc.version) || 1)) + 1;
     // LES VERSIONS PASSÉES, DE LA PLUS RÉCENTE À LA PLUS ANCIENNE, et bornées :
     // une fiche qu'on reprend vingt fois ne doit pas devenir un objet d'un méga.
     const passees = Array.isArray(ficheAnc.devisPassees) ? ficheAnc.devisPassees : [];
-    const neuve = {
+    const ficheV = {
       ...fiche,
       version,
       creeLe: ficheAnc.creeLe || fiche.creeLe,
@@ -4892,50 +5014,138 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
         ? [{ version: Math.max(1, Number(ficheAnc.version) || 1), devis: ficheAnc.devis }, ...passees]
         : passees).slice(0, 20),
     };
-    await pool.query(
-      `UPDATE requests SET billing_company = $2, contact_referent = $3, contact_phone = $4,
-              contact_email = $5, quantity = $6, product = $7, description = $8,
-              deadline = $9, fiche = $10, project_value = $11, client_type = $12
-       WHERE id = $1`,
-      [
-        repriseId, nomDossier, borner(cl.contact, 120), borner(cl.tel, 40),
-        borner(cl.email, 160), quantite, produit, borner(b.projet, DESCRIPTION_MAX),
-        isDay(b.dueDate) ? b.dueDate : null, JSON.stringify(neuve), prix.valeur, clientType,
-      ],
-    );
-    // LE JOURNAL DIT QU'UNE VERSION EST NÉE. Sans lui, le montant du dossier
-    // change tout seul entre deux relectures et personne ne sait pourquoi.
-    await pool.query(
-      'INSERT INTO request_events (request_id, field, value_before, value_after, who) VALUES ($1,$2,$3,$4,$5)',
-      [repriseId, 'devis',
-        `V${version - 1}${ficheAnc.devis && ficheAnc.devis.ttc != null ? ` — ${ficheAnc.devis.ttc} €` : ''}`,
-        `V${version} — ${prix.valeur} €`, quiDemande(req)],
-    ).catch(() => { /* le journal est un confort, il ne fait pas échouer la reprise */ });
-    broadcast({ kind: 'update', ids: [repriseId] });
-    return res.json({ id: repriseId, stage: null, numero, version, reprise: true });
+
+    // L'APPARIEMENT SE FAIT EN DEUX PASSES, et l'ordre compte.
+    //   1. PAR LA DÉSIGNATION, réduite sans casse ni accent — la règle de
+    //      rapprochement de noms du reste de l'application. C'est elle qui fait
+    //      qu'en retirant l'article du milieu, les deux qui restent gardent
+    //      LEUR ligne, avec leur étape, leur BAT et leurs pièces jointes.
+    //   2. PAR LE RANG, pour ce qui reste. Un article RENOMMÉ en V2 (« T-shirt
+    //      Unisexe Bio » devient « T-shirt STAFF ») est le même travail sous un
+    //      autre nom : lui donner une ligne neuve et archiver l'ancienne
+    //      perdrait son BAT et son étape pour un changement de libellé.
+    // Ce qui n'est apparié par NI l'une NI l'autre est un article vraiment
+    // nouveau, et il naît.
+    const cleArticle = (v) => String(v == null ? '' : v).trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const libres = groupeAnc.slice();
+    const apparie = lignesDuDevis.map((l) => {
+      const i = libres.findIndex((o) => cleArticle(o.product) === cleArticle(l.produit));
+      return i >= 0 ? libres.splice(i, 1)[0] : null;
+    });
+    for (let i = 0; i < apparie.length && libres.length; i += 1) {
+      if (!apparie[i]) apparie[i] = libres.shift();
+    }
+
+    const touches = [];
+    const cx = await pool.connect();
+    try {
+      await cx.query('BEGIN');
+      const { rows: posRows } = await cx.query(
+        'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
+      );
+      let rangNeuf = 0;
+      for (let i = 0; i < lignesDuDevis.length; i += 1) {
+        const l = lignesDuDevis[i];
+        const ancienne = apparie[i];
+        const ficheLigne = ficheDeLigne(ficheV, l);
+        if (ancienne) {
+          await cx.query(
+            `UPDATE requests SET billing_company = $2, contact_referent = $3, contact_phone = $4,
+                    contact_email = $5, quantity = $6, product = $7, description = $8,
+                    deadline = $9, fiche = $10, project_value = $11, client_type = $12
+             WHERE id = $1`,
+            [
+              ancienne.id, nomDossier, borner(cl.contact, 120), borner(cl.tel, 40),
+              borner(cl.email, 160), l.quantite, l.produit, borner(b.projet, DESCRIPTION_MAX),
+              isDay(b.dueDate) ? b.dueDate : null, JSON.stringify(ficheLigne), l.valeur, clientType,
+            ],
+          );
+          touches.push(ancienne.id);
+        } else {
+          // UN ARTICLE AJOUTÉ EN V2 NAÎT, il ne se greffe pas sur une ligne qui
+          // décrivait autre chose. Il prend sa place à la suite du groupe.
+          const { rows: r } = await cx.query(
+            `INSERT INTO requests
+               (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
+                contact_referent, contact_phone, contact_email, quantity, product, description,
+                deadline, position, fiche, project_value)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+             RETURNING id`,
+            [
+              famille, sousEtape, 'demande', responsable, 1, clientType, nomDossier,
+              borner(cl.contact, 120), borner(cl.tel, 40), borner(cl.email, 160),
+              l.quantite, l.produit, borner(b.projet, DESCRIPTION_MAX),
+              isDay(b.dueDate) ? b.dueDate : null,
+              Number(posRows[0].pos) + rangNeuf, JSON.stringify(ficheLigne), l.valeur,
+            ],
+          );
+          rangNeuf += 1;
+          touches.push(r[0].id);
+        }
+      }
+      // CE QUE LA V2 NE REPREND PAS EST ARCHIVÉ, avec son journal et ses PDF.
+      for (const restee of libres) {
+        await cx.query('UPDATE requests SET deleted_at = now() WHERE id = $1', [restee.id]);
+      }
+      await cx.query('COMMIT');
+    } catch (err) {
+      await cx.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      cx.release();
+    }
+
+    // LE JOURNAL DIT QU'UNE VERSION EST NÉE, sur chaque ligne touchée. Sans lui,
+    // le montant du dossier change tout seul entre deux relectures et personne
+    // ne sait pourquoi.
+    for (const id of touches) {
+      await pool.query(
+        'INSERT INTO request_events (request_id, field, value_before, value_after, who) VALUES ($1,$2,$3,$4,$5)',
+        [id, 'devis',
+          `V${version - 1}${ficheAnc.devis && ficheAnc.devis.ttc != null ? ` — ${ficheAnc.devis.ttc} €` : ''}`,
+          `V${version} — ${prix.valeur} €`, quiDemande(req)],
+      ).catch(() => { /* le journal est un confort, il ne fait pas échouer la reprise */ });
+    }
+    broadcast({ kind: 'update', ids: touches, stages: [famille] });
+    return res.json({
+      id: touches[0], stage: null, numero, version, reprise: true,
+      ...(nbLignes > 1 ? { lot: { total: nbLignes, ids: touches } } : {}),
+      ...(libres.length ? { archivees: libres.length } : {}),
+    });
   }
 
-  const { rows: posRows } = await pool.query(
-    'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
-  );
-  const { rows } = await pool.query(
-    `INSERT INTO requests
-       (stage, sub_stage, order_kind, responsable, priority, client_type, billing_company,
-        contact_referent, contact_phone, contact_email, quantity, product, description,
-        deadline, position, fiche, project_value)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-     RETURNING id`,
-    [
-      famille, sousEtape, 'demande', responsable, 1, clientType, nomDossier,
-      borner(cl.contact, 120), borner(cl.tel, 40), borner(cl.email, 160),
-      quantite, produit, borner(b.projet, DESCRIPTION_MAX),
-      // UNE DATE SOUHAITÉE N'EST PAS UNE PROMESSE. Sans elle le dossier n'a pas
-      // d'échéance : la dater du jour le ferait paraître en retard dès demain
-      // alors que personne n'a rien promis au client.
-      isDay(b.dueDate) ? b.dueDate : null,
-      posRows[0].pos, JSON.stringify(fiche), prix.valeur,
-    ],
-  );
+  // ---------------------------------------------------------------------------
+  // UN DEVIS NEUF
+  // ---------------------------------------------------------------------------
+  let ids;
+  const cx = await pool.connect();
+  try {
+    await cx.query('BEGIN');
+    const { rows: posRows } = await cx.query(
+      'SELECT COALESCE(MAX(position), 0) + 1000 AS pos FROM requests WHERE stage = $1', [famille],
+    );
+    // LE PROJET NE NAÎT QUE POUR UN GROUPE. Un seul article ne fait pas de
+    // projet : le niveau ne dirait plus rien s'il y avait autant de dossiers que
+    // de devis. C'est le regroupement qui le justifie, et lui seul — même règle
+    // qu'au comptoir.
+    let projetId = null;
+    if (nbLignes > 1) {
+      const bouts = [nomDossier, numero].filter(Boolean);
+      const { rows: pr } = await cx.query(
+        'INSERT INTO projects (numero, nom, billing_company) VALUES ($1, $2, $3) RETURNING id',
+        [numero || null, bouts.join(' — ') || 'Devis sans nom', nomDossier || null],
+      );
+      projetId = pr[0].id;
+    }
+    ids = await ecrireLignes(cx, posRows[0].pos, fiche, projetId);
+    await cx.query('COMMIT');
+  } catch (err) {
+    await cx.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    cx.release();
+  }
 
   await upsertClientSansBloquer({
     societe: nomDossier,
@@ -4946,7 +5156,13 @@ app.post('/api/devis', exige('clients'), asyncH(async (req, res) => unDossierALa
   });
 
   broadcast({ kind: 'create', stages: [famille] });
-  res.status(201).json({ id: rows[0].id, stage: famille, subStage: sousEtape, numero });
+  res.status(201).json({
+    id: ids[0], stage: famille, subStage: sousEtape, numero,
+    // Combien de lignes ce devis a produites, et lesquelles. L'écran le DIT :
+    // sans ce compte, on croit avoir enregistré un devis et on en trouve trois
+    // au planning.
+    ...(nbLignes > 1 ? { lot: { total: nbLignes, ids } } : {}),
+  });
 })));
 
 // POST /api/vente/numero → réserve le numéro du ticket de vente directe,
