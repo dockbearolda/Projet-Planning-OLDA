@@ -506,8 +506,13 @@ h2.section { font-size: var(--taille-titre); font-weight: var(--graisse-forte); 
 
 /* ========================================================= L'ÉCRAN PROJETS */
 .projects-wrap { max-width: var(--lecture); margin: 0 auto; padding: var(--pas-4); }
-.projects-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--pas-2); margin-bottom: var(--pas-4); }
-.projects-head h1 { margin-right: auto; font-size: var(--taille-grand); font-weight: var(--graisse-forte); color: var(--text-1); }
+/* UN SEUL EN-TÊTE D'ÉCRAN (04/09/2026). Cette rangée portait un « Projets » en
+   `--taille-grand` : c'était le titre de l'application autonome, la seule à en
+   avoir un. Dans le CRM, `.ecran-tete` dit déjà « Bon à tirer » juste au-dessus,
+   et l'onglet allumé dit « Projets » — un troisième mot pour la même chose.
+   Ne restent que les commandes, poussées à droite comme avant par la marge
+   automatique que le titre portait. */
+.projects-head { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--pas-2); margin-bottom: var(--pas-4); }
 /* Les deux actions restent solidaires : à l'étroit elles passent à la ligne
    ENSEMBLE plutôt que de se séparer de part et d'autre du titre. */
 .projects-actions { display: flex; align-items: center; gap: var(--pas-2); flex-wrap: wrap; }

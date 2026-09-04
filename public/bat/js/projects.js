@@ -28,7 +28,6 @@ export async function renderProjects(host) {
 
   const head = el(`
     <div class="projects-head">
-      <h1>Projets</h1>
       <div class="projects-actions">
         <button class="btn secondaire" id="btn-open-pdf" title="Rouvrir un BAT exporté par BAT Studio pour le modifier (glissez-déposez aussi le PDF sur cette page)">Ouvrir un BAT (PDF)…</button>
         <button class="btn primaire" id="btn-new">+ Nouveau projet</button>
