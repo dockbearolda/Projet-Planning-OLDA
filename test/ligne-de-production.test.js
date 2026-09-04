@@ -363,19 +363,42 @@ assert.match(
   // -------------------------------------------------------------------------
   // UN SEUL COMPOSANT. Deux vues à un clic l'une de l'autre doivent donner le
   // même bloc, pas deux qui se ressemblent.
-  assert.ok(/export function blocProduction\(r, hiddenCols\)/.test(FAITS),
-    'le bloc de production est une fonction unique — et les colonnes masquées lui '
-    + 'arrivent par la signature, pas par un import de retour vers app.js');
+  // ⚠ TROIS VALEURS À L'APPEL DEPUIS LE 04/09 : les colonnes masquées, ET la
+  // cote du logo. Ce module ne remonte JAMAIS vers `app.js` — un cycle entre
+  // deux modules casse à l'ouverture, et il casse ce jour-là seulement.
+  assert.ok(/export function blocProduction\(r, hiddenCols, cote\)/.test(FAITS),
+    'le bloc de production est une fonction unique — et ce qu’il lui faut lui '
+    + 'arrive par la signature, pas par un import de retour vers app.js');
   const carte = APP.match(/function buildCard\(r, options\)[\s\S]*?\n\}/);
-  assert.ok(carte && /blocProduction\(r, hiddenCols\)/.test(carte[0]), 'la carte porte le bloc');
+  assert.ok(carte && /blocProduction\(r, hiddenCols, coteDuLogo\)/.test(carte[0]), 'la carte porte le bloc');
   const cellule = APP.match(/function cellInfos\(r\)[\s\S]*?\n\}/);
-  assert.ok(cellule && /blocProduction\(r, hiddenCols\)/.test(cellule[0]), 'la cellule Infos porte LE MÊME bloc');
+  assert.ok(cellule && /blocProduction\(r, hiddenCols, coteDuLogo\)/.test(cellule[0]),
+    'la cellule Infos porte LE MÊME bloc');
 
-  // QUATRE FAITS, QUATRE CASES. Chacun décide de ce qu'il voit.
-  for (const cle of ['prod_ref', 'prod_dtf', 'prod_tailles', 'prod_logos']) {
+  // LES CINQ FAITS DU TEXTILE, ET DANS CET ORDRE (Charlie, 04/09/2026) : « réf
+  // du t-shirt, couleur, tailles/quantité, logo, taille du logo ». L'ordre de
+  // la liste EST l'ordre à l'écran — `blocProduction` la parcourt telle quelle.
+  const ORDRE = ['prod_ref', 'prod_couleur', 'prod_tailles', 'prod_logos', 'prod_logo_mm'];
+  const rangs = ORDRE.map((c) => FAITS.indexOf(`key: '${c}'`));
+  assert.ok(rangs.every((x) => x > 0), 'les cinq faits existent');
+  assert.deepStrictEqual([...rangs].sort((a, b) => a - b), rangs,
+    'et ils se suivent dans l’ordre demandé : réf, couleur, tailles, logo, taille du logo');
+  // UN FAIT PAR CHOSE, DONC UN INTERRUPTEUR PAR CHOSE. La couleur vivait dans la
+  // référence et la cote dans le logo : on ne pouvait pas masquer la taille du
+  // logo sans masquer le logo — l'exemple même que Charlie donne.
+  for (const cle of [...ORDRE, 'prod_dtf']) {
     assert.ok(new RegExp(`key: '${cle}'[^}]*surCarte: true`).test(APP),
       `${cle} doit exister dans le rail ET vivre dans les deux vues`);
+    assert.ok(new RegExp(`'${cle}'`).test(APP.slice(APP.indexOf('COLS_REDESSINENT'), APP.indexOf('COLS_TABLEAU'))),
+      `${cle} redessine la ligne quand on le coche`);
   }
+  // ET ILS SONT ALLUMÉS PAR DÉFAUT — « voici ce que je veux par défaut pour le
+  // textile ». Sauf le marquage, qui n'est pas dans les cinq.
+  const allumes = APP.slice(APP.indexOf('const COLS_DEFAUT'), APP.indexOf('COLS_MASQUEES_DEFAUT'));
+  for (const cle of ORDRE) {
+    assert.ok(allumes.includes(`'${cle}'`), `${cle} est allumé par défaut`);
+  }
+  assert.ok(!allumes.includes("'prod_dtf'"), 'le marquage reste à un clic, il n’est pas des cinq');
 
   // -------------------------------------------------------------------------
   // 4 bis. LA HIÉRARCHIE SE FAIT À LA GRAISSE (Charlie, 26/08)
@@ -386,9 +409,16 @@ assert.match(
   // qui permet de balayer une file.
   const bloc = FAITS.slice(FAITS.indexOf('const PROD_FAITS = ['),
     FAITS.indexOf('\n];', FAITS.indexOf('const PROD_FAITS = [')));
-  assert.match(bloc, /morceau\(ref, true\)/, 'la référence porte la graisse');
+  // ⚠ LES FAITS SE SONT DÉDOUBLÉS LE 04/09 (un fait par chose, cf. plus haut) :
+  // la couleur a quitté la référence, la cote a quitté le logo. Ce qui porte la
+  // graisse n'a pas changé — c'est toujours ce qu'on cherche du regard.
+  assert.match(bloc, /morceau\(p\.ref && nom\.includes\(p\.ref\) \? '' : p\.ref, true\)/,
+    'la référence porte la graisse');
   assert.match(bloc, /morceau\(p\.encre, true\)/, 'la couleur du marquage aussi');
-  assert.match(bloc, /x\.mm\} mm` : String\(x\.mm\), fort: true/, 'la largeur des logos aussi');
+  assert.match(bloc, /morceaux\.push\(\{ t: v, fort: true \}\)/, 'la taille du logo aussi');
+  // ⚠ ET LA FACE, ELLE, NE LA PORTE PAS : elle NOMME, la largeur crie. Deux
+  // rangées voisines toutes deux en gras ne se hiérarchisent plus.
+  assert.match(bloc, /\{ t: String\(z\.face \|\| ''\) \}/, 'la face nomme, sans graisse');
   // LA QUANTITÉ, ELLE, A CHANGÉ DE RANGÉE — PAS DE RÔLE (01/09/2026).
   // Elle portait la graisse dans « TAILLES 24 pièces : 6 × S · 10 × M ». Le
   // titre de la ligne la porte désormais, en tête et en graisse forte :
@@ -456,7 +486,10 @@ assert.match(
   // v4 (27/08 au soir) : l'ARTICLE entre dans la ligne par défaut — 99 % des
   // 187 dossiers de la production le portent, et c'était la seule donnée bien
   // remplie que la ligne ne disait pas.
-  assert.match(APP, /const COLS_KEY = 'olda_cols_v4';/,
+  // v5 (04/09) : les CINQ FAITS DU TEXTILE entrent à leur tour. Un poste réglé
+  // en v4 ne connaît aucune des clés neuves : il les aurait toutes trouvées
+  // éteintes, et « par défaut » n'aurait rien voulu dire.
+  assert.match(APP, /const COLS_KEY = 'olda_cols_v5';/,
     'nouvelle ligne par défaut = nouvelle clé, sinon personne ne la voit');
   // Le rattrapage v2 (« le prix repart allumé ») n'a plus lieu d'être : rien
   // n'a encore écrit sous la clé v3, et tout ce qui l'écrira sortira du code

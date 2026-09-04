@@ -53,13 +53,22 @@ const CSS = lire('styles.css');
 const FICHE = lire('fiche-atelier.js');
 
 // ---------------------------------------------------------------------------
-// 1. LES SIX FAITS DE LA LIGNE
+// 1. CE QUE LA LIGNE DIT PAR DÉFAUT
 // ---------------------------------------------------------------------------
+// ⚠ CINQ FAITS DE PLUS LE 04/09, ET C'EST UNE DEMANDE MOT POUR MOT : « sur la
+// ligne pour le textile du planning doit absolument apparaître en un coup
+// d'oeil dans cet ordre : réf du t-shirt, couleur, tailles/quantité, logo,
+// taille du logo ». Ils ne coûtent RIEN aux lignes qui n'en portent pas : une
+// rangée sans valeur ne s'affiche pas, et un dossier sans `fiche.prod` n'a pas
+// de bloc du tout. Ils se rangent entre « ce qui manque » et les notes — après
+// l'état du dossier, avant ce qu'on en dit.
 const defaut = APP.match(/const COLS_DEFAUT = new Set\(\[([^\]]*)\]\)/);
 assert.ok(defaut, 'la ligne par défaut doit être écrite en clair, pas déduite');
 const cles = defaut[1].match(/'([^']+)'/g).map((x) => x.slice(1, -1));
 assert.deepStrictEqual(cles,
-  ['responsable', 'client', 'product', 'price', 'feu', 'description', 'deadline'],
+  ['responsable', 'client', 'product', 'price', 'feu',
+    'prod_ref', 'prod_couleur', 'prod_tailles', 'prod_logos', 'prod_logo_mm',
+    'description', 'deadline'],
   'les faits de la ligne, dans l’ordre où elle les lit');
 
 // Le reste se déduit de la liste : ajouter une colonne au rail ne doit pas
@@ -71,7 +80,7 @@ assert.match(APP, /return new Set\(COLS_MASQUEES_DEFAUT\);/,
 
 // NOUVELLE LIGNE = NOUVELLE CLÉ. Un poste réglé sous l'ancienne garderait son
 // écran, et la ligne arrêtée n'apparaîtrait nulle part.
-assert.match(APP, /const COLS_KEY = 'olda_cols_v4';/);
+assert.match(APP, /const COLS_KEY = 'olda_cols_v5';/);
 
 // LE TABLEAU, PAS LES CARTES. « Infos » et « Date souhaitée » n'existent que
 // là ; le planning ne peut donc plus s'ouvrir sur les cartes — et c'est voulu.
