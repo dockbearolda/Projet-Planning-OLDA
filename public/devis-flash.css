@@ -185,23 +185,15 @@
    Ce qui reste ici, c'est ce qui n'appartient qu'au devis — le détail d'un
    article sous sa ligne, et les cinq pistes de SON tableau.
    =========================================================================== */
-/* LES PISTES DE SON TABLEAU, ET RIEN D'AUTRE. La grammaire de ligne
-   (`.lignes`, `.lignes__tete`, `.lignes__rang`, `.nb`, `.tot`) vit dans
-   `charte.css` : le devis et la vente donnent le même composant, pas deux qui
-   se ressemblent. Tout ce que cet écran redéclarait ici est parti là-bas.
+/* LA GRAMMAIRE DE LIGNE N'EST PLUS ICI. `.lignes`, `.lignes__tete`,
+   `.lignes__rang`, `.nb` et `.tot` vivent dans `charte.css` : le devis et la
+   vente donnent le meme composant, pas deux qui se ressemblent.
 
-   RESTENT LES PISTES, parce que la charte dit elle-même que chaque écran règle
-   `--lignes-cols` chez lui — le devis compte en HT, la vente en TTC, et leurs
-   colonnes diffèrent.
-
-   SIX, PAS CINQ, et c'est le point où deux branches se sont croisées : la
-   valeur par défaut de la charte en compte cinq, mesurées avant que le PU TTC
-   ne rejoigne le PU HT le 03/09 (Charlie : « pouvoir modifier l'un ou l'autre
-   mais qu'il reste lié »). Sans cette ligne, la sixième case passe à la ligne
-   suivante et chaque intitulé coiffe la colonne d'à côté. */
-.devis-flash .lignes {
-  --lignes-cols: minmax(0, 1fr) 56px 76px 76px 96px var(--ctrl-h);
-}
+   LES PISTES NON PLUS, ET C EST VOULU. Ce sont les mesures du devis — il est
+   l'ecran qui les a prises — donc `--lignes-cols` porte SA valeur dans la
+   charte, et il ne la reecrit pas ici. Deux ecritures de la meme mesure, ce
+   sont deux mesures le jour ou l'une bouge. La vente, dont les colonnes
+   different, declare les siennes chez elle. */
 /* LE DÉTAIL D'UN ARTICLE TIENT À TROIS PAR RANGÉE — la référence, la couleur,
    le marquage — avec l'intitulé au-dessus (`.fa-case`) : ce sont des cases
    isolées, pas des colonnes qui se lisent d'un article à l'autre. La note prend

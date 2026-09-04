@@ -1726,7 +1726,12 @@ body.a-connecter { overflow: hidden; }
    lui : le devis compte en HT, la vente en TTC, et leurs colonnes diffèrent.
    =========================================================================== */
 .lignes {
-  --lignes-cols: minmax(0, 1fr) 56px 76px 96px var(--ctrl-h);
+  /* SIX PISTES, PAS CINQ (03/09) : le PU TTC a rejoint le PU HT, meme largeur —
+     Charlie : « pouvoir modifier l'un ou l'autre mais qu'il reste lie ». La
+     valeur etait restee a cinq, mesuree la veille ; l'en-tete du devis compte
+     six intitules depuis, et son test les compte tous les deux. Une piste de
+     moins, et chaque intitule coiffe la colonne d'a cote. */
+  --lignes-cols: minmax(0, 1fr) 56px 76px 76px 96px var(--ctrl-h);
   display: flex;
   flex-direction: column;
   gap: var(--pas-2);
