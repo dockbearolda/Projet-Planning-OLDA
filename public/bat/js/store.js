@@ -254,6 +254,49 @@ export function productByRef(ref) {
   return store.catalogue?.products?.find(p => refKey(p.refSupplier) === k) || null;
 }
 
+// ===========================================================================
+// RETROUVER UN VÊTEMENT QUAND PERSONNE N'ÉCRIT SA RÉFÉRENCE PAREIL
+// ===========================================================================
+// Charlie, 04/09/2026 : « ce genre de chose ne doit pas exister, la recherche
+// doit faire des propositions car personne n'écrit les réfs pareil, il faut de
+// la fluidité absolue car ce genre de détails nous emmerde toute la journée ».
+//
+// LE CAS QUI L'A DÉCLENCHÉ. Le comptoir range « K3025 » ; TopTex — et donc ce
+// catalogue, indexé sur `refSupplier` — l'appelle « K3025IC ». `productByRef`
+// compare deux formes réduites : « k3025 » n'est pas « k3025ic », donc rien.
+// Huit références sur quarante-neuf sont dans ce cas : ça marchait une fois sur
+// deux, en silence.
+//
+// LA CASCADE, DU PLUS SÛR AU PLUS TOLÉRANT :
+//   1. la référence EXACTE (à la casse et à la ponctuation près) ;
+//   2. la référence INTERNE, quand le produit en porte une ;
+//   3. le PRÉFIXE, dans les deux sens — « k3025 » trouve « k3025ic », et
+//      « k3025ic » trouve « k3025 ». C'est ce qui règle le cas TopTex sans
+//      table à tenir.
+//
+// ⚠ ET SEULEMENT S'IL N'Y EN A QU'UN. Deux vêtements qui commencent pareil, ce
+// n'est pas un choix à deviner : on rend la liste, et c'est l'appelant qui
+// PROPOSE. Un produit choisi au hasard donnerait un BAT plausible et faux —
+// c'est exactement ce qu'on essaie d'arrêter.
+export function trouverProduitParRef(ref) {
+  const k = refKey(ref);
+  const tous = store.catalogue?.products || [];
+  if (!k) return { produit: null, propositions: [] };
+
+  const exact = tous.find(p => refKey(p.refSupplier) === k)
+    || tous.find(p => refKey(p.refInternal) === k);
+  if (exact) return { produit: exact, propositions: [] };
+
+  const proches = tous.filter((p) => {
+    const s = refKey(p.refSupplier);
+    const i = refKey(p.refInternal);
+    return (s && (s.startsWith(k) || k.startsWith(s)))
+      || (i && (i.startsWith(k) || k.startsWith(i)));
+  });
+  if (proches.length === 1) return { produit: proches[0], propositions: [] };
+  return { produit: null, propositions: proches };
+}
+
 // Nombre d'articles (tous projets confondus) qui utilisent ce vêtement. Lu dans
 // l'index des projets : inutile d'ouvrir les fichiers un par un. Sert à ne
 // jamais retirer du catalogue un produit dont un BAT dépend encore.

@@ -38,7 +38,7 @@ import {
   // LES SIX TAILLES ET LA TRADUCTION VERS LE DOSSIER viennent du module que
   // les deux ecrans partagent deja : ecrites ici, elles seraient deux listes
   // et deux traductions le jour ou l'une gagne une taille.
-  TAILLES, prodDeLigne,
+  TAILLES, prodDeLigne, referencesDuCatalogue,
 } from './devis.js';
 // LE MENU DÉROULANT AVEC RECHERCHE, celui des deux écrans du comptoir. Charlie,
 // 01/09 : « ce input doit avoir OBLIGATOIREMENT une fonction recherche COMME
@@ -1051,6 +1051,13 @@ function remplirCatalogue() {
   // que les rangées posées à l'instant.
   for (const n of ROOT.querySelectorAll(
     `input[list="${ID_PRODUITS}"], input[data-menu-liste="${ID_PRODUITS}"]`)) menuRafraichir(n);
+  // LA LISTE DES REFERENCES SUIT LE MEME CHEMIN, et pour la meme raison : le
+  // catalogue arrive APRES l'ecran, et une rangee ouverte entre-temps resterait
+  // sur un champ Reference sans propositions.
+  if (poserListeRefs()) {
+    for (const n of ROOT.querySelectorAll(
+      `input[list="${ID_REFS}"], input[data-menu-liste="${ID_REFS}"]`)) menuRafraichir(n);
+  }
 }
 
 // ===========================================================================
@@ -1144,6 +1151,9 @@ const ID_MARQUAGES = 'dvf-marquages';
 // décident du rendu, pas du prix), les faces du tableau des tailles de logo,
 // qui les déclare par famille : c'est la source de la fiche de l'atelier et du
 // ticket, pas une liste réécrite ici.
+// LA LISTE DES REFERENCES — celle qui manquait. Voir
+// `referencesDuCatalogue` (devis.js) pour ce qu'une option porte.
+const ID_REFS = 'df-refs';
 const ID_ENCRES = 'dvf-encres';
 const ID_FACES = 'dvf-faces';
 function poserListe(id, valeurs) {
@@ -1162,11 +1172,49 @@ function poserListe(id, valeurs) {
   }
   return true;
 }
+// LA LISTE DES REFERENCES SE POSE A PART : ses options portent un TEXTE
+// distinct de leur valeur (la designation se LIT, la reference se RANGE), un
+// jeton et un foin de recherche. `poserListe` ne sait poser que des valeurs
+// nues — c'est tout ce que les encres et les faces demandent.
+function poserListeRefs() {
+  const lignes = referencesDuCatalogue(catalogue, FAMILLE_TEXTILE);
+  if (!lignes.length) return false;
+  let liste = document.getElementById(ID_REFS);
+  if (!liste) {
+    liste = el('datalist');
+    liste.id = ID_REFS;
+    ROOT.append(liste);
+  }
+  const frag = document.createDocumentFragment();
+  for (const r of lignes) {
+    const o = el('option');
+    o.value = r.valeur;
+    o.textContent = r.texte;
+    o.dataset.ref = r.jeton;
+    o.dataset.cherche = r.cherche;
+    o.dataset.onglet = r.onglet;
+    frag.append(o);
+  }
+  liste.replaceChildren(frag);
+  return true;
+}
+
+// LA MEME REDUCTION QUE LA RECHERCHE : lettres et chiffres, rien d'autre. La
+// casse, les accents, les espaces, les tirets et les points ne veulent rien
+// dire dans un code — « NS-300 », « ns 300 » et « NS300 » sont la meme
+// reference. C'est la regle de `menuReduire` (menu-recherche.js), tenue ici
+// aussi pour que le champ RECONNAISSE ce que la liste a propose.
+const cleReference = (v) => String(v == null ? '' : v).trim().toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
+
 // Habiller un champ APRÈS coup : le composant remplace le champ dans la page,
 // il faut donc qu'il y soit déjà — et une seule fois, sinon on empile les peaux.
 function habiller(champLa, id, valeurs) {
   if (!champLa || champLa.dataset.menuListe === id) return;
-  if (!poserListe(id, valeurs)) return;
+  // `valeurs === null` : la liste est deja posee par ailleurs (les references,
+  // dont les options portent un texte et un jeton que `poserListe` ne sait pas
+  // ecrire). On habille sans la reconstruire.
+  if (valeurs !== null && !poserListe(id, valeurs)) return;
   champLa.setAttribute('list', id);
   menuPoser(champLa);
 }
@@ -1946,6 +1994,31 @@ function rangeeArticle(ligne) {
     n2.addEventListener('input', () => { ligne[cle] = n2.value; rafraichirTete(); redessiner(); });
   }
 
+  // CHOISIR UNE REFERENCE DANS LA LISTE, C'EST CHOISIR L'ARTICLE. Deux portes,
+  // un seul resultat : la designation, le prix, le coloris et le moteur suivent
+  // exactement comme si on l'avait pris par la Designation. Sans ca, la
+  // reference et l'article se contrediraient sur la meme rangee.
+  //
+  // ⚠ SEULEMENT SUR UN CHOIX DE LA LISTE (`change`), jamais a la frappe : une
+  // reference tapee a moitie ne doit pas remplacer l'article sous les doigts.
+  // Et une reference qui n'est PAS au catalogue reste ce qu'elle est — c'est
+  // une reference libre, elle se chiffre.
+  refe.addEventListener('change', () => {
+    const cle = cleReference(refe.value);
+    if (!cle) return;
+    for (const [nom, p] of parNom) {
+      if (cleReference(p.reference) !== cle) continue;
+      if (design.value === nom) return;          // deja cet article : rien a refaire
+      design.value = nom;
+      // ⚠ ON RELANCE LE GESTE DE LA DESIGNATION, on ne le recopie pas. Choisir
+      // un article, c'est trente lignes — le prix, le coloris, les emplacements
+      // du moteur, les puces de la tasse, la famille. Ecrites une seconde fois
+      // ici, elles seraient deux comportements le jour ou l'une bouge.
+      design.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+  });
+
   // UNE CASE DE TAILLE ÉCRIT TROIS CHOSES : sa part, le texte du devis, et la
   // quantité. Le prix suit, parce que le coefficient est dégressif — dix
   // t-shirts et cent t-shirts n'ont pas le même prix à la pièce.
@@ -2122,6 +2195,24 @@ function rangeeArticle(ligne) {
   // de produit, contrairement aux emplacements de marquage. Les faces peuvent
   // manquer (tableau des tailles de logo injoignable) — le champ reste alors une
   // saisie libre, ce qui est exactement ce qu'il faut.
+  // ⚠ LA REFERENCE S'HABILLE ICI, ET PAS A SA CREATION (04/09/2026). Le
+  // composant SORT le champ de sa place pour lui poser sa peau
+  // (`hote.replaceWith(peau); peau.append(hote)`) ; `champ()`, appele juste
+  // apres, le remettait dans SA boite — le champ quittait la peau, l'attribut
+  // restait, et le menu ne s'ouvrait jamais. Trouve au navigateur : le champ
+  // portait bien `data-menu-liste`, et rien ne se deroulait.
+  //
+  // Elle etait une saisie LIBRE jusqu'ici : ni liste, ni proposition, pendant
+  // que la Designation, juste a cote, cherchait deja dans tout le catalogue.
+  // On tapait « k3025 » et il ne se passait rien.
+  // CE QUE LE FILTRE PROMET, IL DOIT LE TENIR. Il annoncait « couleur » : les
+  // textiles n'en portent pas dans `catalogue_produits` (leurs coloris viennent
+  // du catalogue textile, par reference), donc chercher « olive » ne rendait
+  // rien. Un champ qui promet ce qu'il ne fait pas coute une hesitation par
+  // recherche.
+  refe.dataset.menuFiltre = 'Reference ou designation…';
+  if (poserListeRefs()) habiller(refe, ID_REFS, null);
+
   habiller(faces, ID_FACES, facesConnues);
   moteurTextile()
     .then((TE) => habiller(encre, ID_ENCRES, Object.keys(TE.DB.markingColorsHex || {})))

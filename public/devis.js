@@ -124,6 +124,54 @@ function facesDeLigne(brut) {
     .filter(Boolean);
 }
 
+// ===========================================================================
+// LA RÉFÉRENCE SE CHERCHE, ELLE NE SE TAPE PAS
+// ===========================================================================
+// Charlie, 04/09/2026 : « ce genre de chose ne doit pas exister, la recherche
+// doit faire des propositions car personne n'écrit les réfs pareil, il faut de
+// la fluidité absolue car ce genre de détails nous emmerde toute la journée ».
+//
+// Le champ « Référence » était une saisie LIBRE : ni liste, ni proposition, ni
+// contrôle. On tapait « k3025 », « K-3025 » ou « 3025 » et il ne se passait
+// rien — pendant que le champ « Désignation », juste à côté, cherchait déjà
+// dans tout le catalogue par son menu.
+//
+// LA RECHERCHE EXISTE DÉJÀ, ET ELLE EST BONNE : `menu-recherche.js` réduit les
+// deux côtés à leurs LETTRES ET CHIFFRES avant de comparer — « NS300 »,
+// « ns 300 », « NS-300 » et « ns3 » désignent la même référence, et le rang
+// fait remonter la référence avant un libellé. Il n'y avait rien à écrire, il
+// y avait à la BRANCHER.
+//
+// CE QUE CETTE FONCTION REND est ce que le menu sait lire : la valeur qui
+// tombera dans le champ (la référence), le texte qu'on LIT (la désignation, un
+// code seul ne dit rien), le jeton affiché en tête de ligne, et ce qui se
+// cherche sans s'afficher. Écrit ICI parce que les deux écrans flash le posent
+// à l'identique — et que deux listes de références deviendraient deux listes.
+export function referencesDuCatalogue(catalogue, familleTextile) {
+  const vues = new Set();
+  const out = [];
+  for (const p of Array.isArray(catalogue) ? catalogue : []) {
+    // Un produit éteint ne se propose pas — la règle du menu du comptoir.
+    if (!p || p.actif === false) continue;
+    const ref = texte(p.reference);
+    if (!ref || vues.has(ref)) continue;
+    vues.add(ref);
+    out.push({
+      valeur: ref,
+      // CE QU'ON LIT DANS LA LISTE. « K3025 » ne dit rien à personne trois
+      // jours plus tard ; « T-shirt unisexe léger Pro 145 g » si.
+      texte: texte(p.label) || texte(p.designation) || ref,
+      jeton: ref,
+      // CE QUI SE CHERCHE SANS S'AFFICHER : la famille, la variante, la
+      // couleur. Quelqu'un qui a « olive » en tête doit tomber dessus.
+      cherche: [p.famille, p.designation, p.variante, p.couleur, p.note]
+        .map(texte).filter(Boolean).join(' '),
+      onglet: p.famille === familleTextile ? 'Textile' : 'Boutique',
+    });
+  }
+  return out;
+}
+
 // CE QUE LA LIGNE ENVOIE AU DOSSIER. On ne décide PAS ici si c'est vide : la
 // règle « un `prod` sans un seul fait ne vaut pas la place qu'il prend » vit
 // côté serveur (`prodDuComptoir`), et elle doit rester à un seul endroit —

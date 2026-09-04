@@ -1,6 +1,6 @@
 // Écran « Projets » : liste, création, duplication, suppression.
 
-import { store, availableFaces, productByRef, FACE_ORDER } from './store.js';
+import { store, availableFaces, trouverProduitParRef, FACE_ORDER } from './store.js';
 import { toast } from './ui.js';
 import { loadTailles } from './tailles.js';
 import { isProjectBlank, nettoyerId, batDeLaFiche } from './util.js';
@@ -224,10 +224,18 @@ function poserLesFaces(article, product, colorSlug, faces) {
 function produitDeLaFiche(prod) {
   const products = store.catalogue.products;
   const ref = prod && String(prod.refFournisseur || '').trim();
-  const trouve = ref ? productByRef(ref) : null;
+  // ⚠ ON NE COMPARE PAS DEUX CHAINES, ON CHERCHE. « K3025 » au comptoir,
+  // « K3025IC » chez TopTex : c'est la meme reference, et personne ne les tape
+  // deux fois pareil. Voir `trouverProduitParRef` — et quand elle hesite, elle
+  // PROPOSE plutot que de choisir a notre place.
+  const { produit: trouve, propositions } = ref
+    ? trouverProduitParRef(ref) : { produit: null, propositions: [] };
   if (ref && !trouve) {
-    toast(`${ref} n'est pas au catalogue du BAT — choisis le vetement, ou importe la reference dans Produits.`,
-      { ms: 7000 });
+    const noms = propositions.slice(0, 3).map((p) => p.name || p.refSupplier).join(', ');
+    toast(noms
+      ? `${ref} : plusieurs vetements y repondent — ${noms}. Choisis lequel.`
+      : `${ref} n'est pas au catalogue du BAT — choisis le vetement, ou importe la reference dans Produits.`,
+    { ms: 7000 });
   }
   const product = trouve || products[0];
   const colorSlug = (trouve && colorisDe(trouve, prod && prod.couleur)) || product.colors[0]?.slug || '';
