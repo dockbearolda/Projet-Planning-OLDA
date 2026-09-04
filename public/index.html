@@ -163,6 +163,26 @@
         <a class="nav-switch-btn nav-switch-btn--montravail" id="viewMonTravail" href="#mon-travail" hidden>
           <span class="nav-switch-label">Mon travail</span>
         </a>
+        <!-- BAT — le bon a tirer, entre dans le CRM le 04/09. C est BAT Studio
+             en entier (projets, feuille A4, catalogue produits, reglages),
+             monte dans cet ecran par public/bat/js/monter.js.
+
+             IL EST ICI, ET PAS EN FIN DE RANGEE. Trois ecrans de la barre
+             PRODUISENT un document qu on remet au client : le devis, la
+             facture, et le bon a tirer. Ils se suivent. Les deux derniers
+             onglets, eux, sont des REFERENCES qu on consulte (la base clients,
+             le tableau des tailles) — et « Tailles logos » ferme la marche
+             depuis le 01/09, ce qu un test tient.
+
+             ELLE TIENT DANS LA RANGEE, et c est mesure : a 1 280 px la rangee
+             occupait 868 px sur 960 disponibles avant cet onglet, et 868 sur
+             960 apres. Le mot est court expres — trois lettres, moins de la
+             moitie du plus etroit des dix autres. Un onglet qu on ne voit pas
+             est un ecran qui n existe pas : c est pour cette raison que
+             l Agenda est dans le rail et pas ici. -->
+        <a class="nav-switch-btn" id="viewBat" href="#bat">
+          <span class="nav-switch-label">BAT</span>
+        </a>
         <a class="nav-switch-btn" id="viewPlanning" href="#planning">
           <span class="nav-switch-label">Planning</span>
         </a>
@@ -451,6 +471,12 @@
              saisie à gauche, feuille A4 vivante à droite, impression et dépôt au
              planning. Rendu par devis-flash.js, chargé au premier affichage. -->
         <section class="devis-flash" id="devis-flash" hidden aria-label="Devis"></section>
+
+        <!-- Onglet BAT : BAT Studio, monte dans ce conteneur. Il n a besoin que
+             d une chose de son hote — une HAUTEUR (cf. bat.css) ; il ne
+             l impose pas lui-meme. Le reste (ses feuilles, ses modules) arrive
+             au premier affichage, pas au demarrage du CRM. -->
+        <section class="bat-ecran" id="bat" hidden aria-label="Bon a tirer"></section>
 
         <!-- Onglet Vente flash : la facture qui se compose DEVANT le client —
              saisie à gauche, feuille A4 vivante à droite, impression et

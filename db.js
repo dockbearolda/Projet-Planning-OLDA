@@ -590,6 +590,36 @@ async function init() {
   //        lignes ; DELETE FROM app_meta WHERE key = 'infos_sans_recap_v1';
   await libererLaColonneInfos();
 
+  // LE MAGASIN DE BAT STUDIO (04/09/2026).
+  //
+  // BAT Studio rangeait projets, logos, mockups et BAT archivés sur un DISQUE
+  // (son `DATA_DIR`, un volume Railway). Intégré ici, il n'a plus de disque :
+  // le conteneur du CRM est effacé à chaque déploiement, et le CRM n'a pas de
+  // volume. Ses fichiers vivent donc en base, comme les pièces jointes.
+  //
+  // `contenu` EST DU TEXTE BASE64, PAS DU `bytea`, et c'est mesuré : pg-mem
+  // (la base locale) fait transiter un `bytea` par une chaîne UTF-8 — un octet
+  // 0xFF revient en EF BF BD. Un PDF ou un WebP y perdrait ses octets hauts en
+  // silence, et seul l'écran final le dirait. C'est déjà pour ça que la table
+  // `attachments` range ses PDF en base64 ; on ne change pas de méthode à
+  // mi-chemin.
+  //
+  // Garde app_meta PROPRE (deux incidents réels sont venus d'une garde partagée).
+  // Down : DROP TABLE IF EXISTS bat_fichiers;
+  //        DELETE FROM app_meta WHERE key = 'bat_fichiers_v1';
+  {
+    const { rows } = await pool.query("SELECT 1 FROM app_meta WHERE key = 'bat_fichiers_v1'");
+    if (!rows.length) {
+      await pool.query(`CREATE TABLE IF NOT EXISTS bat_fichiers (
+        chemin   text PRIMARY KEY,
+        contenu  text NOT NULL,
+        octets   integer NOT NULL DEFAULT 0,
+        maj      timestamptz NOT NULL DEFAULT now()
+      )`);
+      await pool.query("INSERT INTO app_meta (key, value) VALUES ('bat_fichiers_v1', '1') ON CONFLICT (key) DO NOTHING");
+    }
+  }
+
   // Ménage : table créée à chaque démarrage et jamais utilisée.
   await retirerTableStatuses();
   // Le stock retiré le 26/08 : on récupère la place, mais seulement si personne
@@ -3887,7 +3917,129 @@ async function getRequestJournal(requestId) {
   return rows;
 }
 
+// ---------------------------------------------------------------------------
+// LE MAGASIN DE BAT STUDIO
+// ---------------------------------------------------------------------------
+// Un magasin CLÉ → OCTETS, et rien de plus : BAT Studio nomme ses fichiers par
+// un chemin relatif (`projects/xxx.json`, `logos/…/…​.png`, `bat/…`) et ne
+// demande jamais autre chose que « lis », « écris », « efface », « liste ».
+// C'est ce qui a permis de remplacer son disque par une table sans toucher une
+// ligne de son code : `webapi.js` parle à `/bat/api/data/*`, exactement comme
+// avant.
+//
+// LE CHEMIN EST VÉRIFIÉ ICI, une fois pour les quatre. Un `..` ou un chemin
+// absolu ne doit jamais atteindre la base : sur disque il sortait du répertoire
+// de données, ici il irait lire la clé d'un autre — le mal est le même.
+// UN CHEMIN SE VALIDE SEGMENT PAR SEGMENT, ET EN CLAIR.
+//
+// La première écriture tenait en une expression : `(?!\\.\\.?$)` devant chaque
+// segment, pour refuser `.` et `..`. Elle ne marchait pas, et pas un peu : le
+// `$` d'une expression régulière ancre la fin de la CHAÎNE, pas celle du
+// segment. `../s` passait donc — le `..` de tête n'étant pas en fin de chaîne,
+// le refus ne se déclenchait jamais. C'est exactement le genre d'erreur qu'une
+// expression maligne fait, et qu'une boucle de trois lignes ne fait pas.
+//
+// Deux contrôles, chacun sur ce qu'il sait faire :
+//   · les CARACTÈRES admis, sur la chaîne entière ;
+//   · les SEGMENTS, un par un — aucun vide (`a//b`, `logos/`), aucun `.` ni
+//     `..` (qui, sur le disque d'avant, sortaient du répertoire de données).
+const BAT_CARACTERES = /^[A-Za-z0-9\u00C0-\u00FF_.@+ ()'\/-]+$/;
+const BAT_CHEMIN_MAX = 512;
+
+function batChemin(rel) {
+  // ON NE CORRIGE PAS, ON REFUSE. Cette fonction retirait le « / » de tête et
+  // de queue avant de valider : `/etc/passwd` devenait la clé `etc/passwd`, et
+  // l'appel réussissait sur une clé que personne n'avait demandée. Aucune
+  // lecture hors du magasin — il n'y a pas de disque derrière — mais c'est la
+  // même faute que celle déjà payée sur les identifiants de fiche : deviner ce
+  // qu'un chemin douteux voulait dire, c'est écrire ailleurs qu'on croit.
+  // Rien de legitime n'envoie de barre en trop : `webapi.js` compose ses
+  // chemins segment par segment, sans jamais en mettre.
+  const c = String(rel || '');
+  const refus = () => { throw Object.assign(new Error('chemin refusé'), { statut: 400 }); };
+  if (!c || c.length > BAT_CHEMIN_MAX || !BAT_CARACTERES.test(c)) refus();
+  for (const segment of c.split('/')) {
+    if (!segment || segment === '.' || segment === '..') refus();
+  }
+  return c;
+}
+
+// Renvoie `{ octets, maj }`, ou `null` si le fichier n'existe pas.
+async function batLire(rel) {
+  const chemin = batChemin(rel);
+  const { rows } = await pool.query("SELECT contenu, maj FROM bat_fichiers WHERE chemin = $1", [chemin]);
+  if (!rows.length) return null;
+  return { octets: Buffer.from(rows[0].contenu, "base64"), maj: rows[0].maj };
+}
+
+async function batEcrire(rel, octets) {
+  const chemin = batChemin(rel);
+  const buf = Buffer.isBuffer(octets) ? octets : Buffer.from(octets || []);
+  // LA TAILLE EST RANGÉE, PAS RECALCULÉE. Le ménage des mockups et l'inventaire
+  // des images lourdes ont besoin du poids de CHAQUE fichier ; `length(contenu)`
+  // le donnerait, mais pg-mem (la base locale) n'implémente pas `length`, et il
+  // faudrait de toute façon retrancher le tiers du base64 pour retomber sur des
+  // octets. Une colonne écrite une fois vaut mieux qu'un calcul rejoué à chaque
+  // inventaire sur cent mégaoctets de texte.
+  await pool.query(
+    `INSERT INTO bat_fichiers (chemin, contenu, octets, maj) VALUES ($1, $2, $3, now())
+     ON CONFLICT (chemin) DO UPDATE SET contenu = EXCLUDED.contenu, octets = EXCLUDED.octets, maj = now()`,
+    [chemin, buf.toString("base64"), buf.length],
+  );
+  return true;
+}
+
+// EFFACE LE FICHIER, ET LE SOUS-ARBRE S'IL Y EN A UN. Sur disque, BAT Studio
+// effaçait par `rm -r` : supprimer un projet emportait son dossier de logos.
+// Sans le préfixe ici, ces logos resteraient en base pour toujours, invisibles
+// et comptés dans le ménage.
+async function batSupprimer(rel) {
+  const chemin = batChemin(rel);
+  const { rowCount } = await pool.query(
+    "DELETE FROM bat_fichiers WHERE chemin = $1 OR chemin LIKE $2",
+    [chemin, chemin.replace(/([\\%_])/g, "\\$1") + "/%"],
+  );
+  return rowCount;
+}
+
+// L'ÉQUIVALENT D'UN `readdir` : ce qui se trouve DIRECTEMENT sous `rel`, en
+// distinguant fichier et « dossier ». Il n'y a pas de dossier en base — un
+// dossier, c'est un segment de chemin que plusieurs clés partagent — donc on
+// le déduit, et on dédoublonne.
+async function batLister(rel) {
+  const prefixe = rel ? batChemin(rel) + "/" : "";
+  const { rows } = await pool.query(
+    prefixe ? "SELECT chemin FROM bat_fichiers WHERE chemin LIKE $1" : "SELECT chemin FROM bat_fichiers",
+    prefixe ? [prefixe.replace(/([\\%_])/g, "\\$1") + "%"] : [],
+  );
+  const vus = new Map();
+  for (const { chemin } of rows) {
+    const reste = chemin.slice(prefixe.length);
+    const coupe = reste.indexOf("/");
+    const name = coupe === -1 ? reste : reste.slice(0, coupe);
+    if (name && !vus.has(name)) vus.set(name, { name, dir: coupe !== -1 });
+  }
+  return [...vus.values()];
+}
+
+// CHEMIN → TAILLE, pour tout un sous-arbre. C'est ce que le ménage des mockups
+// orphelins et l'inventaire des images lourdes lisaient du disque avec un
+// `readdir` récursif suivi d'un `stat` par fichier ; ici, une requête.
+// Le CONTENU n'est pas lu : sur `mockups-custom`, il pèse des mégaoctets qui
+// n'apprendraient rien à un inventaire.
+async function batTailles(rel) {
+  const prefixe = rel ? batChemin(rel) + "/" : "";
+  const { rows } = await pool.query(
+    prefixe
+      ? "SELECT chemin, octets FROM bat_fichiers WHERE chemin LIKE $1"
+      : "SELECT chemin, octets FROM bat_fichiers",
+    prefixe ? [prefixe.replace(/([\\%_])/g, "\\$1") + "%"] : [],
+  );
+  return rows.map((r) => ({ chemin: r.chemin.slice(prefixe.length), octets: r.octets }));
+}
+
 module.exports = {
+  batLire, batEcrire, batSupprimer, batLister, batTailles, batChemin,
   pool, init, repairOrphanStages, toFiveFamilies, migrateFamiliesToFive, migrateStagesToLinear,
   // Exportée pour être rejouée SEULE : pg-mem ne relit pas `schema.sql` deux
   // fois, donc un test ne peut pas rappeler `init()` pour vérifier une garde.

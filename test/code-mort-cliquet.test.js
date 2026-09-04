@@ -58,7 +58,15 @@ const PLAFONDS = {
   orphelins: 0,
 };
 
-const res = spawnSync(process.execPath, ['outils/chercher-code-mort.mjs', '--json'], {
+// BAT STUDIO N'EST PAS JUGÉ PAR CETTE SONDE, ET C'EST DÉLIBÉRÉ (04/09/2026).
+// `public/bat/` est une application VENDORISÉE, entrée d'un bloc : trente-trois
+// modules qui s'appellent par imports dynamiques, des classes construites par
+// morceaux, une API interne à un seul appelant. La sonde en trouve quarante,
+// dont aucune n'est du code mort — et un cliquet à quarante ne refuse plus
+// rien. Ses fichiers restent dans le FOIN (`--sauf` ne retire que des
+// résultats) : une fonction du CRM appelée seulement depuis le BAT — c'est le
+// cas de `ecranTete` — compte donc toujours comme vivante.
+const res = spawnSync(process.execPath, ['outils/chercher-code-mort.mjs', '--json', '--sauf', 'public/bat/'], {
   cwd: RACINE, encoding: 'utf8',
 });
 assert.strictEqual(res.status, 0, `le chercheur doit tourner :\n${res.stderr}`);

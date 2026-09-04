@@ -98,6 +98,13 @@ const REGLES = [
     valeur: 1,
     pourquoi: 'trois graisses (400 / 600 / 800) — 500 et 700 sont des marches qui ne se voient pas',
     ok: (v) => v.includes('var(--') || GRAISSES.has(v.trim()),
+    // SAUF DANS UN `@font-face` : la, `font-weight` ne CHOISIT pas une graisse,
+    // il DECLARE celle que le fichier contient. « Inter Medium pese 500 » est un
+    // fait sur un .woff2, pas une decision de mise en forme — et l'interdire
+    // reviendrait a interdire d'heberger une police dont la graisse ne tombe pas
+    // sur l'echelle. Les polices du document arrivees avec BAT Studio en
+    // portaient six, et aucune ne dit quoi que ce soit d'un ecran.
+    horsFontFace: true,
   },
   {
     nom: 'arrondi hors des trois formes',
@@ -182,6 +189,16 @@ for (const f of fichiers) {
   if (!css.trim()) continue;
   const lignes = css.split('\n');
   const trouves = [];
+  // Les bornes des blocs `@font-face`, pour les regles qui ne s'y appliquent
+  // pas. Calculees une fois par fichier, sur le TEXTE et pas ligne a ligne : un
+  // bloc de police s'ecrit couramment sur cinq lignes, et une recherche ligne
+  // par ligne ne verrait pas qu'elle est dedans.
+  const blocsPolice = [];
+  for (const mp of css.matchAll(/@font-face\s*\{/g)) {
+    const fin = css.indexOf('}', mp.index);
+    blocsPolice.push([mp.index, fin === -1 ? css.length : fin]);
+  }
+  const dansUnePolice = (i) => blocsPolice.some(([a, b]) => i >= a && i <= b);
 
   for (const r of REGLES) {
     r.re.lastIndex = 0;
@@ -199,6 +216,7 @@ for (const f of fichiers) {
                     + (col + m[0].length + 38 < ligne.length ? '…' : '');
       if (r.ok && r.ok(val)) continue;
       if (r.permis && r.permis(ligne)) continue;
+      if (r.horsFontFace && dansUnePolice(m.index)) continue;
       // une déclaration de jeton dans un :root local reste un écart (on ne
       // redéclare pas un jeton) — mais on la nomme autrement, c'est plus clair
       const nom = /^\s*--/.test(ligne) && r.nom === 'couleur en dur'

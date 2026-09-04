@@ -20,6 +20,9 @@ const compression = require('compression');
 // corriger « 30 S » en « 100 S » sur la ligne du planning doit appliquer le
 // dégressif du fichier V9, pas garder le prix de trente pièces.
 const chiffrage = require('./chiffrage');
+// BAT STUDIO — l'onglet « BAT » de la barre. Tout son serveur tient là-dedans ;
+// son front est servi tel quel depuis `public/bat/`. Voir l'entête de bat.js.
+const { monterBat } = require('./bat');
 const {
   pool, init, STAGES, STAGE_SLUGS, SUB_SLUGS, RESPONSABLES, CLIENT_TYPES, FLAGS, ORDER_KINDS,
   getCategoryOwners, setCategoryOwners,
@@ -3297,74 +3300,97 @@ async function touchRequest(id) {
   return rows[0] ? rows[0].stage : null;
 }
 
+// DÉPOSER UN PDF SUR UNE COMMANDE — LA RÈGLE, ÉCRITE UNE FOIS.
+//
+// Elle avait un seul appelant (la route ci-dessous) jusqu'à ce que BAT Studio
+// entre dans le CRM : son export dépose le bon à tirer sur la fiche, et il
+// passait pour ça par un aller-retour HTTP vers cette même route, avec un mot
+// de passe à tenir. Dans le même processus, c'est un appel de fonction — et
+// surtout, le versionnage, l'archivage de la version d'avant, l'armement du
+// verrou de production et le temps réel restent écrits À UN SEUL ENDROIT.
+// Deux écritures redeviennent deux comportements le jour où l'une bouge.
+//
+// Renvoie `{ statut, corps }` : à l'appelant de le rendre au client.
+async function deposerPdf({ id, kind, buf, nom, qui }) {
+  if (!PDF_KINDS.includes(kind)) return { statut: 400, corps: { error: `type invalide (${PDF_KINDS.join('|')})` } };
+  if (!Buffer.isBuffer(buf) || buf.length === 0) return { statut: 400, corps: { error: 'PDF vide' } };
+  // Un vrai PDF commence par « %PDF- ». Sans ce contrôle, n'importe quel
+  // fichier de 12 Mo entrait en base (encodé base64, soit +33 % de poids) et
+  // s'ouvrait ensuite sur une page blanche chez celui qui le consultait.
+  if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') {
+    return { statut: 400, corps: { error: 'ce fichier n’est pas un PDF' } };
+  }
+
+  const exists = await pool.query(`SELECT 1 FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [id]);
+  if (exists.rowCount === 0) return { statut: 404, corps: { error: 'Commande introuvable' } };
+
+  let filename = String(nom || '').slice(0, 255).trim();
+  if (!filename) filename = `${kind}.pdf`;
+  const data = buf.toString('base64');
+
+  // LA VERSION D'AVANT PART À L'HISTORIQUE (§19, §20). Elle était PERDUE :
+  // un devis V2 déposé écrasait le V1, et « quel prix lui avait-on annoncé la
+  // première fois ? » n'avait plus de réponse. Même chose pour un BAT qu'on
+  // corrige — c'est justement la version d'avant que le client conteste.
+  //
+  // TROIS LECTURES, PAS UNE SOUS-REQUÊTE CORRÉLÉE. La forme
+  // `INSERT … SELECT … (SELECT MAX(v.version) … WHERE v.request_id = a.request_id)`
+  // est valide en Postgres, mais pg-mem — la base locale, celle sur laquelle
+  // le patron valide — répond « column "a.request_id" does not exist ». Même
+  // piège que la liste des achats : cassé en local, parfait en production.
+  //
+  // La course entre deux dépôts simultanés est tenue par l'index UNIQUE sur
+  // (request_id, kind, version) : le perdant relit le maximum et réessaie une
+  // fois. Deux versions ne peuvent donc pas porter le même numéro.
+  await archiverVersion(id, kind, qui).catch((err) => {
+    // L'historique est un CONFORT : s'il échoue, le dépôt du document doit
+    // quand même aboutir. Perdre une version d'archive est ennuyeux ; perdre
+    // le devis que la vendeuse vient de déposer est bien pire.
+    console.error('historique des pièces jointes :', err.message);
+  });
+
+  // Upsert atomique sur la clé (request_id, kind). En delete + insert, deux
+  // envois simultanés du même emplacement se marchaient dessus : le second
+  // violait la clé primaire et renvoyait 500 sur un dépôt pourtant valide.
+  await pool.query(
+    `INSERT INTO attachments (request_id, kind, filename, data, updated_at)
+     VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (request_id, kind)
+     DO UPDATE SET filename = EXCLUDED.filename, data = EXCLUDED.data, updated_at = now()`,
+    [id, kind, filename, data],
+  );
+  // DÉPOSER UN BAT, C'EST EN AVOIR UN. Le verrou de production s'arme donc
+  // tout seul : personne n'a à cocher « ce dossier a un BAT », et personne ne
+  // le ferait.
+  if (kind === 'bat') {
+    await pool.query('UPDATE requests SET bat_requis = true WHERE id = $1', [id]).catch(() => {});
+  }
+  // DÉPOSER UN DEVIS, C'EST EN AVOIR UN. Même règle, même raison : le dossier
+  // en exige un désormais, sans que personne ait eu à le déclarer.
+  if (kind === 'devis') {
+    await pool.query('UPDATE requests SET devis_requis = true WHERE id = $1', [id]).catch(() => {});
+  }
+  const stage = await touchRequest(id);
+  broadcast({ kind: 'update', stages: stage ? [stage] : [] });
+  return { statut: 200, corps: { kind, filename } };
+}
+
 // PUT /api/requests/:id/pdf/:kind  (corps = PDF brut, ?name=<nom de fichier>)
 app.put('/api/requests/:id/pdf/:kind', exige('clients'),
   express.raw({ type: () => true, limit: '12mb' }),
   asyncH(async (req, res) => {
-    const { id, kind } = req.params;
-    if (!PDF_KINDS.includes(kind)) return res.status(400).json({ error: `type invalide (${PDF_KINDS.join('|')})` });
-    const buf = req.body;
-    if (!Buffer.isBuffer(buf) || buf.length === 0) return res.status(400).json({ error: 'PDF vide' });
-    // Un vrai PDF commence par « %PDF- ». Sans ce contrôle, n'importe quel
-    // fichier de 12 Mo entrait en base (encodé base64, soit +33 % de poids) et
-    // s'ouvrait ensuite sur une page blanche chez celui qui le consultait.
-    if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') {
-      return res.status(400).json({ error: 'ce fichier n’est pas un PDF' });
-    }
-
-    const exists = await pool.query(`SELECT 1 FROM requests WHERE id = $1 AND ${VIVANTES_NU}`, [id]);
-    if (exists.rowCount === 0) return res.status(404).json({ error: 'Commande introuvable' });
-
-    let filename = String(req.query.name || '').slice(0, 255).trim();
-    if (!filename) filename = `${kind}.pdf`;
-    const data = buf.toString('base64');
-
-    // LA VERSION D'AVANT PART À L'HISTORIQUE (§19, §20). Elle était PERDUE :
-    // un devis V2 déposé écrasait le V1, et « quel prix lui avait-on annoncé la
-    // première fois ? » n'avait plus de réponse. Même chose pour un BAT qu'on
-    // corrige — c'est justement la version d'avant que le client conteste.
-    //
-    // TROIS LECTURES, PAS UNE SOUS-REQUÊTE CORRÉLÉE. La forme
-    // `INSERT … SELECT … (SELECT MAX(v.version) … WHERE v.request_id = a.request_id)`
-    // est valide en Postgres, mais pg-mem — la base locale, celle sur laquelle
-    // le patron valide — répond « column "a.request_id" does not exist ». Même
-    // piège que la liste des achats : cassé en local, parfait en production.
-    //
-    // La course entre deux dépôts simultanés est tenue par l'index UNIQUE sur
-    // (request_id, kind, version) : le perdant relit le maximum et réessaie une
-    // fois. Deux versions ne peuvent donc pas porter le même numéro.
-    await archiverVersion(id, kind, quiDemande(req)).catch((err) => {
-      // L'historique est un CONFORT : s'il échoue, le dépôt du document doit
-      // quand même aboutir. Perdre une version d'archive est ennuyeux ; perdre
-      // le devis que la vendeuse vient de déposer est bien pire.
-      console.error('historique des pièces jointes :', err.message);
+    const { statut, corps } = await deposerPdf({
+      id: req.params.id, kind: req.params.kind,
+      buf: req.body, nom: req.query.name, qui: quiDemande(req),
     });
-
-    // Upsert atomique sur la clé (request_id, kind). En delete + insert, deux
-    // envois simultanés du même emplacement se marchaient dessus : le second
-    // violait la clé primaire et renvoyait 500 sur un dépôt pourtant valide.
-    await pool.query(
-      `INSERT INTO attachments (request_id, kind, filename, data, updated_at)
-       VALUES ($1, $2, $3, $4, now())
-       ON CONFLICT (request_id, kind)
-       DO UPDATE SET filename = EXCLUDED.filename, data = EXCLUDED.data, updated_at = now()`,
-      [id, kind, filename, data],
-    );
-    // DÉPOSER UN BAT, C'EST EN AVOIR UN. Le verrou de production s'arme donc
-    // tout seul : personne n'a à cocher « ce dossier a un BAT », et personne ne
-    // le ferait.
-    if (kind === 'bat') {
-      await pool.query('UPDATE requests SET bat_requis = true WHERE id = $1', [id]).catch(() => {});
-    }
-    // DÉPOSER UN DEVIS, C'EST EN AVOIR UN. Même règle, même raison : le dossier
-    // en exige un désormais, sans que personne ait eu à le déclarer.
-    if (kind === 'devis') {
-      await pool.query('UPDATE requests SET devis_requis = true WHERE id = $1', [id]).catch(() => {});
-    }
-    const stage = await touchRequest(id);
-    broadcast({ kind: 'update', stages: stage ? [stage] : [] });
-    res.json({ kind, filename });
+    res.status(statut).json(corps);
   }));
+
+// BAT STUDIO, MONTÉ ICI ET PAS AILLEURS : juste derrière `deposerPdf`, qui est
+// la seule chose que le CRM lui prête. Tout ce qui est sous `/bat/api` lui
+// appartient ; le reste de `/bat` (js, css, polices, vendor) est du statique
+// ordinaire, servi par `express.static` comme le reste de `public/`.
+monterBat(app, { deposerPdf, asyncH, quiDemande });
 
 // Range la version COURANTE à l'historique, avant qu'on l'écrase.
 async function archiverVersion(id, kind, qui, essai = 0) {
@@ -5043,6 +5069,12 @@ const { depouiller } = require('./depouiller.js');
 // ligne qu'aucun des deux autres dépouilleurs n'atteignait : 209 Ko pour
 // `demande-devis.html`. Les trois pèsent 111 Ko compressés, ils en pèsent 60.
 const DEPOUILLABLE = /\.(js|css|html)$/;
+// SAUF LES BIBLIOTHÈQUES TIERCES DE BAT STUDIO. 5,4 Mo de bundles DÉJÀ minifiés
+// (pdf-lib, pdf.js, fontkit, pako, libheif, UTIF) : il n'y a plus un commentaire
+// à retirer, et les dépouiller coûterait le calcul et le risque pour zéro octet
+// gagné. Le reste de `public/bat/` passe au dépouillage comme le reste du CRM —
+// c'est du code écrit à la main, et il est très commenté.
+const NON_DEPOUILLABLE = /^\/bat\/vendor\//;
 const TYPE_MIME = { css: 'text/css', html: 'text/html; charset=utf-8', js: 'text/javascript' };
 const genre = (chemin) => (chemin.endsWith('.css') ? 'css' : chemin.endsWith('.html') ? 'html' : 'js');
 
@@ -5100,7 +5132,7 @@ app.use((req, res, next) => {
   // et sans passer par ici. Le fichier le plus lu de l'application était donc le
   // seul à repartir avec ses 12 Ko de prose.
   const voulu = req.path.endsWith('/') ? `${req.path}index.html` : req.path;
-  if (!DEPOUILLABLE.test(voulu)) return next();
+  if (!DEPOUILLABLE.test(voulu) || NON_DEPOUILLABLE.test(voulu)) return next();
   // `path.join` normalise `..` : on vérifie ensuite qu'on n'est pas sorti de
   // `public/`, sans quoi une adresse fabriquée lirait n'importe quel fichier.
   const racine = path.join(__dirname, 'public');
