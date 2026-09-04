@@ -765,7 +765,15 @@ select.fa-in { appearance: none; cursor: pointer; }
    devait departager. Elle ferme la scene, sur toute la largeur : c'est du texte
    libre, il n'a pas de raison de tenir dans une demi-colonne. Son intitule et sa
    boite sont ceux de partout ailleurs. */
-.fa-note {
+/* LES DEUX BLOCS QUI FERMENT LA FICHE, DANS UNE SEULE REGLE (04/09/2026).
+   La note, puis la saisie du comptoir : meme place, meme rembourrage, meme
+   filet au-dessus. Ecrites deux fois, elles redeviennent deux blocs le jour ou
+   l'une bouge — et l'ecart entre deux blocs voisins ne se voit pas en relisant
+   une regle, seulement en les comparant. `test/acompte-en-un-clic.test.js`
+   refuse d'ailleurs qu'une commande de la fiche se donne un rembourrage a
+   elle : la note portait deja l'exception, la saisie entre avec elle. */
+.fa-note,
+.fa-saisie {
   padding: var(--pas-3) var(--pas-4);
   border-top: 1px solid var(--border);
 }
@@ -1044,10 +1052,6 @@ select.fa-in { appearance: none; cursor: pointer; }
    d'ici ; il n'est pas redessine ici, seule sa place l'est.
    DEUX COLONNES : trente-six paires en une seule pile font deux ecrans de
    defilement pour une archive qu'on parcourt du regard. */
-.fa-saisie {
-  padding: var(--pas-3) var(--pas-4);
-  border-top: 1px solid var(--border);
-}
 .fa-saisie__liste {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

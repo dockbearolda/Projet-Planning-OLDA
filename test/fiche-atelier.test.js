@@ -396,8 +396,26 @@ assert.ok(!/@media[^{]*\{\s*\.fa-details \{[\s\S]*?position: absolute;/.test(CSS
   'et il ne redevient un calque nulle part');
 // LA NOTE S'INTERCALE ENTRE LES DEUX (29/08) : on a fini de lire le dossier, on
 // écrit ce qui ne rentrait dans aucune case, puis on regarde l'argent.
-assert.ok(/scene\.append\(travail, blocNote, panneau\);/.test(JS),
-  'il vit dans la scène, qu’il allonge en se dépliant — et la note le précède');
+//
+// UN QUATRIÈME BLOC S'EST GLISSÉ LE 04/09, entre la note et l'argent : la
+// SAISIE DU COMPTOIR (`.fa-saisie`), l'archive de ce que la vendeuse a tapé en
+// boutique. Elle arrive là et pas ailleurs pour la même raison que la note :
+// on lit le dossier, on écrit ce qu'on a à dire, on va chercher le détail
+// d'origine si on en a besoin, et l'argent ferme l'écran — c'est lui qu'on
+// regarde en dernier, et la barre du bas est faite pour ça.
+// Elle est CONDITIONNELLE : les dossiers qui ne viennent pas du comptoir n'ont
+// rien à montrer, et un cadre autour de rien est un défaut.
+assert.ok(/scene\.append\(travail, blocNote, \.\.\.\(saisie \? \[saisie\] : \[\]\), panneau\);/.test(JS),
+  'il vit dans la scène, qu’il allonge en se dépliant — la note le précède, et la saisie du comptoir s’intercale entre les deux');
+// L'ORDRE COMPTE PLUS QUE L'ÉCRITURE : si la ligne ci-dessus doit changer, ces
+// trois-là disent ce qu'il faut préserver.
+{
+  const ligne = JS.match(/scene\.append\([\s\S]*?panneau\);/)[0];
+  const rang = (nom) => ligne.indexOf(nom);
+  assert.ok(rang('travail') < rang('blocNote'), 'les colonnes d’abord : on lit le dossier');
+  assert.ok(rang('blocNote') < rang('saisie'), '… puis la note : on écrit ce qui ne rentrait nulle part');
+  assert.ok(rang('saisie') < rang('panneau'), '… et l’argent ferme l’écran, toujours en dernier');
+}
 // TOUT LE FINANCIER D'UN COUP : aucune hauteur maximale, aucun défilement
 // interne. Il avait `max-height: 400px; overflow: auto` du temps du calque.
 assert.ok(!/max-height/.test(PANNEAU) && !/overflow: auto/.test(PANNEAU),
