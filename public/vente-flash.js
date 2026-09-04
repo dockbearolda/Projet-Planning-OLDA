@@ -195,6 +195,21 @@ let transports = {};
 // emettreFacture). PAS DE REPRISE/VERSION ICI, contrairement au devis flash —
 // une facture est immuable, une nouvelle vente est un nouveau dossier.
 let dossierId = null;
+// ⚠ DEUX FAITS, DEUX DRAPEAUX (04/09/2026). `dossierId` disait à lui seul
+// « facture émise », et il mentait sur le seul cas qui compte : l'émission
+// passe par DEUX appels (le dossier, puis la facture) et le second peut
+// échouer. Le dossier existait alors, `dossierId` était posé — donc l'écran
+// annonçait « Facture émise », le bouton se grisait, et le garde
+// `if (dossierId) return` en tête d'`emettreFacture` rendait tout nouveau clic
+// muet. La vendeuse repartait convaincue d'avoir facturé, sans document et
+// sans moyen de reprendre. `numeroFacture` ne se pose qu'au retour de
+// `POST /api/factures` : c'est LUI qui dit qu'une facture existe.
+//
+// GARDER `dossierId` MALGRÉ L'ÉCHEC EST VOULU : la route de la facture est
+// idempotente sur le dossier (server.js, `dossier_id UNIQUE`), donc reprendre
+// avec le même identifiant termine la vente au lieu d'ouvrir un second dossier
+// pour le même client.
+let numeroFacture = '';
 
 // LE BROUILLON EST PAR APPAREIL. Une vente se compose devant le client, en
 // quelques minutes, et un poste qui se ferme au milieu ne doit pas faire tout
@@ -208,7 +223,7 @@ let dossierId = null;
 // devis), et l'inverse au retour. Deux écrans, deux brouillons.
 const CLE_BROUILLON = 'olda.vente.brouillon';
 function garderBrouillon() {
-  try { localStorage.setItem(CLE_BROUILLON, JSON.stringify({ saisie, dossierId, replis })); } catch (_) { /* plein ou refusé */ }
+  try { localStorage.setItem(CLE_BROUILLON, JSON.stringify({ saisie, dossierId, numeroFacture, replis })); } catch (_) { /* plein ou refusé */ }
 }
 function relireBrouillon() {
   try {
@@ -226,6 +241,7 @@ function relireBrouillon() {
       if (!Array.isArray(l.taillesLibres)) l.taillesLibres = [];
     }
     dossierId = d.dossierId || null;
+    numeroFacture = typeof d.numeroFacture === 'string' ? d.numeroFacture : '';
     replis = d.replis && typeof d.replis === 'object' ? d.replis : {};
   } catch (_) { /* un brouillon illisible vaut pas de brouillon */ }
 }
@@ -2128,7 +2144,11 @@ function peindre() {
   const compteur = $('#dvf-compte');
   if (compteur) {
     const n = saisie.lignes.length;
-    const etatDevis = dossierId ? 'facture émise' : 'brouillon local';
+    // TROIS ÉTATS, PAS DEUX. « Dossier ouvert » est celui qu'on ne voyait
+    // jamais et qui coûtait le plus cher : le dossier est au planning, la
+    // facture ne l'est pas, et il reste un clic à faire.
+    const etatDevis = numeroFacture ? `facture ${numeroFacture} émise`
+      : (dossierId ? 'dossier ouvert — facture à émettre' : 'brouillon local');
     // CE QUI MANQUE SE COMPTE ICI, une fois pour toute la vente. Une ligne « à
     // chiffrer » se voit dans le tableau — mais le tableau se replie, et
     // c'est justement replié qu'on clique « Émettre ». Le compte, lui, est
@@ -2163,11 +2183,14 @@ function peindre() {
     // ⚠ DEUX CONDITIONS DE PLUS QUE LE DEVIS : un mode de règlement choisi,
     // et AUCUNE ligne sans prix — une facture émise connaît tous ses prix
     // (§4 du spec), là où un devis peut sortir avec des lignes « à chiffrer ».
-    bSave.disabled = !!dossierId || !saisie.lignes.length
+    bSave.disabled = !!numeroFacture || !saisie.lignes.length
       || !String(saisie.client.nom || '').trim()
       || !saisie.mode
       || compte.lignes.some((l) => l.sansPrix);
-    bSave.textContent = dossierId ? 'Facture émise' : 'Émettre la facture';
+    // ET SON INTITULÉ DIT CE QUE LE CLIC VA FAIRE : reprendre là où
+    // l'émission s'est arrêtée n'est pas la commencer.
+    bSave.textContent = numeroFacture ? 'Facture émise'
+      : (dossierId ? 'Reprendre l’émission' : 'Émettre la facture');
   }
 
   const feuille = $('#dvf-feuille');
@@ -2195,7 +2218,7 @@ function peindre() {
 // vente déjà décidée.
 let emissionEnCours = false;
 async function emettreFacture() {
-  if (emissionEnCours || dossierId) return;
+  if (emissionEnCours || numeroFacture) return;
   const nom = String(saisie.client.nom || '').trim();
   if (!nom) return dire('Le nom du client est requis', 'is-ko');
   if (!saisie.lignes.length) return dire('Une vente sans article ne s’émet pas', 'is-ko');
@@ -2208,6 +2231,12 @@ async function emettreFacture() {
   if (bouton) bouton.disabled = true;
   try {
     // --- 1. Le dossier, par la route du comptoir --------------------------
+    // ⚠ ON NE LE REFAIT PAS S'IL EXISTE DÉJÀ. Une reprise après un échec de
+    // l'étape 2 doit terminer CETTE vente, pas en ouvrir une seconde pour le
+    // même client — la route du comptoir est idempotente par empreinte, mais
+    // une empreinte se calcule sur une saisie qui a pu bouger entre-temps.
+    // L'identifiant qu'on tient déjà, lui, ne bouge pas.
+    //
     // TOUT EST EN TTC ICI, PAS EN HT. `partsDuTicket` (server.js) compare la
     // somme des `amount` d'articles au montant TTC du dossier (voir
     // `rDossier` plus bas, `amount: compte.ttc`) — un article envoyé en HT
@@ -2215,57 +2244,59 @@ async function emettreFacture() {
     // taux effectif vient de `compte.tauxTgca` (déjà résolu par
     // `calculerDevis` selon le régime — 0 sur Revente/Export), jamais de
     // `saisie.tauxTgca` brut qui ignorerait le régime.
-    const articles = compte.lignes.map((l) => ({
-      label: l.designation,
-      qty: l.quantite,
-      amount: Math.round(l.totalHt * (1 + compte.tauxTgca) * 100) / 100,
-      prod: { ref: l.reference, couleur: l.couleur, marquage: l.marquage, encre: l.encre },
-      // MOTEUR « UNITAIRE » : le prix est déjà tranché à l'émission (par le
-      // moteur V9 ou le catalogue), on l'archive tel quel plutôt que de
-      // rejouer une chiffrage textile complexe server-side pour ce lot. Une
-      // correction de quantité plus tard au planning recalcule linéairement
-      // sur ce prix — pas le dégressif V9 d'origine. Limite connue, acceptée
-      // pour ce lot (voir spec).
-      chiffrage: {
-        moteur: 'unitaire',
-        unitTTC: Math.round(l.unitaireHt * (1 + compte.tauxTgca) * 100) / 100,
-        rate: 0,
-      },
-      detail: l.note || null,
-    }));
-    const rDossier = await api('POST', '/api/comptoir/projet', {
-      source: 'Vente directe',
-      clientObj: {
-        name: saisie.client.nom, company: saisie.client.nom, type: saisie.client.type,
-      },
-      amount: compte.ttc,
-      // `name`/`quantity` NE SERVENT QUE SUR UN PANIER D'UN SEUL ARTICLE :
-      // server.js (POST /api/comptoir/projet) ne construit un « lot » multi-
-      // lignes qu'à partir de deux articles ou plus — sur un seul, il retombe
-      // sur CES DEUX CHAMPS RACINE pour la désignation et la quantité, et
-      // ignore `articles[0].label`/`articles[0].qty` pour ça (seuls
-      // `articles[0].prod`/`articles[0].chiffrage` sont repris dans ce cas).
-      // Les poser inconditionnellement est sans effet quand il y a plusieurs
-      // articles (le serveur les ignore alors).
-      name: articles.length === 1 ? articles[0].label : `${articles.length} articles`,
-      quantity: articles.length === 1 ? articles[0].qty : undefined,
-      articles,
-      paiement: { mode: saisie.mode },
-      dueDate: saisie.dueDate, dueTime: saisie.dueHeure,
-      comment: saisie.noteInterne,
-      client_info: [
-        ['Client', saisie.client.nom], ['Type de client', saisie.client.type === 'perso' ? 'Particulier' : 'Professionnel'],
-        ['Adresse', saisie.client.adresse],
-        ['Ville', saisie.client.ville], ['Téléphone', saisie.client.tel], ['E-mail', saisie.client.email],
-      ].filter(([, v]) => v),
-      details: articles.flatMap((a, i) => [
-        [`Article ${i + 1} — Désignation`, a.label],
-        a.prod.couleur ? [`Article ${i + 1} — Couleur`, a.prod.couleur] : null,
-        a.prod.marquage ? [`Article ${i + 1} — Marquage`, a.prod.marquage] : null,
-      ].filter(Boolean)),
-    });
-    dossierId = rDossier && rDossier.id ? rDossier.id : null;
-    if (!dossierId) throw new Error('Le dossier n’a pas pu être créé');
+    if (!dossierId) {
+      const articles = compte.lignes.map((l) => ({
+        label: l.designation,
+        qty: l.quantite,
+        amount: Math.round(l.totalHt * (1 + compte.tauxTgca) * 100) / 100,
+        prod: { ref: l.reference, couleur: l.couleur, marquage: l.marquage, encre: l.encre },
+        // MOTEUR « UNITAIRE » : le prix est déjà tranché à l'émission (par le
+        // moteur V9 ou le catalogue), on l'archive tel quel plutôt que de
+        // rejouer une chiffrage textile complexe server-side pour ce lot. Une
+        // correction de quantité plus tard au planning recalcule linéairement
+        // sur ce prix — pas le dégressif V9 d'origine. Limite connue, acceptée
+        // pour ce lot (voir spec).
+        chiffrage: {
+          moteur: 'unitaire',
+          unitTTC: Math.round(l.unitaireHt * (1 + compte.tauxTgca) * 100) / 100,
+          rate: 0,
+        },
+        detail: l.note || null,
+      }));
+      const rDossier = await api('POST', '/api/comptoir/projet', {
+        source: 'Vente directe',
+        clientObj: {
+          name: saisie.client.nom, company: saisie.client.nom, type: saisie.client.type,
+        },
+        amount: compte.ttc,
+        // `name`/`quantity` NE SERVENT QUE SUR UN PANIER D'UN SEUL ARTICLE :
+        // server.js (POST /api/comptoir/projet) ne construit un « lot » multi-
+        // lignes qu'à partir de deux articles ou plus — sur un seul, il retombe
+        // sur CES DEUX CHAMPS RACINE pour la désignation et la quantité, et
+        // ignore `articles[0].label`/`articles[0].qty` pour ça (seuls
+        // `articles[0].prod`/`articles[0].chiffrage` sont repris dans ce cas).
+        // Les poser inconditionnellement est sans effet quand il y a plusieurs
+        // articles (le serveur les ignore alors).
+        name: articles.length === 1 ? articles[0].label : `${articles.length} articles`,
+        quantity: articles.length === 1 ? articles[0].qty : undefined,
+        articles,
+        paiement: { mode: saisie.mode },
+        dueDate: saisie.dueDate, dueTime: saisie.dueHeure,
+        comment: saisie.noteInterne,
+        client_info: [
+          ['Client', saisie.client.nom], ['Type de client', saisie.client.type === 'perso' ? 'Particulier' : 'Professionnel'],
+          ['Adresse', saisie.client.adresse],
+          ['Ville', saisie.client.ville], ['Téléphone', saisie.client.tel], ['E-mail', saisie.client.email],
+        ].filter(([, v]) => v),
+        details: articles.flatMap((a, i) => [
+          [`Article ${i + 1} — Désignation`, a.label],
+          a.prod.couleur ? [`Article ${i + 1} — Couleur`, a.prod.couleur] : null,
+          a.prod.marquage ? [`Article ${i + 1} — Marquage`, a.prod.marquage] : null,
+        ].filter(Boolean)),
+      });
+      dossierId = rDossier && rDossier.id ? rDossier.id : null;
+      if (!dossierId) throw new Error('Le dossier n’a pas pu être créé');
+    }
 
     // --- 2. La facture, immuable --------------------------------------------
     const rFacture = await api('POST', '/api/factures', {
@@ -2282,6 +2313,9 @@ async function emettreFacture() {
       jour: jourAtelier(),
     });
     saisie.numero = (rFacture && rFacture.numero) || '';
+    // C'EST ICI, ET NULLE PART AVANT, QU'UNE FACTURE EXISTE. Tant que cette
+    // ligne n'a pas été atteinte, l'écran doit dire qu'il reste un clic à faire.
+    numeroFacture = saisie.numero;
 
     // --- 3. Impression automatique -------------------------------------------
     const t = modeleFacture(saisie, entreprise);
@@ -2311,10 +2345,11 @@ async function emettreFacture() {
 function repartirDeZero() {
   // ON NE VIDE PAS UNE VENTE QU'ON N'A PAS ÉMISE SANS LE DIRE. Un brouillon
   // perdu, c'est un client qu'on fait attendre pendant qu'on retape.
-  if (!dossierId && saisie.lignes.length
+  if (!numeroFacture && saisie.lignes.length
     && !window.confirm('Cette vente n’a pas été facturée. La remplacer par une vente vierge ?')) return;
   saisie = saisieNeuve();
   dossierId = null;
+  numeroFacture = '';
   for (const [id, v] of [['#dvf-cl-nom', ''], ['#dvf-cl-code', ''], ['#dvf-cl-adresse', ''],
     ['#dvf-cl-ville', ''],
     ['#dvf-cl-email', ''], ['#dvf-cl-contact', ''], ['#dvf-cl-tel', ''], ['#dvf-cl-wa', ''],
