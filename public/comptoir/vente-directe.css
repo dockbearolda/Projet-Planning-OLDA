@@ -68,40 +68,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-1);margin:0}
 .card{background:var(--surface);border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin-bottom:var(--pas-3);box-shadow:var(--shadow-1)}
 h2{margin:0 0 var(--pas-3);font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-serre)}
 h3{margin-top:0;font-size:var(--taille-texte);font-weight:var(--graisse-forte);line-height:var(--ligne-serre)}
-/* .grid / .grid-3 : gouttière alignée sur celle du devis (--rangee), voir
-   « Le champ et son intitulé » dans charte.css — même mesure, deux techniques
-   de rangée (celle-ci garde son subgrid, propre à cet écran). */
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--rangee)}
-.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--rangee)}
-/* UNE RANGÉE ALIGNE SES COMMANDES, QUOI QU'IL Y AIT AUTOUR D'ELLES.
-   Les grilles de formulaire collaient leurs cellules EN BAS
-   (`align-items:end`) pour qu'un intitulé passé à la ligne ne pousse pas son
-   champ 18 px plus bas que ses voisins. Mais c'était régler le problème par le
-   bas : dès qu'un message d'erreur s'ajoute SOUS un champ, c'est le champ qui
-   REMONTE — 27 px au-dessus de ses voisins de rangée, au moment précis où
-   l'œil le cherche. Le rouge signalait le champ qui manque, et le décalait.
-   Chaque cellule reprend donc les LIGNES de sa rangée (`subgrid`) : les
-   intitulés sur la première, les commandes sur la deuxième, les messages sur la
-   troisième. Plus rien de ce qui est au-dessus ou au-dessous ne peut déplacer
-   une commande. Sans subgrid, on garde le collage en bas — le moins mauvais
-   des deux. */
-@supports (grid-template-rows:subgrid){
-  .grid,.grid-3{grid-template-rows:auto auto auto;align-items:stretch}
-  .grid>.field,.grid-3>.field{display:grid;grid-template-rows:subgrid;grid-row:span 3;margin-bottom:0}
-  .grid>.field>label,.grid-3>.field>label{grid-row:1;align-self:end}
-  .grid>.field>.error,.grid>.field>.help,
-  .grid-3>.field>.error,.grid-3>.field>.help{grid-row:3}
-  /* UN CHAMP QUI PORTE TOUT UN EMPILEMENT NE RENTRE PAS DANS TROIS LIGNES.
-     « Date souhaitée » tient sa date, ses trois raccourcis de délai, son avis
-     de supplément, son barème dépliable ET l'heure souhaitée avec son propre
-     intitulé : sept éléments pour trois lignes de rangée. Le débordement
-     partait dans les lignes implicites et démontait la rangée entière.
-     Une rangée qui contient un champ à deux intitulés renonce donc au partage
-     de lignes et se range normalement — c'est le seul cas des deux écrans. */
-  .grid:has(>.field label~label),.grid-3:has(>.field label~label){grid-template-rows:none}
-  .grid:has(>.field label~label)>.field,.grid-3:has(>.field label~label)>.field{display:block;grid-row:auto;margin-bottom:var(--rangee)}
-}
-.field{margin-bottom:var(--rangee)}
+/* `.grid` EST PARTIE EN ENTIER (02/09). Elle mettait deux CHAMPS côte à côte,
+   chacun dans son `.field` à intitulé au-dessus, et ses cellules partageaient
+   leurs lignes (`subgrid`) pour qu'un message d'erreur ne fasse pas remonter un
+   champ au-dessus de ses voisins. Depuis que la saisie est une feuille de
+   calcul (`.rangs` / `.rang`, charte.css), il n'y a plus une seule rangée de
+   champs sur cet écran : `.field`, `.grid-3`, le partage de lignes et son
+   exception `label~label` sont partis avec elle.
+   Son dernier porteur était la paire « Articles de la commande » / « Résumé
+   TTC » : mesuré au rendu, le tableau y disposait de 570 px pour cinq colonnes
+   et la désignation tombait à 140 px — « Tee-shi… » sur la ligne qu'on relit
+   avant d'encaisser. Les deux cartes s'empilent, comme sur le devis flash. */
 /* label : même intitulé que le devis (voir « Le champ et son intitulé » dans
    charte.css) — il prenait 17 px en graisse 800 (celle des titres), quand
    --taille-note/--graisse-note (14 px / 600) porte déjà « Référence » à côté.
@@ -170,36 +147,121 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
    dessous). Aucun champ visible ne vit hors d'une bulle sur cet écran — les
    sept qui traînent sont des champs CACHÉS, porteurs de valeurs pour le ticket
    et le planning. */
-.bloc{border:1px solid var(--card-border);border-radius:var(--arrondi-carte);padding:var(--pas-4);margin:var(--pas-3) 0 0;background:var(--surface)}
-/* Les trois cartes qui portent des groupes ne sont plus des cartes : leurs
-   enfants en sont. Sans ça on retrouverait un arrondi dans un arrondi. */
-.card:has(> .bloc){background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;margin:0 0 var(--pas-3)}
+.bloc{margin:var(--pas-3) 0 0}
+/* LE GROUPE A RENDU SON CADRE A LA CARTE-VOLET (02/09) : il ne reste que
+   l'ecart, et un FILET entre deux groupes qui se suivent. Ecrit sur le
+   deuxieme, jamais sur chacun : un trait par groupe en pose un de trop sous le
+   dernier. */
+.volet-carte .bloc+.bloc{border-top:1px solid var(--card-border);padding-top:var(--pas-3)}
+/* ===========================================================================
+   CHAQUE CARTE EST UN VOLET (02/09/2026)
+   ---------------------------------------------------------------------------
+   Charlie : « je veux que mon onglet vente soit pareil que flash devis avec
+   les menus depliables repliables. » Le composant vient de la CHARTE
+   (`.volet-plus` pour la fleche et l'ouverture glissee, `.volet-carte` pour la
+   poignee a `--ctrl-h`) : c'est celui du devis flash, au pixel, pas un repli
+   ecrit ici qui lui ressemblerait.
+
+   LA CARTE REDEVIENT UNE CARTE, ET LES GROUPES S'APLATISSENT. Depuis le 25/08,
+   une carte qui ne portait QUE des groupes de champs (`.bloc`) s'effaçait et
+   c'etaient ses enfants qui faisaient les cartes — sans quoi on avait un
+   arrondi dans un arrondi. Un volet renverse ce partage : ce qu'on replie, ce
+   qu'on lit ferme, c'est la CARTE et son titre ; un titre nu pose sur le fond
+   gris ne se lit pas comme une carte, et l'ecran d'a cote en montre une.
+   C'est donc la carte qui reprend le cadre, et les groupes qui le rendent : ils
+   ne sont plus qu'un ecart et un filet de separation. TROIS NIVEAUX, comme
+   avant — fond gris, carte, champ — l'un d'eux a simplement change de main.
+   =========================================================================== */
+/* Le corps du volet : le titre a rendu sa marge basse (`.volet-carte` dans
+   charte.css), c'est le corps qui prend l'air sous la poignee. */
+.vd-corps{padding-top:var(--pas-2)}
+.vd-corps>:first-child{margin-top:0}
+.vd-corps>:last-child{margin-bottom:0}
+/* La règle qui empêchait une carte fermée de s'étirer sur sa voisine ouverte
+   est partie avec la grille qui les mettait côte à côte (02/09) : empilées,
+   elles prennent chacune leur hauteur. */
 .bloc>:first-child{margin-top:0}
 .bloc>:last-child{margin-bottom:0}
-/* Un encadré posé DANS une bulle repasse en blanc, et une bulle posée dans un
-   encadré aussi : deux fonds gris l'un sur l'autre ne se distinguent pas. */
-.bloc .notice,.bloc .product-card,.notice .bloc{background:var(--surface)}
+/* La règle « un encadré dans une bulle repasse en blanc » est partie avec le
+   fond de la bulle (02/09) : le groupe n'a plus de fond à opposer à celui d'un
+   encadré, et aucun `.notice` ni `.product-card` de cet écran n'en a jamais
+   été l'enfant. */
+/* `.product-card` ne sert plus qu'à UN encadré : la fiche du client retenu.
+   Les articles, eux, sont des LIGNES de tableau depuis le 02/09 — `.product-top`,
+   `.product-title`, `.product-description`, `.summary-row` et `.summary-total`
+   sont partis avec les cartes qu'ils habillaient. Le compte prend `.tot` et le
+   tableau `.lignes`, tous deux dans la charte : c'est la grammaire du devis
+   flash, et deux écrans du même poste ne peuvent pas en avoir deux. */
 .product-card{border:1px solid var(--border);border-radius:var(--arrondi-bloc);padding:var(--pas-3);margin-top:var(--pas-2);background:var(--zone-bg)}
-.product-top{display:flex;justify-content:space-between;gap:12px}
-.product-title{font-weight:var(--graisse-forte)}
-.product-description{white-space:pre-wrap;color:var(--text-2);margin-top:8px}
-.summary-row{display:flex;justify-content:space-between;gap:12px;margin:9px 0}
-.summary-total{font-size:var(--taille-grand);font-weight:var(--graisse-forte);border-top:1px solid var(--border);padding-top:12px}
+
+/* ===========================================================================
+   LA GRAMMAIRE DE LIGNE DE CET ÉCRAN (02/09/2026)
+   ---------------------------------------------------------------------------
+   Charlie : « je veux que tu normalises en ligne exactement comme dans flash
+   devis, les lignes, la façon dont on écrit les prix ; vente doit être une
+   copie de flash devis avec ses spécificités. »
+
+   Le composant vient de `charte.css` — `.rangs` / `.rang` pour la feuille de
+   calcul, `.lignes` pour le tableau, `.nb` pour un nombre, `.tot` pour le
+   compte. Ce qui s'écrit ICI, ce sont les DEUX mesures qui dépendent de
+   l'écran : la largeur de sa colonne d'intitulés, et ses pistes à lui.
+   =========================================================================== */
+/* 210 px : « Prix personnalisation TTC » et « Description de production * »,
+   les deux plus longs de l'écran, tiennent en une ligne au cran des libellés.
+   Le devis en demande 176 — ses libellés sont plus courts. La grille, elle,
+   est la même : c'est le JETON qui diffère, pas la règle. */
+.rangs{--rangs-k:210px}
+/* CINQ PISTES, ET CE NE SONT PAS CELLES DU DEVIS. Le prix est TTC (c'est ce
+   qu'on encaisse, et les montants y sont plus longs qu'en HT), et la dernière
+   piste porte DEUX actions : on modifie un article dans le formulaire du haut,
+   là où le devis se corrige dans sa propre ligne. */
+.lignes{--lignes-cols:minmax(0,1fr) 64px 104px 124px calc(var(--ctrl-h) * 2 + var(--pas-1))}
+/* LE MONTANT DÛ N'A RIEN AU-DESSUS DE LUI, DONC PAS DE TRAIT. `.tot--grand`
+   porte un filet plein qui SÉPARE le total des lignes qui le construisent ;
+   à l'étape « Paiement » il ouvre la carte, et ce trait n'y séparait rien —
+   un trait décoratif, ce que la charte ne veut pas. */
+#amountDue{border-top:0;padding-top:0}
+/* CE QUI DIT COMMENT ON PRODUIT VIT SOUS LA LIGNE. Le délai et la date de
+   récupération se lisent d'un coup d'œil sur la rangée ; la consigne de
+   production est une phrase, elle prend la ligne suivante en entier et garde
+   ses retours à la ligne — c'est ce que l'atelier va suivre. */
+.vd-detail{display:flex;align-items:center;gap:var(--pas-2);flex-wrap:wrap;padding:0 var(--pas-1)}
+.vd-detail__quand{font-size:var(--taille-note);color:var(--text-2)}
+.vd-detail__prod{padding:0 var(--pas-1);font-size:var(--taille-note);line-height:var(--ligne-texte);color:var(--text-2);white-space:pre-wrap}
+.vd-detail__prod:empty{display:none}
 .badge{display:inline-block;padding:5px 8px;border-radius:999px;font-weight:var(--graisse-forte);background:var(--border-soft)}
 .badge.green{background:var(--primary-soft);color:var(--primary)}
 .badge.orange{background:var(--warning-bg);color:var(--warning)}
 .internal{border:2px solid var(--primary);background:var(--surface)}
-.internal-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+/* LE TITRE SUIT SA FLECHE, LE BADGE FINIT LA LIGNE. `space-between` ecartait
+   les TROIS elements de la poignee — la fleche du volet, le titre, le badge —
+   et posait « Note interne OLDA » au milieu de la carte quand les trois autres
+   volets collent leur titre a la fleche. Par une marge automatique sur le
+   badge, jamais par `flex-end` : une rangee en `flex-end` qui deborde se fait
+   rogner PAR LA GAUCHE. */
+.internal-head{display:flex;align-items:center;gap:var(--pas-1)}
+.internal-head .lock{margin-left:auto}
 .lock{background:var(--primary);color:var(--on-primary);border-radius:999px;padding:5px 9px;font-weight:var(--graisse-forte)}
 .hidden{display:none!important}
-.payment-option{display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:var(--graisse-texte)}
-.payment-option input{width:auto}
+/* LES CINQ MODES PRENNENT LA BOÎTE DE L'APPLICATION (02/09). Ils sortaient à
+   53 px — leur contenu plus deux marges de 10 — dans un écran où tout ce qui se
+   clique et se remplit fait `--ctrl-h`. Un mode de paiement se clique : c'est
+   la même boîte, et l'écart passe sur le groupe, une seule fois. */
+.payment-option{display:flex;align-items:center;gap:var(--pas-2);margin:0;min-height:var(--ctrl-h);font-weight:var(--graisse-texte);cursor:pointer}
+/* UN BOUTON RADIO N'EST PAS UN CHAMP DE SAISIE. La recette des commandes pose
+   `input{height:var(--ctrl-h);border:1.5px…}` sur TOUS les `input` : le rond du
+   mode de paiement héritait donc d'une boîte de 50 px et d'un trait de 1,5 —
+   53 px de contenu dans une rangée qui en demande 50, et l'égalisation sautait
+   par le bas. Il reprend sa boîte native ; ce qui se remplit garde la sienne. */
+.payment-option input{width:auto;height:auto;min-height:0;padding:0!important;border:0!important;accent-color:var(--primary)}
 .success{background:var(--success-bg);border:1px solid var(--success-line);border-radius:var(--arrondi-bloc);padding:15px}
 .center{text-align:center}
 .footer-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-@media(max-width:800px){
-  .grid,.grid-3,.footer-actions,
-}
+/* Une règle CASSÉE dormait ici : `@media(max-width:800px){.grid,.grid-3,
+   .footer-actions,}` — une liste de sélecteurs sans accolade de déclaration,
+   donc sans effet, et qui avale la règle suivante dans certains analyseurs.
+   Elle est partie avec `.grid-3` (02/09). Le breakpoint 800 px visait la
+   tablette, mise au rebut le 21/08. */
 
 .client-search-wrap{position:relative}
 .client-results{margin-top:var(--pas-2);display:grid;gap:var(--pas-2)}
@@ -255,12 +317,9 @@ button{border:0;border-radius:var(--arrondi-champ);min-height:var(--ctrl-h);padd
 }
 
 
-/* Masque les anciens boutons de navigation pour ne garder qu'une action claire */
-#goToClientBtn,
-#continueToPaymentBtn,
-#backToArticlesBtn{
-  display:none!important;
-}
+/* Les trois anciens boutons de navigation ne sont plus masqués : ils sont
+   PARTIS (02/09), avec leurs fonctions et leurs écouteurs. Masquer un bouton
+   laisse sa carte. */
 
 
 /* V10 — Vente directe reprise propre */
@@ -527,12 +586,14 @@ body{font-family:var(--font)!important}
    `inherit` et non un nom en dur : dans le ticket, qui a sa propre échelle,
    les champs doivent rester avec lui. */
 input,select,textarea,button{font-family:inherit!important}
-/* `:not(:has(> .bloc))` : une carte qui ne contient QUE des groupes de champs
-   n'est plus une carte depuis le 25/08 — ce sont ses enfants qui le sont (voir
-   « TROIS NIVEAUX, JAMAIS PLUS » plus bas). Sans cette exception, ces deux
-   `!important` la lui rendaient de force, et on retrouvait l'arrondi dans
-   l'arrondi. */
-.card:not(:has(> .bloc)){border-radius:var(--arrondi-carte)!important}
+/* L'EXCEPTION `:not(:has(> .bloc))` EST PARTIE AVEC LES VOLETS (02/09). Elle
+   protegeait les cartes qui ne portaient QUE des groupes de champs : elles
+   s'effacaient au profit de leurs enfants, et ces deux `!important` leur
+   rendaient le cadre de force. Depuis que chaque carte est un volet, le corps
+   du volet s'interpose, plus aucune carte n'a de `.bloc` pour enfant direct, et
+   le carve-out ne designait plus rien — un selecteur qui ne retire rien, qu'on
+   relit dix fois en se demandant ce qu'il protege. */
+.card{border-radius:var(--arrondi-carte)!important}
 /* `:not(.btn-retour)` : le bouton « revenir d'un cran » de la charte est ROND,
    et un `!important` sur un sélecteur nu bat n'importe quelle classe — c'est
    ainsi qu'il se retrouvait avec l'arrondi d'un champ au lieu du sien. */
@@ -590,7 +651,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(var(--primary-rgb),.
    pixel sur ses voisins. Hauteur de ligne fixée, le libellé ne décide plus de
    la boîte. */
 button{line-height:var(--ligne-serre)!important}
-.card:not(:has(> .bloc)){border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
+.card{border:1px solid var(--card-border)!important;box-shadow:var(--shadow-1)!important;padding:var(--pas-4)!important}
 input,select,textarea{border:1.5px solid var(--border)!important;line-height:var(--ligne-serre)!important}input,select{padding:0 var(--champ-x)!important}textarea{padding:var(--champ-x)!important}
 input:focus,select:focus,textarea:focus{outline:3px solid rgba(var(--primary-rgb),.15)!important;border-color:var(--primary)!important}
 h2{letter-spacing:-.01em}
@@ -653,16 +714,29 @@ select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-i
 /* Les raccourcis de délai, SOUS le calendrier : ils le servent, ils ne le
    remplacent pas. Ce sont des pastilles à cliquer, pas des champs : elles
    prennent la boîte serrée de la charte. */
+/* ILS TOMBENT SUR LE RAIL DES CASES (02/09). Ces trois pastilles écrivent dans
+   « Date souhaitée » : posées au bord gauche de la carte, elles commençaient
+   210 px avant la colonne qu'elles remplissent. Elles démarrent donc là où
+   démarrent les cases — et l'avis de supplément avec elles, puisqu'il répond à
+   la date qu'elles viennent de poser. Le décalage se CALCULE sur le jeton de la
+   colonne d'intitulés, il ne se retape pas. */
+.delay-quick,.delai-etat,.rangs~.help{margin-left:calc(var(--rangs-k) + var(--pas-3))}
 .delay-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 /* Le délai tient sur DEUX lignes stables : les raccourcis et le réglage du
    barème sur la première, l'avis de supplément sur la seconde. Tout mettre sur
    une seule ligne la ferait déborder (385 + 420 + 150 px pour 910 disponibles),
    et une rangée qui se replie change de hauteur selon la longueur du texte. */
-.delai-rangee{display:flex;align-items:center;gap:var(--pas-3);flex-wrap:wrap;margin-top:var(--pas-2)}
-.delai-rangee .delay-quick{margin-top:0}
+/* `.delai-rangee` est partie avec le barème (02/09) : elle mettait les trois
+   raccourcis et le réglage du barème sur une ligne, et le barème a quitté cet
+   écran le 27/08. Il ne restait qu'un conteneur à un seul enfant. */
 .delai-etat{margin-top:var(--pas-2)}
+/* ⚠ `flex: 0 0 auto` DEPUIS LE 02/09. La pastille était en `flex: 1 1 auto`
+   pour remplir la cellule de 430 px où elle vivait ; sous la feuille de calcul
+   elle dispose de toute la largeur, et les trois sortaient à 385 px chacune —
+   trois boutons géants pour trois mots. Une pastille prend la place de son
+   texte. */
 .delay-chip{
-  flex:1 1 auto;padding:var(--champ-y-serre) var(--champ-x);
+  flex:0 0 auto;padding:var(--champ-y-serre) var(--champ-x);
   border:1.5px solid var(--border)!important;border-radius:999px!important;
   background:var(--surface);color:var(--text-1);font-weight:var(--graisse-forte)
 }

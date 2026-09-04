@@ -304,9 +304,9 @@ function carte(icone, titre, cle) {
 // Il garde `.fa-lab` et `.fa-in` — l'intitulé et la boîte de l'application. Ce
 // qui change, c'est la mise en place, pas les composants.
 function rang(nom, noeud) {
-  const c = el('div', 'dvf-rang');
-  const lab = el('label', 'fa-lab dvf-rang__k', nom);
-  const boite = el('div', 'dvf-rang__v');
+  const c = el('div', 'rang');
+  const lab = el('label', 'rang__k', nom);
+  const boite = el('div', 'rang__v');
   boite.append(noeud);
   if (noeud.id) lab.setAttribute('for', noeud.id);
   c.append(lab, boite);
@@ -316,7 +316,7 @@ function rang(nom, noeud) {
 // UNE COLONNE DE RANGÉES. Les traits de séparation viennent de la grille, pas
 // de chaque rangée : une bordure écrite par rangée en pose une de trop en bas.
 function feuille(...rangs) {
-  const g = el('div', 'dvf-grille');
+  const g = el('div', 'rangs');
   g.append(...rangs);
   return g;
 }
@@ -842,12 +842,12 @@ function carteArticles() {
   // qui dit DE QUOI on parle : sans elle sous les yeux, un prix corrigé à
   // droite se corrige sur la ligne d'à côté. Elle se fige donc à gauche —
   // exactement ce que fait une feuille de calcul avec sa première colonne.
-  const tab = el('div', 'dvf-tab');
-  const tete = el('div', 'dvf-tab__tete');
+  const tab = el('div', 'lignes');
+  const tete = el('div', 'lignes__tete');
   tete.id = 'dvf-tab-tete';
   for (const nom of COLONNES) tete.append(el('span', 'fa-lab', nom));
   tab.append(tete);
-  const liste = el('div', 'dvf-liste');
+  const liste = el('div', 'lignes__corps');
   liste.id = 'dvf-liste';
   tab.append(liste);
   corps.append(tab);
@@ -1386,7 +1386,7 @@ function ajouterLigne(modele) {
   });
   const hote = $('#dvf-liste');
   if (hote) {
-    const vide = hote.querySelector('.dvf-vide');
+    const vide = hote.querySelector('.lignes__vide');
     if (vide) vide.remove();
     hote.append(rangeeArticle(saisie.lignes[saisie.lignes.length - 1]));
   }
@@ -1415,7 +1415,7 @@ function poserLignes() {
   hote.replaceChildren();
   majTeteTableau();
   if (!saisie.lignes.length) {
-    hote.append(el('div', 'dvf-vide', 'Aucun article. Pioche dans le catalogue, ou ajoute une ligne libre.'));
+    hote.append(el('div', 'lignes__vide', 'Aucun article. Pioche dans le catalogue, ou ajoute une ligne libre.'));
     return;
   }
   for (const l of saisie.lignes) hote.append(rangeeArticle(l));
@@ -1427,7 +1427,7 @@ function poserLignes() {
 // suivante partirait dans le vide.
 function rangeeArticle(ligne) {
   const n = Math.random().toString(36).slice(2, 8);
-  const bloc = el('div', 'dvf-art');
+  const bloc = el('div', 'lignes__art');
   // LA LIGNE PEUT DEVENIR UN TEXTILE APRÈS SA CONSTRUCTION — c'est le cas
   // normal : on ajoute une ligne, PUIS on cherche son produit. Ce drapeau ne
   // dit donc que l'état de DÉPART, celui d'un brouillon relu ; partout ailleurs
@@ -1437,7 +1437,7 @@ function rangeeArticle(ligne) {
 
   // LA RANGÉE DU TABLEAU. Ses cases suivent `COLONNES` dans l'ordre, sans
   // intitulé : l'en-tête les nomme une fois pour toutes les lignes.
-  const rangee = el('div', 'dvf-tab__rang');
+  const rangee = el('div', 'lignes__rang');
   bloc.append(rangee);
 
   const design = entree(`dvf-a-${n}-d`, {
@@ -1483,12 +1483,12 @@ function rangeeArticle(ligne) {
   // zéro mètre de DTF, et la ligne sortirait au prix du vêtement nu.
   const marq = entree(`dvf-a-${n}-m`, { valeur: ligne.marquage, exemple: 'Cœur + dos' });
   marq.id = `dvf-a-${n}-m`;
-  const qte = entree(`dvf-a-${n}-q`, { type: 'number', valeur: ligne.quantite, classe: 'dvf-nb' });
+  const qte = entree(`dvf-a-${n}-q`, { type: 'number', valeur: ligne.quantite, classe: 'nb' });
   // LE PRIX SE TAPE, OU IL SE CHIFFRE — et tant qu'il n'existe ni l'un ni
   // l'autre, la case reste VIDE et le dit. Un « 0 » affiché est un prix : il
   // laisse partir un devis à zéro euro sans que personne ne le remarque.
   const pu = entree(`dvf-a-${n}-p`, {
-    type: 'number', valeur: ligne.unitaireHt == null ? '' : ligne.unitaireHt, classe: 'dvf-nb',
+    type: 'number', valeur: ligne.unitaireHt == null ? '' : ligne.unitaireHt, classe: 'nb',
   });
   pu.step = '0.01';
   pu.placeholder = SANS_PRIX;
@@ -1505,13 +1505,13 @@ function rangeeArticle(ligne) {
   const puTtc = entree(`dvf-a-${n}-ptc`, {
     type: 'number',
     valeur: ligne.unitaireHt == null ? '' : Math.round(ligne.unitaireHt * (1 + tauxEffectif()) * 100) / 100,
-    classe: 'dvf-nb',
+    classe: 'nb',
   });
   puTtc.step = '0.01';
   puTtc.placeholder = SANS_PRIX;
   // LE TOTAL DE LA LIGNE EST UNE CASE, PAS UN CHAMP : il ne se tape pas, il se
   // lit. Il prend le rail des cases pour tomber sur elles.
-  const total = el('div', 'dvf-tab__lu dvf-nb');
+  const total = el('div', 'lignes__lu nb');
   const sup = el('button', 'reg-tarif-del');
   sup.type = 'button';
   sup.setAttribute('aria-label', 'Retirer cet article');
@@ -1549,7 +1549,7 @@ function rangeeArticle(ligne) {
   // tailles de logo, qui les déclare par FAMILLE : c'est la même source que la
   // fiche de l'atelier et que le ticket.
   const faces = entree(`dvf-a-${n}-f`, { valeur: ligne.faces, exemple: 'Coeur, Dos…' });
-  const remise = entree(`dvf-a-${n}-rm`, { type: 'number', valeur: ligne.remise || '', classe: 'dvf-nb' });
+  const remise = entree(`dvf-a-${n}-rm`, { type: 'number', valeur: ligne.remise || '', classe: 'nb' });
   remise.max = '100';
   remise.placeholder = '0';
 
@@ -1593,7 +1593,7 @@ function rangeeArticle(ligne) {
   libre.hidden = !ligne.libre;
   const lRef = entree(`dvf-a-${n}-lr`, { valeur: ligne.libre ? ligne.libre.ref : '', exemple: 'SWEAT-XL' });
   const lAchat = entree(`dvf-a-${n}-la`, {
-    type: 'number', valeur: ligne.libre ? ligne.libre.achat : '', classe: 'dvf-nb',
+    type: 'number', valeur: ligne.libre ? ligne.libre.achat : '', classe: 'nb',
   });
   lAchat.step = '0.01';
   lAchat.placeholder = '12.50';
@@ -1625,7 +1625,7 @@ function rangeeArticle(ligne) {
   for (const t of TAILLES) {
     const boite = el('div', 'fa-taille');
     const c = entree(`dvf-a-${n}-t-${t}`, {
-      type: 'number', valeur: Number(ligne.parTaille && ligne.parTaille[t]) || '', classe: 'dvf-nb',
+      type: 'number', valeur: Number(ligne.parTaille && ligne.parTaille[t]) || '', classe: 'nb',
     });
     c.placeholder = '0';
     boite.append(el('label', 'fa-lab fa-taille__k', t), c);
@@ -1650,7 +1650,7 @@ function rangeeArticle(ligne) {
     (ligne.taillesLibres || []).forEach((tl, i) => {
       const bulle = el('div', 'dvf-taille-libre');
       const champNom = entree(`dvf-a-${n}-tl-${i}-nom`, { valeur: tl.nom, exemple: '4XL' });
-      const champQte = entree(`dvf-a-${n}-tl-${i}-qte`, { type: 'number', valeur: tl.qte || '', classe: 'dvf-nb' });
+      const champQte = entree(`dvf-a-${n}-tl-${i}-qte`, { type: 'number', valeur: tl.qte || '', classe: 'nb' });
       champQte.placeholder = '0';
       const retirer = el('button', 'reg-tarif-del');
       retirer.type = 'button';
@@ -1722,7 +1722,7 @@ function rangeeArticle(ligne) {
   const rafraichirQte = () => {
     const somme = totalTailles(ligne.parTaille, ligne.taillesLibres);
     qte.readOnly = somme > 0;
-    qte.classList.toggle('dvf-tab__calc', somme > 0);
+    qte.classList.toggle('lignes__calc', somme > 0);
     if (somme > 0) {
       ligne.quantite = somme;
       if (document.activeElement !== qte) qte.value = String(somme);
@@ -1755,7 +1755,7 @@ function rangeeArticle(ligne) {
     total.textContent = sansPrix
       ? SANS_PRIX
       : euro((Number(ligne.quantite) || 0) * (Number(ligne.unitaireHt) || 0));
-    total.classList.toggle('dvf-tab__vide', sansPrix);
+    total.classList.toggle('lignes__attente', sansPrix);
     reprendre.hidden = !((ligne.textile || ligne.tasse) && ligne.puManuel);
   };
   // LE PRIX QUE LE MOTEUR VIENT DE POSER REDESCEND DANS LE CHAMP. C'est la
@@ -2028,7 +2028,7 @@ function carteArgent() {
   // (positif) sur l'ensemble, en euros ou en pourcentage du sous-total HT.
   const ajustementUnite = menu('dvf-ajustement-unite', AJUSTEMENT_UNITES, saisie.ajustement.unite);
   const ajustementValeur = entree('dvf-ajustement-valeur', {
-    type: 'number', valeur: saisie.ajustement.valeur || '', classe: 'dvf-nb',
+    type: 'number', valeur: saisie.ajustement.valeur || '', classe: 'nb',
   });
   ajustementValeur.removeAttribute('min');
   ajustementValeur.step = '0.01';
@@ -2044,7 +2044,7 @@ function carteArgent() {
     rang('Mode de règlement', mode),
   ));
 
-  const totaux = el('div', 'dvf-totaux');
+  const totaux = el('div', 'totaux');
   totaux.id = 'dvf-totaux';
   corps.append(totaux);
 
@@ -2098,11 +2098,11 @@ function peindre() {
     }
     totaux.replaceChildren();
     for (const [k, v] of lignes) {
-      const l = el('div', 'dvf-tot');
+      const l = el('div', 'tot');
       l.append(el('span', null, k), el('b', null, euro(v)));
       totaux.append(l);
     }
-    const grand = el('div', 'dvf-tot dvf-tot--grand');
+    const grand = el('div', 'tot tot--grand');
     grand.append(el('span', null, compte.vedette === 'ht' ? 'TOTAL HT' : 'TOTAL À PAYER'),
       el('b', null, euro(compte.vedette === 'ht' ? compte.totalHt : compte.ttc)));
     totaux.append(grand);
